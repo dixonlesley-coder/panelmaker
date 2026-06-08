@@ -3,6 +3,38 @@
 import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
+import type { PhaseAssignment } from './electrical';
+
+/** Protective-earth + neutral conductor sizing and cable make-up for a circuit. */
+export interface GroundingResult {
+  peCsaMm2: number;
+  neutralCsaMm2: number;
+  /** Total cores (live + neutral + PE). */
+  cores: number;
+  /** Human-readable cable make-up, e.g. "NYY 4×16 mm² (+ 16 mm² PE)". */
+  cableSpec: string;
+}
+
+/** Per-phase loading (line currents, A) and the resulting imbalance. */
+export interface PhaseBalanceResult {
+  L1: number;
+  L2: number;
+  L3: number;
+  imbalancePct: number;
+}
+
+/** Project supply arrangement: direct LV, or MV with a step-down transformer. */
+export interface SupplyResult {
+  type: 'LV' | 'MV';
+  voltageV: number;
+  demandKva: number;
+  note: string;
+  mvVoltageV?: number;
+  transformerKva?: number;
+  transformerImpedancePct?: number;
+  transformerPrimaryA?: number;
+  transformerSecondaryA?: number;
+}
 
 export interface BreakerResult {
   ratingA: number;
@@ -29,9 +61,12 @@ export interface CircuitResult {
   circuitId: string;
   name: string;
   designCurrentA: number;
+  /** 1-phase circuits report their assigned phase; 3-phase report '3ph'. */
+  phase: PhaseAssignment;
   breaker: BreakerResult;
   cable: CableResult;
   voltageDrop: VoltageDropResult;
+  grounding: GroundingResult;
   control?: ControlAssembly;
 }
 
@@ -98,6 +133,7 @@ export interface PanelResult {
   enclosure: EnclosureResult;
   totalConnectedLoadW: number;
   totalDemandCurrentA: number;
+  phaseBalance: PhaseBalanceResult;
   warnings: Warning[];
   standardsVersion: string;
 }
@@ -107,6 +143,7 @@ export interface SystemResult {
   panels: Record<string, PanelResult>;
   /** Panel ids in upstream (root-first) order. */
   order: string[];
+  supply: SupplyResult;
   totals: {
     connectedLoadW: number;
     panelCount: number;

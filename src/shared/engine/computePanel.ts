@@ -1,6 +1,8 @@
 import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
+import { LOAD_DEFAULTS } from '../standards/loads';
 import type { CircuitInput, PanelInput } from '../types/project';
+import type { SystemType } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
@@ -11,6 +13,8 @@ import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
 import { sizeCable } from './cableSizing';
+import { balancePhases, circuitIsThreePhase } from './phase';
+import { sizeGrounding } from './grounding';
 import { round } from './util';
 import { voltageDrop } from './voltageDrop';
 import { circuitWarnings, validateInterlocks } from './warnings';
@@ -34,6 +38,7 @@ interface CircuitComputation {
   heatW: number;
   floorGear: boolean;
   effectiveLoadW: number;
+  threePhase: boolean;
 }
 
 function computeCircuit(
@@ -43,14 +48,32 @@ function computeCircuit(
   opts: ComputePanelOptions,
 ): CircuitComputation {
   const loadW = effectiveLoadW(c, opts);
-  const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
+  const def = LOAD_DEFAULTS[c.loadKind];
+  const isFeeder = c.loadKind === 'feeder' || c.feedsPanelId !== undefined;
+
+  const threePhase = circuitIsThreePhase({
+    panelSystem: panel.system,
+    kind: c.loadKind,
+    loadW,
+    motorKw: c.motorKw,
+    hasStarter: Boolean(c.starterType),
+    isFeeder,
+  });
+  const isMotor =
+    (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined && threePhase;
+
+  // Single-phase circuits on a three-phase panel run at the phase voltage (~230 V).
+  const phaseVoltage = panel.system === '3ph' ? round(panel.voltageV / Math.sqrt(3), 0) : panel.voltageV;
+  const circuitSystem: SystemType = threePhase ? '3ph' : '1ph';
+  const useVoltage = threePhase ? panel.voltageV : phaseVoltage;
+
   const ib = isMotor
     ? motorFLC(c.motorKw!, panel.voltageV)
-    : loadCurrent({ powerW: loadW, voltageV: panel.voltageV, cosPhi: c.cosPhi, system: panel.system });
+    : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
   const designCurrentA = round(ib, 1);
 
   const breaker = selectBreaker({ designCurrentA: ib, loadKind: c.loadKind });
-  const isTrunk = c.role === 'incomer' || c.loadKind === 'feeder' || c.feedsPanelId !== undefined;
+  const isTrunk = c.role === 'incomer' || isFeeder;
   const baseMinSection = isTrunk ? 4 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const cable = sizeCable({
@@ -64,12 +87,19 @@ function computeCircuit(
     lengthM: c.lengthM,
     csaMm2: cable.csaMm2,
     cosPhi: c.cosPhi,
-    system: panel.system,
-    voltageV: panel.voltageV,
+    system: circuitSystem,
+    voltageV: useVoltage,
     isLighting: c.isLighting,
   });
+  const grounding = sizeGrounding({
+    phaseCsaMm2: cable.csaMm2,
+    panelSystem: panel.system,
+    threePhase,
+    // three-phase motor-like loads typically have no neutral (4-core + PE)
+    hasNeutral: threePhase ? !def.motorLike : true,
+  });
 
-  let modules = panel.system === '3ph' ? 3 : 1; // branch breaker poles
+  let modules = threePhase ? 3 : 1; // branch breaker poles
   let heatW = 0;
   let floorGear = false;
   const warnings: Warning[] = [];
@@ -98,19 +128,29 @@ function computeCircuit(
     circuitId: c.id,
     name: c.name,
     designCurrentA,
+    phase: threePhase ? '3ph' : 'L1', // single-phase assignment finalised after balancing
     breaker,
     cable,
     voltageDrop: vd,
+    grounding,
     control,
   };
   warnings.push(
     ...circuitWarnings(result, { deratingFactor: df, minSectionMm2: minSection, panelId: panel.id }),
   );
 
-  return { result, warnings, modules: Math.ceil(modules), heatW: round(heatW, 1), floorGear, effectiveLoadW: loadW };
+  return {
+    result,
+    warnings,
+    modules: Math.ceil(modules),
+    heatW: round(heatW, 1),
+    floorGear,
+    effectiveLoadW: loadW,
+    threePhase,
+  };
 }
 
-/** Compute all sizing, control, enclosure, busbar and warnings for one panel. */
+/** Compute all sizing, control, phase balance, enclosure, busbar and warnings for one panel. */
 export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}): PanelResult {
   const df = deratingFactor({
     ambientC: panel.ambientTempC,
@@ -119,21 +159,45 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   });
 
   const branches = panel.circuits.filter((c) => c.role === 'branch');
+  const comps = branches.map((c) => computeCircuit(c, panel, df, opts));
+
+  // distribute single-phase circuits across phases and report imbalance
+  const balance = balancePhases(
+    comps.map((cm) => ({
+      id: cm.result.circuitId,
+      threePhase: cm.threePhase,
+      currentA: cm.result.designCurrentA,
+    })),
+    panel.system,
+  );
+  for (const cm of comps) {
+    cm.result.phase = balance.assignment[cm.result.circuitId] ?? cm.result.phase;
+  }
+
   const warnings: Warning[] = [];
   let totalConnectedLoadW = 0;
   let totalModules = panel.system === '3ph' ? 4 : 2; // incomer breaker
   let totalHeatW = 0;
   let hasFloorGear = false;
 
-  const circuits: CircuitResult[] = branches.map((c) => {
-    const comp = computeCircuit(c, panel, df, opts);
-    totalConnectedLoadW += comp.effectiveLoadW;
-    totalModules += comp.modules;
-    totalHeatW += comp.heatW;
-    if (comp.floorGear) hasFloorGear = true;
-    warnings.push(...comp.warnings);
-    return comp.result;
-  });
+  for (const cm of comps) {
+    totalConnectedLoadW += cm.effectiveLoadW;
+    totalModules += cm.modules;
+    totalHeatW += cm.heatW;
+    if (cm.floorGear) hasFloorGear = true;
+    warnings.push(...cm.warnings);
+  }
+
+  const circuits = comps.map((cm) => cm.result);
+
+  if (panel.system === '3ph' && balance.imbalancePct > 15) {
+    warnings.push({
+      code: 'phase-imbalance',
+      severity: 'warning',
+      message: `Phase loading is unbalanced by ${balance.imbalancePct}% (L1 ${balance.L1} A, L2 ${balance.L2} A, L3 ${balance.L3} A). Redistribute single-phase circuits.`,
+      panelId: panel.id,
+    });
+  }
 
   const totalDemandCurrentA = round(
     circuits.reduce((s, c) => s + c.designCurrentA, 0),
@@ -150,6 +214,12 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     enclosure,
     totalConnectedLoadW: round(totalConnectedLoadW, 0),
     totalDemandCurrentA,
+    phaseBalance: {
+      L1: balance.L1,
+      L2: balance.L2,
+      L3: balance.L3,
+      imbalancePct: balance.imbalancePct,
+    },
     warnings,
     standardsVersion: STANDARDS_VERSION,
   };

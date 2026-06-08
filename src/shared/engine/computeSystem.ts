@@ -1,6 +1,7 @@
 import type { ProjectInput } from '../types/project';
 import type { PanelResult, SystemResult, Warning } from '../types/results';
 import { computePanel } from './computePanel';
+import { determineSupply } from './transformer';
 
 /**
  * Compute a whole project (building) by walking the panel feeder tree
@@ -78,10 +79,18 @@ export function computeSystem(project: ProjectInput): SystemResult {
 
   const connectedLoadW = Object.values(results).reduce((s, r) => s + r.totalConnectedLoadW, 0);
 
+  // Determine the supply (LV direct vs MV + transformer) from the diversified
+  // demand presented by the root panel(s). kVA = kW / power-factor.
+  const BUILDING_PF = 0.85;
+  const rootDemandW = roots.reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
+  const lvVoltageV = roots[0]?.voltageV ?? 400;
+  const supply = determineSupply(rootDemandW / 1000 / BUILDING_PF, lvVoltageV);
+
   return {
     projectId: project.id,
     panels: results,
     order: [...postOrder].reverse(), // root-first
+    supply,
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
     warnings,
   };

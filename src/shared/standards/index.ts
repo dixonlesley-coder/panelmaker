@@ -2,4 +2,7 @@ export * from './version';
 export * from './conductors';
 export * from './protection';
 export * from './enclosure';
+export * from './loads';
+export * from './transformer';
+export * from './grounding';
 export * from './control';

@@ -1,9 +1,5 @@
-import {
-  STANDARD_BREAKER_RATINGS_A,
-  breakerClassFor,
-  recommendedCurve,
-  type BreakerCurve,
-} from '../standards/protection';
+import { STANDARD_BREAKER_RATINGS_A, breakerClassFor, type BreakerCurve } from '../standards/protection';
+import { LOAD_DEFAULTS } from '../standards/loads';
 import type { LoadKind } from '../types/electrical';
 import type { BreakerResult } from '../types/results';
 
@@ -20,9 +16,7 @@ export function selectBreaker({
   loadKind,
   maxRatingA,
 }: BreakerSelectInput): BreakerResult {
-  const curveKind =
-    loadKind === 'lighting' ? 'lighting' : loadKind === 'motor' || loadKind === 'pump' ? 'motor' : 'general';
-  const curve: BreakerCurve = recommendedCurve(curveKind);
+  const curve: BreakerCurve = LOAD_DEFAULTS[loadKind].curve;
 
   let chosen = STANDARD_BREAKER_RATINGS_A.find((r) => r >= designCurrentA);
   if (chosen === undefined) chosen = STANDARD_BREAKER_RATINGS_A[STANDARD_BREAKER_RATINGS_A.length - 1]!;

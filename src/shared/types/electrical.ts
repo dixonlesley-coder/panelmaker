@@ -4,7 +4,25 @@ export type SystemType = '1ph' | '3ph';
 
 export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF';
 
-export type LoadKind = 'general' | 'lighting' | 'motor' | 'pump' | 'feeder';
+export type LoadKind =
+  | 'general'
+  | 'lighting'
+  | 'socket'
+  | 'heating'
+  | 'hvac'
+  | 'motor'
+  | 'pump'
+  | 'ev_charger'
+  | 'welding'
+  | 'capacitor'
+  | 'ups'
+  | 'feeder';
+
+/** Which phase(s) a circuit is connected to. */
+export type PhaseAssignment = 'L1' | 'L2' | 'L3' | '3ph';
+
+/** Earthing (grounding) system arrangement. */
+export type EarthingSystem = 'TN-S' | 'TN-C-S' | 'TT';
 
 export type InstallMethod = 'conduit' | 'trunking' | 'wall' | 'air' | 'tray' | 'buried';
 
