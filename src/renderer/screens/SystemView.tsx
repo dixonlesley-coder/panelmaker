@@ -9,7 +9,14 @@ import {
 } from '@xyflow/react';
 import { Badge, Box, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconBolt, IconCash, IconDeviceFloppy, IconDownload, IconStack2 } from '@tabler/icons-react';
+import {
+  IconBolt,
+  IconCash,
+  IconDeviceFloppy,
+  IconDownload,
+  IconSolarPanel,
+  IconStack2,
+} from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
 import type { PanelInput, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
@@ -217,6 +224,33 @@ export function SystemView() {
           {sup.note}
         </Text>
       </Card>
+
+      {system.sources && (
+        <Card withBorder radius="md" padding="md">
+          <Group gap="xs" mb="xs">
+            <ThemeIcon variant="light" color="green">
+              <IconSolarPanel size={16} />
+            </ThemeIcon>
+            <Text fw={600} size="sm">
+              Energy sources
+            </Text>
+          </Group>
+          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+            {system.sources.generator && (
+              <KeyStat k="Generator" v={`${system.sources.generator.ratingKva} kVA`} />
+            )}
+            {system.sources.solar && (
+              <KeyStat
+                k="Solar PV"
+                v={`${system.sources.solar.arrayKwp} kWp · ${system.sources.solar.inverterKw} kW`}
+              />
+            )}
+            {system.sources.battery && (
+              <KeyStat k="Battery" v={`${system.sources.battery.installedKwh} kWh`} />
+            )}
+          </SimpleGrid>
+        </Card>
+      )}
 
       <Card withBorder radius="md" padding="xs">
         <Group justify="space-between" px="xs" py={4}>

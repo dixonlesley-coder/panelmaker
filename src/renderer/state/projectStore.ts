@@ -9,13 +9,14 @@ import type {
   SchematicRung,
   SchematicSymbol,
   SchematicSymbolType,
+  SourcesConfig,
   SuggestedFix,
 } from '@shared/types';
 import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 
-export type Screen = 'system' | 'panel' | 'parts' | 'pricelist' | 'settings';
+export type Screen = 'system' | 'panel' | 'parts' | 'pricelist' | 'sources' | 'settings';
 
 /** A monotonic id generator for circuits/panels created at runtime. */
 let runtimeSeq = 0;
@@ -53,6 +54,10 @@ export interface ProjectState {
   // pricing
   /** Merge imported unit prices (partId -> price) into the active price map. */
   mergePrices: (prices: Record<string, number>) => void;
+
+  // energy sources
+  /** Merge a partial energy-sources config into the project. */
+  updateSources: (patch: Partial<SourcesConfig>) => void;
 
   // control schematics
   /** Build the schematic from the assembly the first time it is requested. */
@@ -200,6 +205,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
 
   mergePrices: (prices) => set((s) => ({ prices: { ...s.prices, ...prices } })),
+
+  updateSources: (patch) =>
+    set((s) => ({ project: { ...s.project, sources: { ...s.project.sources, ...patch } } })),
 
   ensureSchematic: (circuitId, assembly) =>
     set((s) => {
