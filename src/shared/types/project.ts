@@ -30,6 +30,9 @@ export interface CircuitInput {
   controlMode?: PumpControlMode;
   sensing?: LevelSensing;
 
+  /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
+  cableOverrideMm2?: number;
+
   /** If set, this branch feeds another panel (its load = that panel's demand). */
   feedsPanelId?: string;
 }

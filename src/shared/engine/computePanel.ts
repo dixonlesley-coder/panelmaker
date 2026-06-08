@@ -51,7 +51,8 @@ function computeCircuit(
 
   const breaker = selectBreaker({ designCurrentA: ib, loadKind: c.loadKind });
   const isTrunk = c.role === 'incomer' || c.loadKind === 'feeder' || c.feedsPanelId !== undefined;
-  const minSection = isTrunk ? 4 : 2.5;
+  const baseMinSection = isTrunk ? 4 : 2.5;
+  const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const cable = sizeCable({
     designCurrentA: ib,
     breakerRatingA: breaker.ratingA,

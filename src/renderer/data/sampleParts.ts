@@ -1,0 +1,108 @@
+import type { Part } from '@shared/types';
+
+/** A small seed catalog illustrating the parts database (prices in IDR). */
+export const SAMPLE_PARTS: Part[] = [
+  {
+    id: 'mcb-c16',
+    category: 'breaker',
+    manufacturer: 'Schneider',
+    model: 'iC60N C16',
+    attributes: { ratingA: 16, poles: 1, curve: 'C', breakingKa: 6 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'mcb-c32',
+    category: 'breaker',
+    manufacturer: 'Schneider',
+    model: 'iC60N C32',
+    attributes: { ratingA: 32, poles: 3, curve: 'C', breakingKa: 6 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'mccb-160',
+    category: 'breaker',
+    manufacturer: 'ABB',
+    model: 'XT3N 160',
+    attributes: { ratingA: 160, poles: 3, breakingKa: 36 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'cable-nyy-4x16',
+    category: 'cable',
+    manufacturer: 'Supreme',
+    model: 'NYY 4x16mm²',
+    attributes: { type: 'NYY', cores: 4, csaMm2: 16 },
+    defaultUnit: 'm',
+  },
+  {
+    id: 'cable-nym-3x2.5',
+    category: 'cable',
+    manufacturer: 'Supreme',
+    model: 'NYM 3x2.5mm²',
+    attributes: { type: 'NYM', cores: 3, csaMm2: 2.5 },
+    defaultUnit: 'm',
+  },
+  {
+    id: 'contactor-40',
+    category: 'contactor',
+    manufacturer: 'Schneider',
+    model: 'LC1D40A',
+    attributes: { utilizationCategory: 'AC-3', ac3AmpRating: 40, ratedKwAt400V: 18.5, coilVoltage: '230VAC', heatLossW: 4.5, widthMm: 45 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'contactor-115',
+    category: 'contactor',
+    manufacturer: 'Schneider',
+    model: 'LC1D115',
+    attributes: { utilizationCategory: 'AC-3', ac3AmpRating: 115, ratedKwAt400V: 55, coilVoltage: '230VAC', heatLossW: 11, widthMm: 55 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'ol-relay-63',
+    category: 'overload_relay',
+    manufacturer: 'Schneider',
+    model: 'LRD3363',
+    attributes: { adjustMinA: 63, adjustMaxA: 80, tripClass: '10', resetMode: 'manual' },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'vfd-11kw',
+    category: 'vfd',
+    manufacturer: 'Danfoss',
+    model: 'FC280 11kW',
+    attributes: { ratedKw: 11, ratedA: 25, supplyV: 400, heatLossW: 330, widthMm: 90 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'level-relay-61f',
+    category: 'level_relay',
+    manufacturer: 'Omron',
+    model: '61F-G-AP',
+    attributes: { sensingType: 'electrode', electrodeCount: 3, supplyV: '230VAC', outputContacts: '2NO+2NC' },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'enclosure-wm',
+    category: 'enclosure',
+    manufacturer: 'Rittal',
+    model: 'AE 800x600x250',
+    attributes: { widthMm: 800, heightMm: 600, depthMm: 250, ip: 'IP55', material: 'steel' },
+    defaultUnit: 'pcs',
+  },
+];
+
+/** Sample unit prices (IDR) keyed by part id. */
+export const SAMPLE_PRICES: Record<string, number> = {
+  'mcb-c16': 185000,
+  'mcb-c32': 420000,
+  'mccb-160': 3250000,
+  'cable-nyy-4x16': 165000,
+  'cable-nym-3x2.5': 18500,
+  'contactor-40': 685000,
+  'contactor-115': 2150000,
+  'ol-relay-63': 1450000,
+  'vfd-11kw': 8900000,
+  'level-relay-61f': 520000,
+  'enclosure-wm': 2750000,
+};
