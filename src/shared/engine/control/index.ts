@@ -5,3 +5,5 @@ export * from './sizeControlTransformer';
 export * from './selectVFD';
 export * from './applyStarterTemplate';
 export * from './pumpControl';
+export * from './buildSchematic';
+export * from './mergeSchematic';
