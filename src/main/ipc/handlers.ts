@@ -7,10 +7,11 @@
  * surfaces as a rejected promise on the renderer side).
  */
 
-import { ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 import { z } from 'zod';
 import type { Part } from '@shared/types/parts';
 import type { ProjectInput } from '@shared/types/project';
+import type { ControlSchematic } from '@shared/types/schematic';
 import { IPC } from './channels';
 import {
   deleteProject,
@@ -20,6 +21,7 @@ import {
 } from '../repositories/projects.repo';
 import { listParts, upsertPart } from '../repositories/parts.repo';
 import { importPricelist } from '../repositories/pricelists.repo';
+import { saveSchematic, loadSchematic } from '../repositories/schematic.repo';
 import { computeProject } from '../services/calc.service';
 import { exportPanelPdf, exportSystemPdf } from '../services/export.service';
 
@@ -134,4 +136,24 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.exportSystemPdf, (_e, project: unknown, filePath: unknown) =>
     exportSystemPdf(asProject(project), z.string().min(1).parse(filePath)),
   );
+
+  ipcMain.handle(IPC.saveSchematic, (_e, schematic: unknown) =>
+    saveSchematic(schematic as ControlSchematic),
+  );
+
+  ipcMain.handle(IPC.loadSchematic, (_e, circuitId: unknown) =>
+    loadSchematic(idSchema.parse(circuitId)),
+  );
+
+  ipcMain.handle(IPC.chooseSavePath, async (e, defaultName: unknown) => {
+    const win = BrowserWindow.fromWebContents(e.sender) ?? undefined;
+    const opts = {
+      defaultPath: z.string().parse(defaultName),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    };
+    const res = win
+      ? await dialog.showSaveDialog(win, opts)
+      : await dialog.showSaveDialog(opts);
+    return res.canceled || !res.filePath ? null : res.filePath;
+  });
 }

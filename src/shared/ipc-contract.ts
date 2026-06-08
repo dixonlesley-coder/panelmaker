@@ -11,6 +11,7 @@
 import type { ProjectInput } from './types/project';
 import type { Part, PricelistItem } from './types/parts';
 import type { SystemResult } from './types/results';
+import type { ControlSchematic } from './types/schematic';
 
 /** A lightweight project summary for list views (avoids loading full graphs). */
 export interface ProjectSummary {
@@ -59,6 +60,9 @@ export const IPC = {
   importPricelist: 'pricelists:import',
   exportPanelPdf: 'export:panelPdf',
   exportSystemPdf: 'export:systemPdf',
+  saveSchematic: 'schematic:save',
+  loadSchematic: 'schematic:load',
+  chooseSavePath: 'dialog:saveAs',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -106,6 +110,14 @@ export interface Api {
 
   /** Render the whole-system PDF report and write it to `filePath`. */
   exportSystemPdf(project: ProjectInput, filePath: string): Promise<ExportResult>;
+
+  /** Persist a circuit's control/ladder schematic (manual edits included). */
+  saveSchematic(schematic: ControlSchematic): Promise<{ id: string }>;
+  /** Load a circuit's saved schematic, or `null` if none has been saved. */
+  loadSchematic(circuitId: string): Promise<ControlSchematic | null>;
+
+  /** Show a native "save as" dialog; returns the chosen path or `null` if cancelled. */
+  chooseSavePath(defaultName: string): Promise<string | null>;
 }
 
 /** Re-export of the priced item type for renderer convenience. */

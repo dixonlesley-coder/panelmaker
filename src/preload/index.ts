@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC, type Api } from '@shared/ipc-contract';
 import type { ProjectInput } from '@shared/types/project';
 import type { Part } from '@shared/types/parts';
+import type { ControlSchematic } from '@shared/types/schematic';
 import type { PricelistRowInput } from '@shared/ipc-contract';
 
 const api: Api = {
@@ -29,6 +30,10 @@ const api: Api = {
     ipcRenderer.invoke(IPC.exportPanelPdf, project, panelId, filePath),
   exportSystemPdf: (project: ProjectInput, filePath: string) =>
     ipcRenderer.invoke(IPC.exportSystemPdf, project, filePath),
+
+  saveSchematic: (schematic: ControlSchematic) => ipcRenderer.invoke(IPC.saveSchematic, schematic),
+  loadSchematic: (circuitId: string) => ipcRenderer.invoke(IPC.loadSchematic, circuitId),
+  chooseSavePath: (defaultName: string) => ipcRenderer.invoke(IPC.chooseSavePath, defaultName),
 };
 
 contextBridge.exposeInMainWorld('api', api);
