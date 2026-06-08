@@ -1,16 +1,11 @@
 import { ActionIcon, Button, Group, NumberInput, Select, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
+import { LOAD_KINDS, LOAD_DEFAULTS } from '@shared/standards';
 import { useProjectStore } from '@renderer/state/projectStore';
 
-/** Load-kind options for the editable Select. */
-const LOAD_KIND_OPTIONS: { value: LoadKind; label: string }[] = [
-  { value: 'general', label: 'General' },
-  { value: 'lighting', label: 'Lighting' },
-  { value: 'motor', label: 'Motor' },
-  { value: 'pump', label: 'Pump' },
-  { value: 'feeder', label: 'Feeder' },
-];
+/** Load-kind options for the editable Select (full catalog). */
+const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
 
 /** Starter-type options, shown only for motor/pump circuits. */
 const STARTER_OPTIONS: { value: StarterType; label: string }[] = [

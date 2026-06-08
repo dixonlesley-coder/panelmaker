@@ -7,8 +7,9 @@ import {
   ReactFlow,
   ReactFlowProvider,
 } from '@xyflow/react';
-import { Box, Card, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core';
-import { IconBolt, IconCash, IconStack2 } from '@tabler/icons-react';
+import { Badge, Box, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { IconBolt, IconCash, IconDeviceFloppy, IconDownload, IconStack2 } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
 import type { PanelInput, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
@@ -16,6 +17,7 @@ import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
 import { costSystem } from '@renderer/lib/bom';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { exportSystemPdf, saveProjectToDisk } from '@renderer/api';
 
 const NODE_W = 200;
 const NODE_H = 130;
@@ -124,14 +126,42 @@ export function SystemView() {
     setScreen('panel');
   };
 
+  const notify = (res: { ok: boolean; reason?: string; message: string }) =>
+    notifications.show({
+      message: res.message,
+      color: res.ok ? 'teal' : res.reason === 'web' ? 'blue' : 'red',
+    });
+
+  const sup = system.supply;
+
   return (
     <Stack gap="md">
-      <div>
-        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Building overview
-        </Text>
-        <Title order={3}>{project.name}</Title>
-      </div>
+      <Group justify="space-between" align="flex-end">
+        <div>
+          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+            Building overview
+          </Text>
+          <Title order={3}>{project.name}</Title>
+        </div>
+        <Group gap="xs">
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconDeviceFloppy size={14} />}
+            onClick={async () => notify(await saveProjectToDisk(project))}
+          >
+            Save
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconDownload size={14} />}
+            onClick={async () => notify(await exportSystemPdf(project))}
+          >
+            Export system PDF
+          </Button>
+        </Group>
+      </Group>
 
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
         <Stat
@@ -154,6 +184,39 @@ export function SystemView() {
           color="teal"
         />
       </SimpleGrid>
+
+      <Card withBorder radius="md" padding="md">
+        <Group justify="space-between" mb={sup.type === 'MV' ? 'xs' : 4}>
+          <Group gap="xs">
+            <ThemeIcon variant="light" color={sup.type === 'MV' ? 'orange' : 'teal'}>
+              <IconBolt size={16} />
+            </ThemeIcon>
+            <Text fw={600} size="sm">
+              Supply
+            </Text>
+            <Badge variant="light" color={sup.type === 'MV' ? 'orange' : 'teal'}>
+              {sup.type === 'MV' ? 'Medium voltage + transformer' : 'Low voltage (direct PLN)'}
+            </Badge>
+          </Group>
+          <Text size="sm" fw={600}>
+            {sup.demandKva} kVA demand
+          </Text>
+        </Group>
+        {sup.type === 'MV' && (
+          <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
+            <KeyStat k="Transformer" v={`${sup.transformerKva} kVA`} />
+            <KeyStat k="MV voltage" v={`${(sup.mvVoltageV ?? 0) / 1000} kV`} />
+            <KeyStat k="Impedance" v={`${sup.transformerImpedancePct}%`} />
+            <KeyStat
+              k="Primary / sec."
+              v={`${formatAmps(sup.transformerPrimaryA ?? 0)} / ${formatAmps(sup.transformerSecondaryA ?? 0)}`}
+            />
+          </SimpleGrid>
+        )}
+        <Text size="xs" c="dimmed">
+          {sup.note}
+        </Text>
+      </Card>
 
       <Card withBorder radius="md" padding="xs">
         <Group justify="space-between" px="xs" py={4}>
@@ -185,5 +248,19 @@ export function SystemView() {
         </Box>
       </Card>
     </Stack>
+  );
+}
+
+/** A compact key/value used in the supply/transformer card. */
+function KeyStat({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {k}
+      </Text>
+      <Text size="sm" fw={600}>
+        {v}
+      </Text>
+    </div>
   );
 }

@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import {
   Badge,
   Box,
+  Button,
   Card,
   Collapse,
   Divider,
   Group,
+  Progress,
   SimpleGrid,
   Stack,
   Table,
@@ -13,18 +15,28 @@ import {
   ThemeIcon,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import {
   IconBolt,
   IconChevronRight,
   IconCpu,
   IconCurrencyDollar,
+  IconDownload,
   IconTemperature,
 } from '@tabler/icons-react';
-import type { CircuitResult, PanelResult, Part } from '@shared/types';
+import type { CircuitResult, PanelResult, Part, PhaseAssignment } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
 import { costPanel } from '@renderer/lib/bom';
 import { formatAmps, formatIdr, formatKw, formatPercent } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { exportPanelPdf } from '@renderer/api';
+
+const PHASE_COLOR: Record<PhaseAssignment, string> = {
+  L1: 'red',
+  L2: 'yellow',
+  L3: 'blue',
+  '3ph': 'grape',
+};
 
 /** Color a voltage-drop cell green/red against its limit. */
 function vdColor(within: boolean): string {
@@ -126,6 +138,11 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
             </Text>
           </Group>
         </Table.Td>
+        <Table.Td>
+          <Badge size="sm" variant="light" color={PHASE_COLOR[circuit.phase]}>
+            {circuit.phase}
+          </Badge>
+        </Table.Td>
         <Table.Td>{formatAmps(circuit.designCurrentA)}</Table.Td>
         <Table.Td>
           <Badge variant="light" color="indigo" size="sm">
@@ -138,6 +155,9 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
             {' '}
             (Iz {formatAmps(circuit.cable.deratedIzA)})
           </Text>
+          <Text c="dimmed" fz="xs">
+            {circuit.grounding.cores}-core · PE {circuit.grounding.peCsaMm2} mm²
+          </Text>
         </Table.Td>
         <Table.Td>
           <Text c={vdColor(vd.withinLimit)} fw={vd.withinLimit ? 400 : 700} size="sm">
@@ -147,7 +167,7 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
       </Table.Tr>
       {hasControl && (
         <Table.Tr>
-          <Table.Td colSpan={5} p={0} style={{ border: open ? undefined : 'none' }}>
+          <Table.Td colSpan={6} p={0} style={{ border: open ? undefined : 'none' }}>
             <Collapse in={open}>
               <ControlDetail circuit={circuit} />
             </Collapse>
@@ -162,6 +182,7 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
 export function ResultsPanel({ result }: { result: PanelResult }) {
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
+  const project = useProjectStore((s) => s.project);
 
   const cost = useMemo(() => {
     const priceMap = new Map<string, number>(Object.entries(prices));
@@ -170,9 +191,26 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
 
   const enc = result.enclosure;
   const bus = result.busbar;
+  const pb = result.phaseBalance;
+  const phaseMax = Math.max(pb.L1, pb.L2, pb.L3, 1);
+
+  async function onExportPdf() {
+    const res = await exportPanelPdf(project, result.panelId, result.name);
+    notifications.show({
+      message: res.message,
+      color: res.ok ? 'teal' : res.reason === 'web' ? 'blue' : 'red',
+    });
+  }
 
   return (
     <Stack gap="md">
+      <Group justify="space-between">
+        <Text fw={600}>Results</Text>
+        <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={onExportPdf}>
+          Export panel PDF
+        </Button>
+      </Group>
+
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="sm">
         <Stat
           label="Connected load"
@@ -211,10 +249,11 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Circuit</Table.Th>
-                <Table.Th w={110}>Design I</Table.Th>
-                <Table.Th w={160}>Breaker</Table.Th>
-                <Table.Th w={150}>Cable</Table.Th>
-                <Table.Th w={90}>Vdrop</Table.Th>
+                <Table.Th w={64}>Phase</Table.Th>
+                <Table.Th w={100}>Design I</Table.Th>
+                <Table.Th w={150}>Breaker</Table.Th>
+                <Table.Th w={170}>Cable / wiring</Table.Th>
+                <Table.Th w={80}>Vdrop</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -250,6 +289,38 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
           </Stack>
         </Card>
       </SimpleGrid>
+
+      <Card withBorder radius="md" padding="md">
+        <Group justify="space-between" mb="xs">
+          <Text fw={600} size="sm">
+            Phase balance
+          </Text>
+          {result.phaseBalance.L2 === 0 && result.phaseBalance.L3 === 0 ? (
+            <Badge variant="light" color="gray">
+              single-phase
+            </Badge>
+          ) : (
+            <Badge variant="light" color={pb.imbalancePct > 15 ? 'red' : 'teal'}>
+              {formatPercent(pb.imbalancePct)} imbalance
+            </Badge>
+          )}
+        </Group>
+        <SimpleGrid cols={3} spacing="md">
+          {(['L1', 'L2', 'L3'] as const).map((ph) => (
+            <div key={ph}>
+              <Group justify="space-between" mb={2}>
+                <Text size="xs" c="dimmed">
+                  {ph}
+                </Text>
+                <Text size="xs" fw={600}>
+                  {formatAmps(pb[ph])}
+                </Text>
+              </Group>
+              <Progress value={(pb[ph] / phaseMax) * 100} color={PHASE_COLOR[ph]} size="sm" />
+            </div>
+          ))}
+        </SimpleGrid>
+      </Card>
 
       <Divider label="Bill of materials" labelPosition="left" />
       <Card withBorder radius="md" padding="sm">
