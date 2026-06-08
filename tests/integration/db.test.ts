@@ -9,7 +9,13 @@ import {
   listProjects,
   deleteProject,
 } from '../../src/main/repositories/projects.repo';
+import {
+  saveSchematic,
+  loadSchematic,
+  deleteSchematic,
+} from '../../src/main/repositories/schematic.repo';
 import { createSampleProject } from '@renderer/data/sampleProject';
+import { applyStarterTemplate, buildSchematic } from '@shared/engine';
 
 /**
  * Runtime verification of the SQLite/Drizzle persistence layer using the
@@ -55,5 +61,35 @@ describe('SQLite persistence', () => {
     expect(listProjects().some((p) => p.id === project.id)).toBe(true);
     deleteProject(project.id);
     expect(loadProject(project.id)).toBeNull();
+  });
+
+  it('saves and reloads a control schematic for a real circuit', () => {
+    migrate();
+    const project = createSampleProject();
+    saveProject(project);
+
+    const mcc = project.panels.find((p) => p.name.includes('MCC'))!;
+    const starDelta = mcc.circuits.find((c) => c.starterType === 'STAR_DELTA')!;
+    const assembly = applyStarterTemplate({
+      circuitId: starDelta.id,
+      starterType: 'STAR_DELTA',
+      motorKw: starDelta.motorKw!,
+    });
+    const schematic = buildSchematic(assembly);
+    expect(schematic.rungs.length).toBeGreaterThan(0);
+
+    saveSchematic(schematic);
+    const loaded = loadSchematic(starDelta.id);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.rungs.length).toBe(schematic.rungs.length);
+    expect(loaded!.symbols.length).toBe(schematic.symbols.length);
+    // a coil symbol round-trips its device cross-reference
+    const coil = loaded!.symbols.find((s) => s.type === 'coil');
+    expect(coil?.deviceRef?.element).toBe('coil');
+
+    deleteSchematic(starDelta.id);
+    expect(loadSchematic(starDelta.id)).toBeNull();
+
+    deleteProject(project.id);
   });
 });
