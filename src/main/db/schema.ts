@@ -115,6 +115,9 @@ export const circuits = sqliteTable('circuits', {
   sensing: text('sensing'),
 
   cableOverrideMm2: real('cable_override_mm2'),
+  // Daily operating window (absent = continuous) for the load profile.
+  scheduleStartHour: integer('schedule_start_hour'),
+  scheduleEndHour: integer('schedule_end_hour'),
   /** If this branch feeds a sub-panel, its id. */
   feedsPanelId: text('feeds_panel_id'),
 

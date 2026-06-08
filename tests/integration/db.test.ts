@@ -57,6 +57,11 @@ describe('SQLite persistence', () => {
     const main = loaded!.panels.find((p) => p.sourceType === 'utility')!;
     expect(main.circuits.some((c) => c.feedsPanelId)).toBe(true);
 
+    // scheduled loads round-trip
+    const lpdb = loaded!.panels.find((p) => p.name.includes('LP-DB'))!;
+    const ev = lpdb.circuits.find((c) => c.loadKind === 'ev_charger')!;
+    expect(ev.schedule).toEqual({ startHour: 22, endHour: 6 });
+
     // appears in the project list, then deletes cleanly
     expect(listProjects().some((p) => p.id === project.id)).toBe(true);
     deleteProject(project.id);

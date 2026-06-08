@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS circuits (
   control_mode TEXT,
   sensing TEXT,
   cable_override_mm2 REAL,
+  schedule_start_hour INTEGER,
+  schedule_end_hour INTEGER,
   feeds_panel_id TEXT,
   chosen_cable_part_id TEXT REFERENCES parts(id) ON DELETE SET NULL,
   chosen_breaker_part_id TEXT REFERENCES parts(id) ON DELETE SET NULL,

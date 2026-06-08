@@ -1,11 +1,14 @@
 import { ActionIcon, Button, Group, NumberInput, Select, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
-import { LOAD_KINDS, LOAD_DEFAULTS } from '@shared/standards';
+import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor } from '@shared/standards';
 import { useProjectStore } from '@renderer/state/projectStore';
 
 /** Load-kind options for the editable Select (full catalog). */
 const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
+
+/** Daily-usage schedule presets. */
+const SCHEDULE_OPTIONS = SCHEDULE_PRESETS.map((p) => ({ value: p.key, label: p.label }));
 
 /** Starter-type options, shown only for motor/pump circuits. */
 const STARTER_OPTIONS: { value: StarterType; label: string }[] = [
@@ -117,6 +120,20 @@ function CircuitRow({ panelId, circuit }: RowProps) {
       </Table.Td>
 
       <Table.Td>
+        <Select
+          data={SCHEDULE_OPTIONS}
+          value={presetKeyFor(circuit.schedule)}
+          size="xs"
+          allowDeselect={false}
+          comboboxProps={{ withinPortal: true }}
+          onChange={(value) => {
+            const preset = SCHEDULE_PRESETS.find((p) => p.key === value);
+            patch({ schedule: preset?.schedule });
+          }}
+        />
+      </Table.Td>
+
+      <Table.Td>
         {motor ? (
           <Select
             data={STARTER_OPTIONS}
@@ -160,7 +177,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
 
   return (
     <div>
-      <Table.ScrollContainer minWidth={680}>
+      <Table.ScrollContainer minWidth={860}>
         <Table verticalSpacing="xs" highlightOnHover stickyHeader>
           <Table.Thead>
             <Table.Tr>
@@ -169,6 +186,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
               <Table.Th w={120}>Load</Table.Th>
               <Table.Th w={100}>Length</Table.Th>
               <Table.Th w={80}>pf</Table.Th>
+              <Table.Th w={170}>Usage</Table.Th>
               <Table.Th w={160}>Starter</Table.Th>
               <Table.Th w={44} />
             </Table.Tr>

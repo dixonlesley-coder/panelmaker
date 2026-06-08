@@ -39,10 +39,39 @@ export function createSampleProject(): ProjectInput {
     name: 'LP-DB (Lighting & Power)',
     sourceType: 'feeder',
     circuits: [
-      branch({ name: 'Lighting — Ground floor', loadW: 6000, loadKind: 'lighting', isLighting: true, lengthM: 35 }),
-      branch({ name: 'Socket outlets', loadW: 8000, lengthM: 30 }),
-      branch({ name: 'Air conditioning', loadW: 12000, lengthM: 20, cosPhi: 0.9 }),
-      branch({ name: 'Car-park lighting (long run)', loadW: 5000, loadKind: 'lighting', isLighting: true, lengthM: 180 }),
+      branch({
+        name: 'Lighting — Ground floor',
+        loadW: 6000,
+        loadKind: 'lighting',
+        isLighting: true,
+        lengthM: 35,
+        schedule: { startHour: 8, endHour: 18 },
+      }),
+      branch({ name: 'Socket outlets', loadW: 8000, lengthM: 30, schedule: { startHour: 8, endHour: 18 } }),
+      branch({
+        name: 'Air conditioning',
+        loadW: 12000,
+        loadKind: 'hvac',
+        lengthM: 20,
+        cosPhi: 0.9,
+        schedule: { startHour: 9, endHour: 17 },
+      }),
+      branch({
+        name: 'EV charging',
+        loadW: 11000,
+        loadKind: 'ev_charger',
+        cosPhi: 0.98,
+        lengthM: 25,
+        schedule: { startHour: 22, endHour: 6 },
+      }),
+      branch({
+        name: 'Car-park lighting (long run)',
+        loadW: 5000,
+        loadKind: 'lighting',
+        isLighting: true,
+        lengthM: 180,
+        schedule: { startHour: 17, endHour: 23 },
+      }),
     ],
   });
 

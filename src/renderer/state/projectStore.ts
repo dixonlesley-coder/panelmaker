@@ -16,7 +16,14 @@ import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 
-export type Screen = 'system' | 'panel' | 'parts' | 'pricelist' | 'sources' | 'settings';
+export type Screen =
+  | 'system'
+  | 'dashboard'
+  | 'panel'
+  | 'parts'
+  | 'pricelist'
+  | 'sources'
+  | 'settings';
 
 /** A monotonic id generator for circuits/panels created at runtime. */
 let runtimeSeq = 0;

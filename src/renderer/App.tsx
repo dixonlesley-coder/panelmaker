@@ -3,6 +3,7 @@ import {
   IconSun,
   IconMoon,
   IconSitemap,
+  IconGauge,
   IconAdjustmentsBolt,
   IconBox,
   IconReceipt,
@@ -13,6 +14,7 @@ import {
 
 import { useProjectStore, type Screen } from '@renderer/state/projectStore';
 import { SystemView } from '@renderer/screens/SystemView';
+import { Dashboard } from '@renderer/screens/Dashboard';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
@@ -27,6 +29,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { screen: 'system', label: 'System', icon: <IconSitemap size={18} /> },
+  { screen: 'dashboard', label: 'Dashboard', icon: <IconGauge size={18} /> },
   { screen: 'panel', label: 'Panel Editor', icon: <IconAdjustmentsBolt size={18} /> },
   { screen: 'parts', label: 'Parts Catalog', icon: <IconBox size={18} /> },
   { screen: 'pricelist', label: 'Pricelist', icon: <IconReceipt size={18} /> },
@@ -57,6 +60,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
   switch (screen) {
     case 'system':
       return <SystemView />;
+    case 'dashboard':
+      return <Dashboard />;
     case 'panel':
       return <PanelEditor />;
     case 'parts':
