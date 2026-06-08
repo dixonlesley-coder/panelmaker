@@ -1,0 +1,47 @@
+appId: com.panelmaker.app
+productName: PanelMaker
+copyright: Copyright © 2026 PanelMaker
+
+# Rebuild native modules (better-sqlite3) against the bundled Electron ABI.
+npmRebuild: true
+
+directories:
+  output: release
+  buildResources: build
+
+# electron-vite emits the compiled main/preload/renderer here.
+files:
+  - out/**/*
+  - package.json
+
+# Native module must stay unpacked so its .node binary is loadable from asar.
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+
+# Ship offline resources (fonts / seed data) alongside the app.
+extraResources:
+  - from: resources
+    to: resources
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-setup.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+
+linux:
+  category: Utility
+  target:
+    - AppImage
+    - deb

@@ -1,0 +1,42 @@
+/**
+ * Preload bridge. Runs in an isolated world with context isolation ON and
+ * exposes a typed, minimal `window.api` that forwards to the main process over
+ * `ipcRenderer.invoke`. No Node globals or `ipcRenderer` itself are leaked to
+ * the renderer — only the methods declared in the shared `Api` contract.
+ */
+
+import { contextBridge, ipcRenderer } from 'electron';
+import { IPC, type Api } from '@shared/ipc-contract';
+import type { ProjectInput } from '@shared/types/project';
+import type { Part } from '@shared/types/parts';
+import type { PricelistRowInput } from '@shared/ipc-contract';
+
+const api: Api = {
+  listProjects: () => ipcRenderer.invoke(IPC.listProjects),
+  loadProject: (id: string) => ipcRenderer.invoke(IPC.loadProject, id),
+  saveProject: (project: ProjectInput) => ipcRenderer.invoke(IPC.saveProject, project),
+  deleteProject: (id: string) => ipcRenderer.invoke(IPC.deleteProject, id),
+
+  computeProject: (project: ProjectInput) => ipcRenderer.invoke(IPC.computeProject, project),
+
+  listParts: () => ipcRenderer.invoke(IPC.listParts),
+  upsertPart: (part: Part) => ipcRenderer.invoke(IPC.upsertPart, part),
+
+  importPricelist: (name: string, rows: PricelistRowInput[], currency?: string) =>
+    ipcRenderer.invoke(IPC.importPricelist, name, rows, currency),
+
+  exportPanelPdf: (project: ProjectInput, panelId: string, filePath: string) =>
+    ipcRenderer.invoke(IPC.exportPanelPdf, project, panelId, filePath),
+  exportSystemPdf: (project: ProjectInput, filePath: string) =>
+    ipcRenderer.invoke(IPC.exportSystemPdf, project, filePath),
+};
+
+contextBridge.exposeInMainWorld('api', api);
+
+/** Ambient declaration so the renderer can type `window.api`. */
+declare global {
+  // eslint-disable-next-line no-var
+  interface Window {
+    api: Api;
+  }
+}

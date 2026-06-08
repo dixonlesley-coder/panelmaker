@@ -11,3 +11,4 @@ coverage/
 *.sqlite
 *.sqlite-journal
 panelmaker.db*
+.panelmaker/
