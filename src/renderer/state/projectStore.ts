@@ -1,11 +1,17 @@
 import { create } from 'zustand';
 import type {
   CircuitInput,
+  ControlAssembly,
+  ControlSchematic,
   PanelInput,
   Part,
   ProjectInput,
+  SchematicRung,
+  SchematicSymbol,
+  SchematicSymbolType,
   SuggestedFix,
 } from '@shared/types';
+import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 
@@ -15,12 +21,18 @@ export type Screen = 'system' | 'panel' | 'parts' | 'settings';
 let runtimeSeq = 0;
 const nextId = (prefix: string) => `${prefix}-rt${(runtimeSeq += 1)}`;
 
+/** A separate counter for schematic rungs/symbols authored at runtime. */
+let schematicSeq = 0;
+const nextSchematicId = (prefix: string) => `${prefix}-rt${(schematicSeq += 1)}`;
+
 export interface ProjectState {
   project: ProjectInput;
   parts: Part[];
   prices: Record<string, number>;
   activePanelId: string;
   activeScreen: Screen;
+  /** Control/ladder schematics, keyed by circuitId. */
+  schematics: Record<string, ControlSchematic>;
 
   // navigation
   setScreen: (screen: Screen) => void;
@@ -37,6 +49,22 @@ export interface ProjectState {
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
+
+  // control schematics
+  /** Build the schematic from the assembly the first time it is requested. */
+  ensureSchematic: (circuitId: string, assembly: ControlAssembly) => void;
+  /** Re-run generation, preserving any hand-authored (manual) rungs. */
+  regenerateSchematic: (circuitId: string, assembly: ControlAssembly) => void;
+  /** Append a blank manual rung the user can drop symbols into. */
+  addRung: (circuitId: string) => void;
+  /** Append a manual symbol at the next free column on a rung. */
+  addSymbol: (circuitId: string, rungId: string, type: SchematicSymbolType) => void;
+  /** Remove a single symbol from a schematic. */
+  removeSymbol: (circuitId: string, symbolId: string) => void;
+  /** Remove a manual (unlocked) rung and its symbols. */
+  removeRung: (circuitId: string, rungId: string) => void;
+  /** Detach a rung so a future regenerate will not clobber it. */
+  detachRung: (circuitId: string, rungId: string) => void;
 }
 
 /** Immutably map over the project's panels, replacing the one matching `panelId`. */
@@ -63,6 +91,27 @@ function mapCircuit(
   };
 }
 
+/**
+ * Immutably transform the schematic for `circuitId`. The transform receives the
+ * existing schematic (or `undefined` if none) and returns the next one; returning
+ * `undefined` leaves the map unchanged.
+ */
+function mapSchematic(
+  schematics: Record<string, ControlSchematic>,
+  circuitId: string,
+  fn: (existing: ControlSchematic | undefined) => ControlSchematic | undefined,
+): Record<string, ControlSchematic> {
+  const next = fn(schematics[circuitId]);
+  if (next === undefined) return schematics;
+  return { ...schematics, [circuitId]: next };
+}
+
+/** The next unused series column on a rung (max existing col + 1, or 0 if empty). */
+function nextFreeCol(schematic: ControlSchematic, rungId: string): number {
+  const cols = schematic.symbols.filter((s) => s.rungId === rungId).map((s) => s.col);
+  return cols.length === 0 ? 0 : Math.max(...cols) + 1;
+}
+
 const initialProject = createSampleProject();
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -71,6 +120,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   prices: SAMPLE_PRICES,
   activePanelId: initialProject.panels[0]?.id ?? '',
   activeScreen: 'system',
+  schematics: {},
 
   setScreen: (screen) => set({ activeScreen: screen }),
   setActivePanel: (panelId) => set({ activePanelId: panelId }),
@@ -144,4 +194,107 @@ export const useProjectStore = create<ProjectState>((set) => ({
         ),
       };
     }),
+
+  ensureSchematic: (circuitId, assembly) =>
+    set((s) => {
+      if (s.schematics[circuitId]) return s;
+      return {
+        schematics: { ...s.schematics, [circuitId]: buildSchematic(assembly) },
+      };
+    }),
+
+  regenerateSchematic: (circuitId, assembly) =>
+    set((s) => {
+      const regenerated = buildSchematic(assembly);
+      const existing = s.schematics[circuitId] ?? regenerated;
+      return {
+        schematics: {
+          ...s.schematics,
+          [circuitId]: mergeSchematic(existing, regenerated),
+        },
+      };
+    }),
+
+  addRung: (circuitId) =>
+    set((s) => ({
+      schematics: mapSchematic(s.schematics, circuitId, (existing) => {
+        if (!existing) return undefined;
+        const order = existing.rungs.reduce((max, r) => Math.max(max, r.order + 1), 0);
+        const rung: SchematicRung = {
+          id: nextSchematicId('rung'),
+          order,
+          label: `Custom rung ${existing.rungs.filter((r) => !r.generated).length + 1}`,
+          generated: false,
+          locked: false,
+        };
+        return { ...existing, rungs: [...existing.rungs, rung] };
+      }),
+    })),
+
+  addSymbol: (circuitId, rungId, type) =>
+    set((s) => ({
+      schematics: mapSchematic(s.schematics, circuitId, (existing) => {
+        if (!existing) return undefined;
+        const rung = existing.rungs.find((r) => r.id === rungId);
+        // Only allow dropping symbols onto manual, unlocked rungs.
+        if (!rung || rung.locked) return undefined;
+        const symbol: SchematicSymbol = {
+          id: nextSchematicId('sym'),
+          rungId,
+          type,
+          col: nextFreeCol(existing, rungId),
+          branch: 0,
+          generated: false,
+        };
+        return { ...existing, symbols: [...existing.symbols, symbol] };
+      }),
+    })),
+
+  removeSymbol: (circuitId, symbolId) =>
+    set((s) => ({
+      schematics: mapSchematic(s.schematics, circuitId, (existing) => {
+        if (!existing) return undefined;
+        return {
+          ...existing,
+          symbols: existing.symbols.filter((sym) => sym.id !== symbolId),
+          connections: existing.connections.filter(
+            (c) => c.fromSymbolId !== symbolId && c.toSymbolId !== symbolId,
+          ),
+        };
+      }),
+    })),
+
+  removeRung: (circuitId, rungId) =>
+    set((s) => ({
+      schematics: mapSchematic(s.schematics, circuitId, (existing) => {
+        if (!existing) return undefined;
+        const rung = existing.rungs.find((r) => r.id === rungId);
+        // Locked (generated) rungs cannot be removed.
+        if (!rung || rung.locked) return undefined;
+        const droppedSymIds = new Set(
+          existing.symbols.filter((sym) => sym.rungId === rungId).map((sym) => sym.id),
+        );
+        return {
+          ...existing,
+          rungs: existing.rungs.filter((r) => r.id !== rungId),
+          symbols: existing.symbols.filter((sym) => sym.rungId !== rungId),
+          connections: existing.connections.filter(
+            (c) => !droppedSymIds.has(c.fromSymbolId) && !droppedSymIds.has(c.toSymbolId),
+          ),
+        };
+      }),
+    })),
+
+  detachRung: (circuitId, rungId) =>
+    set((s) => ({
+      schematics: mapSchematic(s.schematics, circuitId, (existing) => {
+        if (!existing) return undefined;
+        return {
+          ...existing,
+          rungs: existing.rungs.map((r) =>
+            r.id === rungId ? { ...r, generated: false, locked: false } : r,
+          ),
+        };
+      }),
+    })),
 }));
