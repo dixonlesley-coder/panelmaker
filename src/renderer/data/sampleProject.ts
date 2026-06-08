@@ -127,5 +127,10 @@ export function createSampleProject(): ProjectInput {
     id: 'PRJ-1',
     name: 'Sample Commercial Building',
     panels: [main, lpDb, mcc],
+    sources: {
+      generator: { enabled: true, backupFraction: 1, mode: 'standby' },
+      solar: { enabled: true, targetKwp: 40, panelWp: 550, dcAcRatio: 1.2 },
+      battery: { enabled: true, backupKw: 15, autonomyHours: 4, chemistry: 'lifepo4' },
+    },
   };
 }

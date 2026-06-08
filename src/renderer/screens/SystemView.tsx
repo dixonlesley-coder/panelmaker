@@ -7,13 +7,26 @@ import {
   ReactFlow,
   ReactFlowProvider,
 } from '@xyflow/react';
-import { Badge, Box, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Group,
+  SimpleGrid,
+  Stack,
+  Tabs,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconBolt,
   IconCash,
   IconDeviceFloppy,
   IconDownload,
+  IconSitemap,
   IconSolarPanel,
   IconStack2,
 } from '@tabler/icons-react';
@@ -21,6 +34,7 @@ import { computeSystem } from '@shared/engine';
 import type { PanelInput, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
 import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
+import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem } from '@renderer/lib/bom';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -253,15 +267,23 @@ export function SystemView() {
       )}
 
       <Card withBorder radius="md" padding="xs">
-        <Group justify="space-between" px="xs" py={4}>
-          <Text fw={600} size="sm">
-            Single-line diagram
-          </Text>
-          <Text size="xs" c="dimmed">
-            Click a panel to open it in the editor
-          </Text>
-        </Group>
-        <Box h={460}>
+        <Tabs defaultValue="building">
+          <Tabs.List>
+            <Tabs.Tab value="building" leftSection={<IconSitemap size={14} />}>
+              Building
+            </Tabs.Tab>
+            <Tabs.Tab value="power" leftSection={<IconBolt size={14} />}>
+              Power one-line
+            </Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="building" pt="xs">
+            <Group justify="flex-end" px="xs" pb={4}>
+              <Text size="xs" c="dimmed">
+                Click a panel to open it in the editor
+              </Text>
+            </Group>
+            <Box h={460}>
           <ReactFlowProvider>
             <ReactFlow
               nodes={nodes}
@@ -279,7 +301,13 @@ export function SystemView() {
               <Controls showInteractive={false} />
             </ReactFlow>
           </ReactFlowProvider>
-        </Box>
+            </Box>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="power">
+            <PowerOneline system={system} />
+          </Tabs.Panel>
+        </Tabs>
       </Card>
     </Stack>
   );

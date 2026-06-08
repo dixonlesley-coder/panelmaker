@@ -14,6 +14,7 @@ export * from './transformer';
 export * from './grounding';
 export * from './sources';
 export * from './loadProfile';
+export * from './powerOneline';
 export * from './computePanel';
 export * from './computeSystem';
 export * from './control';
