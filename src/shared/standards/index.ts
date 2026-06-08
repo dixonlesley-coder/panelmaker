@@ -3,6 +3,8 @@ export * from './conductors';
 export * from './protection';
 export * from './enclosure';
 export * from './loads';
+export * from './schedule';
 export * from './transformer';
 export * from './grounding';
+export * from './sources';
 export * from './control';

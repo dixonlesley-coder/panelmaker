@@ -139,6 +139,23 @@ export interface PanelResult {
   standardsVersion: string;
 }
 
+/** A 24-hour building demand profile and peak analysis. */
+export interface LoadProfileResult {
+  /** Demand (kW) for each hour 0-23. */
+  hourlyKw: number[];
+  peakKw: number;
+  /** Hour of day (0-23) at which the peak occurs. */
+  peakHour: number;
+  /** Total daily energy (kWh). */
+  dailyKwh: number;
+  /** Average/peak load factor (0-1). */
+  loadFactor: number;
+  /** Per-panel hourly contribution (the "where" over time). */
+  byPanel: { panelId: string; name: string; hourlyKw: number[] }[];
+  /** Circuits driving the peak hour, largest first. */
+  peakContributors: { circuitId: string; name: string; panelName: string; kw: number }[];
+}
+
 export interface SystemResult {
   projectId: string;
   panels: Record<string, PanelResult>;

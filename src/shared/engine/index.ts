@@ -13,6 +13,7 @@ export * from './phase';
 export * from './transformer';
 export * from './grounding';
 export * from './sources';
+export * from './loadProfile';
 export * from './computePanel';
 export * from './computeSystem';
 export * from './control';

@@ -8,6 +8,14 @@ import type { SystemType, LoadKind, InstallMethod } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { SourcesConfig } from './sources';
 
+/** A load's daily operating window (hours). May wrap past midnight (e.g. 22→6). */
+export interface LoadSchedule {
+  /** Operating window start hour [0-23]. */
+  startHour: number;
+  /** Operating window end hour (exclusive) [1-24]. */
+  endHour: number;
+}
+
 export interface CircuitInput {
   id: string;
   name: string;
@@ -33,6 +41,9 @@ export interface CircuitInput {
 
   /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
   cableOverrideMm2?: number;
+
+  /** Daily operating window; absent = continuous (24 h). Drives the load profile. */
+  schedule?: LoadSchedule;
 
   /** If set, this branch feeds another panel (its load = that panel's demand). */
   feedsPanelId?: string;
