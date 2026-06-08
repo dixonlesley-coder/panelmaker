@@ -4,6 +4,7 @@ import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
 import type { PhaseAssignment } from './electrical';
+import type { SourcesResult } from './sources';
 
 /** Protective-earth + neutral conductor sizing and cable make-up for a circuit. */
 export interface GroundingResult {
@@ -144,6 +145,8 @@ export interface SystemResult {
   /** Panel ids in upstream (root-first) order. */
   order: string[];
   supply: SupplyResult;
+  /** Distributed energy sources sizing, when configured. */
+  sources?: SourcesResult;
   totals: {
     connectedLoadW: number;
     panelCount: number;

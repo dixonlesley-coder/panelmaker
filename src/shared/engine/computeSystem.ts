@@ -2,6 +2,7 @@ import type { ProjectInput } from '../types/project';
 import type { PanelResult, SystemResult, Warning } from '../types/results';
 import { computePanel } from './computePanel';
 import { determineSupply } from './transformer';
+import { computeSources } from './sources';
 
 /**
  * Compute a whole project (building) by walking the panel feeder tree
@@ -84,13 +85,16 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const BUILDING_PF = 0.85;
   const rootDemandW = roots.reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
   const lvVoltageV = roots[0]?.voltageV ?? 400;
-  const supply = determineSupply(rootDemandW / 1000 / BUILDING_PF, lvVoltageV);
+  const totalDemandKva = rootDemandW / 1000 / BUILDING_PF;
+  const supply = determineSupply(totalDemandKva, lvVoltageV);
+  const sources = computeSources(project.sources, totalDemandKva);
 
   return {
     projectId: project.id,
     panels: results,
     order: [...postOrder].reverse(), // root-first
     supply,
+    ...(sources ? { sources } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
     warnings,
   };

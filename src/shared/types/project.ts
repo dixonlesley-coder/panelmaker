@@ -6,6 +6,7 @@
 
 import type { SystemType, LoadKind, InstallMethod } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
+import type { SourcesConfig } from './sources';
 
 export interface CircuitInput {
   id: string;
@@ -57,4 +58,6 @@ export interface ProjectInput {
   id: string;
   name: string;
   panels: PanelInput[];
+  /** Optional distributed energy sources (generator / solar / battery). */
+  sources?: SourcesConfig;
 }
