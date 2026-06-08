@@ -19,21 +19,27 @@ export interface LoadDefaults {
   threePhasePreferred: boolean;
   /** Behaves like a motor (high inrush) for protection purposes. */
   motorLike: boolean;
+  /**
+   * Whether the load uses a neutral conductor. Lighting fixtures and pure
+   * line-to-line loads run without one (2-core L+PE single-phase / 4-core
+   * 3L+PE three-phase); loads with a neutral get the extra core.
+   */
+  needsNeutral: boolean;
 }
 
 export const LOAD_DEFAULTS: Readonly<Record<LoadKind, LoadDefaults>> = {
-  general: { label: 'General', cosPhi: 0.85, demandFactor: 1, curve: 'C', threePhasePreferred: false, motorLike: false },
-  lighting: { label: 'Lighting', cosPhi: 0.9, demandFactor: 1, curve: 'B', threePhasePreferred: false, motorLike: false },
-  socket: { label: 'Socket outlets', cosPhi: 0.9, demandFactor: 0.7, curve: 'C', threePhasePreferred: false, motorLike: false },
-  heating: { label: 'Heating / resistive', cosPhi: 1.0, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false },
-  hvac: { label: 'HVAC / air-con', cosPhi: 0.85, demandFactor: 0.9, curve: 'C', threePhasePreferred: true, motorLike: true },
-  motor: { label: 'Motor', cosPhi: 0.85, demandFactor: 1, curve: 'D', threePhasePreferred: true, motorLike: true },
-  pump: { label: 'Pump', cosPhi: 0.85, demandFactor: 1, curve: 'D', threePhasePreferred: true, motorLike: true },
-  ev_charger: { label: 'EV charger', cosPhi: 0.98, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false },
-  welding: { label: 'Welding', cosPhi: 0.7, demandFactor: 0.5, curve: 'D', threePhasePreferred: true, motorLike: false },
-  capacitor: { label: 'Capacitor bank', cosPhi: 1.0, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false },
-  ups: { label: 'UPS', cosPhi: 0.9, demandFactor: 1, curve: 'C', threePhasePreferred: false, motorLike: false },
-  feeder: { label: 'Feeder (sub-panel)', cosPhi: 0.85, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false },
+  general: { label: 'General', cosPhi: 0.85, demandFactor: 1, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
+  lighting: { label: 'Lighting', cosPhi: 0.9, demandFactor: 1, curve: 'B', threePhasePreferred: false, motorLike: false, needsNeutral: false },
+  socket: { label: 'Socket outlets', cosPhi: 0.9, demandFactor: 0.7, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
+  heating: { label: 'Heating / resistive', cosPhi: 1.0, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: false },
+  hvac: { label: 'HVAC / air-con', cosPhi: 0.85, demandFactor: 0.9, curve: 'C', threePhasePreferred: true, motorLike: true, needsNeutral: true },
+  motor: { label: 'Motor', cosPhi: 0.85, demandFactor: 1, curve: 'D', threePhasePreferred: true, motorLike: true, needsNeutral: false },
+  pump: { label: 'Pump', cosPhi: 0.85, demandFactor: 1, curve: 'D', threePhasePreferred: true, motorLike: true, needsNeutral: false },
+  ev_charger: { label: 'EV charger', cosPhi: 0.98, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: true },
+  welding: { label: 'Welding', cosPhi: 0.7, demandFactor: 0.5, curve: 'D', threePhasePreferred: true, motorLike: false, needsNeutral: true },
+  capacitor: { label: 'Capacitor bank', cosPhi: 1.0, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: false },
+  ups: { label: 'UPS', cosPhi: 0.9, demandFactor: 1, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
+  feeder: { label: 'Feeder (sub-panel)', cosPhi: 0.85, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: true },
 };
 
 /** Order of load kinds for UI pickers. */

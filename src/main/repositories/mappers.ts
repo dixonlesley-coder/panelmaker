@@ -195,6 +195,10 @@ export function assembleProject(
   id: string,
   name: string,
   panels: PanelInput[],
+  earthingSystem?: string | null,
 ): ProjectInput {
-  return { id, name, panels };
+  const project: ProjectInput = { id, name, panels };
+  const es = nullToUndef(earthingSystem);
+  if (es !== undefined) project.earthingSystem = es as ProjectInput['earthingSystem'];
+  return project;
 }

@@ -10,9 +10,10 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconInfoCircle } from '@tabler/icons-react';
+import { IconInfoCircle, IconShieldBolt } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
-import type { InstallMethod } from '@shared/types';
+import { EARTHING_SYSTEMS } from '@shared/standards';
+import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 
 /** Install-method options for the panel default Select. */
@@ -29,14 +30,13 @@ export function Settings() {
   const project = useProjectStore((s) => s.project);
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const updatePanel = useProjectStore((s) => s.updatePanel);
+  const setEarthingSystem = useProjectStore((s) => s.setEarthingSystem);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
 
-  // Read the standards version off any computed panel result.
-  const standardsVersion = useMemo(() => {
-    const system = computeSystem(project);
-    return Object.values(system.panels)[0]?.standardsVersion ?? 'unknown';
-  }, [project]);
+  const system = useMemo(() => computeSystem(project), [project]);
+  const standardsVersion = Object.values(system.panels)[0]?.standardsVersion ?? 'unknown';
+  const earthing = system.earthing;
 
   if (!panel) {
     return (
@@ -104,6 +104,32 @@ export function Settings() {
       </Card>
 
       <Card withBorder radius="md" padding="md">
+        <Group gap="xs" mb="md">
+          <IconShieldBolt size={18} color="var(--mantine-color-teal-6)" />
+          <Text fw={600}>Earthing &amp; grounding</Text>
+        </Group>
+        <Select
+          label="Earthing system"
+          description="Project-wide; drives RCD requirements and bonding"
+          data={EARTHING_SYSTEMS.map((e) => ({ value: e.value, label: e.label }))}
+          value={project.earthingSystem ?? 'TN-C-S'}
+          allowDeselect={false}
+          onChange={(v) => v && setEarthingSystem(v as EarthingSystem)}
+          mb="md"
+          maw={360}
+        />
+        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
+          <KeyStat k="RCD policy" v={earthing.requiresRcd ? 'All final circuits' : 'Sockets / EV only'} />
+          <KeyStat k="Main earthing" v={`${earthing.mainEarthingConductorMm2} mm²`} />
+          <KeyStat k="Main bonding" v={`${earthing.mainBondingConductorMm2} mm²`} />
+          <KeyStat k="Electrode target" v={`≤ ${earthing.electrodeResistanceTargetOhm} Ω`} />
+        </SimpleGrid>
+        <Text size="xs" c="dimmed">
+          {earthing.note}
+        </Text>
+      </Card>
+
+      <Card withBorder radius="md" padding="md">
         <Text fw={600} mb="md">
           Project
         </Text>
@@ -132,5 +158,19 @@ export function Settings() {
         editor's dropdown.
       </Alert>
     </Stack>
+  );
+}
+
+/** Compact key/value for the earthing design strip. */
+function KeyStat({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {k}
+      </Text>
+      <Text size="sm" fw={600}>
+        {v}
+      </Text>
+    </div>
   );
 }

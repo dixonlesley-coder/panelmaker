@@ -4,7 +4,7 @@
  * these shapes; the engine never imports DB or DOM code.
  */
 
-import type { SystemType, LoadKind, InstallMethod } from './electrical';
+import type { SystemType, LoadKind, InstallMethod, EarthingSystem } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { SourcesConfig } from './sources';
 
@@ -69,6 +69,8 @@ export interface ProjectInput {
   id: string;
   name: string;
   panels: PanelInput[];
+  /** Installation earthing system (default TN-C-S). */
+  earthingSystem?: EarthingSystem;
   /** Optional distributed energy sources (generator / solar / battery). */
   sources?: SourcesConfig;
 }

@@ -3,6 +3,7 @@ import type {
   CircuitInput,
   ControlAssembly,
   ControlSchematic,
+  EarthingSystem,
   PanelInput,
   Part,
   ProjectInput,
@@ -65,6 +66,10 @@ export interface ProjectState {
   // energy sources
   /** Merge a partial energy-sources config into the project. */
   updateSources: (patch: Partial<SourcesConfig>) => void;
+
+  // earthing
+  /** Set the installation earthing system. */
+  setEarthingSystem: (system: EarthingSystem) => void;
 
   // control schematics
   /** Build the schematic from the assembly the first time it is requested. */
@@ -215,6 +220,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   updateSources: (patch) =>
     set((s) => ({ project: { ...s.project, sources: { ...s.project.sources, ...patch } } })),
+
+  setEarthingSystem: (system) => set((s) => ({ project: { ...s.project, earthingSystem: system } })),
 
   ensureSchematic: (circuitId, assembly) =>
     set((s) => {

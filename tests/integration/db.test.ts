@@ -37,11 +37,13 @@ describe('SQLite persistence', () => {
     expect(migrate()).toBe('bootstrap');
 
     const project = createSampleProject();
+    project.earthingSystem = 'TT';
     saveProject(project);
 
     const loaded = loadProject(project.id);
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe(project.name);
+    expect(loaded!.earthingSystem).toBe('TT');
     expect(loaded!.panels.length).toBe(project.panels.length);
 
     // motor circuit round-trips its starter + motor fields

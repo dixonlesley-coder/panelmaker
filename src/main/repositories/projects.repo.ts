@@ -46,11 +46,12 @@ export function saveProject(project: ProjectInput, db: Db = getDb()): { id: stri
           createdAt: ts,
           updatedAt: ts,
           appVersion: APP_VERSION,
+          earthingSystem: project.earthingSystem ?? null,
         })
         .run();
     } else {
       tx.update(projects)
-        .set({ name: project.name, updatedAt: ts })
+        .set({ name: project.name, updatedAt: ts, earthingSystem: project.earthingSystem ?? null })
         .where(eq(projects.id, project.id))
         .run();
     }
@@ -88,7 +89,7 @@ export function loadProject(id: string, db: Db = getDb()): ProjectInput | null {
     return rowToPanel(pr, circuitRows.map(rowToCircuit));
   });
 
-  return assembleProject(projectRow.id, projectRow.name, builtPanels);
+  return assembleProject(projectRow.id, projectRow.name, builtPanels, projectRow.earthingSystem);
 }
 
 /** List all projects as lightweight summaries. */

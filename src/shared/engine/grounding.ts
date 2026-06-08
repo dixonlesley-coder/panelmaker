@@ -1,6 +1,13 @@
-import { neutralConductorSize, peConductorSize } from '../standards/grounding';
-import type { CableType, SystemType } from '../types/electrical';
-import type { GroundingResult } from '../types/results';
+import {
+  EARTHING_SYSTEMS,
+  MAX_EARTH_RESISTANCE_OHM,
+  mainBondingConductor,
+  mainEarthingConductor,
+  neutralConductorSize,
+  peConductorSize,
+} from '../standards/grounding';
+import type { CableType, EarthingSystem, LoadKind, SystemType } from '../types/electrical';
+import type { EarthingResult, GroundingResult, RcdSpec } from '../types/results';
 
 export interface GroundingInput {
   phaseCsaMm2: number;
@@ -29,4 +36,52 @@ export function sizeGrounding(i: GroundingInput): GroundingResult {
   const cableSpec = `${type} ${cores}×${i.phaseCsaMm2} mm² (+ ${pe} mm² PE)`;
 
   return { peCsaMm2: pe, neutralCsaMm2: neutral, cores, cableSpec };
+}
+
+/**
+ * Design the installation earthing system: RCD policy, main earthing + bonding
+ * conductors and the electrode resistance target. The supply PE is the PE of the
+ * main incomer.
+ */
+export function computeEarthing(system: EarthingSystem, supplyPeMm2: number): EarthingResult {
+  const info = EARTHING_SYSTEMS.find((s) => s.value === system) ?? EARTHING_SYSTEMS[0]!;
+  const requiresRcd = system === 'TT';
+  const tail = requiresRcd
+    ? ' Earth-fault loop impedance is high, so an RCD provides fault protection on every final circuit.'
+    : ' Overcurrent devices clear earth faults; RCDs are still required for socket-outlets and special locations.';
+  return {
+    system,
+    label: info.label,
+    requiresRcd,
+    mainEarthingConductorMm2: mainEarthingConductor(supplyPeMm2),
+    mainBondingConductorMm2: mainBondingConductor(supplyPeMm2),
+    electrodeResistanceTargetOhm: MAX_EARTH_RESISTANCE_OHM,
+    note: info.note + tail,
+  };
+}
+
+export interface CircuitRcdInput {
+  earthingSystem: EarthingSystem;
+  loadKind: LoadKind;
+  isFinalCircuit: boolean;
+  designCurrentA: number;
+}
+
+/** Decide whether a circuit needs an RCD and at what sensitivity. */
+export function circuitRcd(i: CircuitRcdInput): RcdSpec {
+  if (i.earthingSystem === 'TT' && i.isFinalCircuit) {
+    return {
+      required: true,
+      ratingMa: i.designCurrentA <= 63 ? 30 : 100,
+      reason: 'TT system — RCD required for earth-fault protection.',
+    };
+  }
+  if (i.loadKind === 'socket' || i.loadKind === 'ev_charger') {
+    return {
+      required: true,
+      ratingMa: 30,
+      reason: 'Socket / EV circuit — 30 mA RCD (additional protection).',
+    };
+  }
+  return { required: false, ratingMa: 0, reason: '' };
 }

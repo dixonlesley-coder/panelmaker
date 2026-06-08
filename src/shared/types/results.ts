@@ -3,8 +3,29 @@
 import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
-import type { PhaseAssignment } from './electrical';
+import type { PhaseAssignment, EarthingSystem } from './electrical';
 import type { SourcesResult } from './sources';
+
+/** Residual-current device requirement for a circuit. */
+export interface RcdSpec {
+  required: boolean;
+  ratingMa: number;
+  reason: string;
+}
+
+/** Installation earthing-system design. */
+export interface EarthingResult {
+  system: EarthingSystem;
+  label: string;
+  requiresRcd: boolean;
+  /** Earthing conductor to the electrode (mm^2). */
+  mainEarthingConductorMm2: number;
+  /** Main protective bonding conductor (mm^2). */
+  mainBondingConductorMm2: number;
+  /** Target earth-electrode resistance (ohm). */
+  electrodeResistanceTargetOhm: number;
+  note: string;
+}
 
 /** Protective-earth + neutral conductor sizing and cable make-up for a circuit. */
 export interface GroundingResult {
@@ -68,6 +89,7 @@ export interface CircuitResult {
   cable: CableResult;
   voltageDrop: VoltageDropResult;
   grounding: GroundingResult;
+  rcd: RcdSpec;
   control?: ControlAssembly;
 }
 
@@ -162,6 +184,8 @@ export interface SystemResult {
   /** Panel ids in upstream (root-first) order. */
   order: string[];
   supply: SupplyResult;
+  /** Installation earthing-system design. */
+  earthing: EarthingResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
   totals: {

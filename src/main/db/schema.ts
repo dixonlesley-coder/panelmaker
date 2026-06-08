@@ -58,6 +58,7 @@ export const projects = sqliteTable('projects', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   appVersion: text('app_version'),
+  earthingSystem: text('earthing_system'),
 });
 
 export const panels = sqliteTable('panels', {

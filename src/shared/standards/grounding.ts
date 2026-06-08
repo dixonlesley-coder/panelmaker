@@ -47,6 +47,24 @@ export function peConductorSize(phaseCsaMm2: number): number {
 }
 
 /**
+ * Main protective bonding conductor (IEC 60364-5-54 544.1): at least half the
+ * supply PE, minimum 6 mm^2, need not exceed 25 mm^2 (copper).
+ */
+export function mainBondingConductor(supplyPeMm2: number): number {
+  const target = Math.max(6, supplyPeMm2 / 2);
+  const std = STANDARD_SECTIONS_MM2.find((s) => s >= target) ?? 25;
+  return Math.min(25, std);
+}
+
+/**
+ * Earthing conductor to the electrode: PE-sized but at least 16 mm^2 (buried
+ * copper), bounded for practicality.
+ */
+export function mainEarthingConductor(supplyPeMm2: number): number {
+  return Math.min(50, Math.max(16, supplyPeMm2));
+}
+
+/**
  * Neutral conductor cross-section. A full-size neutral (= phase) is used by
  * default; a reduced neutral (down to S/2, min 16 mm²) is permitted for balanced
  * three-phase circuits without significant harmonic content.

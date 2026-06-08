@@ -1,8 +1,12 @@
 import type { ProjectInput } from '../types/project';
 import type { PanelResult, SystemResult, Warning } from '../types/results';
+import { peConductorSize } from '../standards/grounding';
 import { computePanel } from './computePanel';
 import { determineSupply } from './transformer';
 import { computeSources } from './sources';
+import { computeEarthing } from './grounding';
+import { selectBreaker } from './breakerSelect';
+import { sizeCable } from './cableSizing';
 
 /**
  * Compute a whole project (building) by walking the panel feeder tree
@@ -72,7 +76,10 @@ export function computeSystem(project: ProjectInput): SystemResult {
     for (const c of panel.circuits) {
       if (c.feedsPanelId) feederLoadW[c.feedsPanelId] = panelDemandW.get(c.feedsPanelId) ?? 0;
     }
-    const pr = computePanel(panel, { feederLoadW });
+    const pr = computePanel(panel, {
+      feederLoadW,
+      earthingSystem: project.earthingSystem ?? 'TN-C-S',
+    });
     results[id] = pr;
     panelDemandW.set(id, pr.totalConnectedLoadW * panel.diversityFactor);
     pr.warnings.forEach((w) => warnings.push(w));
@@ -89,11 +96,27 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const supply = determineSupply(totalDemandKva, lvVoltageV);
   const sources = computeSources(project.sources, totalDemandKva);
 
+  // Earthing system designed from the main incomer's PE conductor.
+  const mainResult = roots[0] ? results[roots[0].id] : undefined;
+  const mainIb = mainResult?.totalDemandCurrentA ?? 0;
+  const mainBreaker = selectBreaker({ designCurrentA: mainIb, loadKind: 'feeder' });
+  const mainCable = sizeCable({
+    designCurrentA: mainIb,
+    breakerRatingA: mainBreaker.ratingA,
+    deratingFactor: 1,
+    minSectionMm2: 4,
+  });
+  const earthing = computeEarthing(
+    project.earthingSystem ?? 'TN-C-S',
+    peConductorSize(mainCable.csaMm2),
+  );
+
   return {
     projectId: project.id,
     panels: results,
     order: [...postOrder].reverse(), // root-first
     supply,
+    earthing,
     ...(sources ? { sources } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
     warnings,

@@ -2,7 +2,7 @@ import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
 import type { CircuitInput, PanelInput } from '../types/project';
-import type { SystemType } from '../types/electrical';
+import type { SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
@@ -14,7 +14,7 @@ import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
-import { sizeGrounding } from './grounding';
+import { circuitRcd, sizeGrounding } from './grounding';
 import { round } from './util';
 import { voltageDrop } from './voltageDrop';
 import { circuitWarnings, validateInterlocks } from './warnings';
@@ -22,6 +22,8 @@ import { circuitWarnings, validateInterlocks } from './warnings';
 export interface ComputePanelOptions {
   /** Aggregated downstream demand (W) keyed by the child panel id a feeder serves. */
   feederLoadW?: Record<string, number>;
+  /** Installation earthing system (drives RCD requirements). */
+  earthingSystem?: EarthingSystem;
 }
 
 function effectiveLoadW(c: CircuitInput, opts: ComputePanelOptions): number {
@@ -91,12 +93,22 @@ function computeCircuit(
     voltageV: useVoltage,
     isLighting: c.isLighting,
   });
+  // Cores follow the load's neutral need: single-phase lighting fixtures and
+  // line-only loads = 2-core (L+PE); items with a neutral = 3-core (L+N+PE).
+  // Three-phase: motors/resistive line loads = 4-core (3L+PE); loads with a
+  // neutral (distribution, single-phase parts) = 5-core (3L+N+PE).
+  const hasNeutral = threePhase ? def.needsNeutral && !def.motorLike : c.loadKind !== 'lighting';
   const grounding = sizeGrounding({
     phaseCsaMm2: cable.csaMm2,
     panelSystem: panel.system,
     threePhase,
-    // three-phase motor-like loads typically have no neutral (4-core + PE)
-    hasNeutral: threePhase ? !def.motorLike : true,
+    hasNeutral,
+  });
+  const rcd = circuitRcd({
+    earthingSystem: opts.earthingSystem ?? 'TN-C-S',
+    loadKind: c.loadKind,
+    isFinalCircuit: !isFeeder,
+    designCurrentA,
   });
 
   let modules = threePhase ? 3 : 1; // branch breaker poles
@@ -133,6 +145,7 @@ function computeCircuit(
     cable,
     voltageDrop: vd,
     grounding,
+    rcd,
     control,
   };
   warnings.push(

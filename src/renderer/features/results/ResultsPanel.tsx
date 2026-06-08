@@ -158,6 +158,11 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
           <Text c="dimmed" fz="xs">
             {circuit.grounding.cores}-core · PE {circuit.grounding.peCsaMm2} mm²
           </Text>
+          {circuit.rcd.required && (
+            <Badge size="xs" variant="light" color="teal" mt={2}>
+              RCD {circuit.rcd.ratingMa} mA
+            </Badge>
+          )}
         </Table.Td>
         <Table.Td>
           <Text c={vdColor(vd.withinLimit)} fw={vd.withinLimit ? 400 : 700} size="sm">

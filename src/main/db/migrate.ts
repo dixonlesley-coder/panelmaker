@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS projects (
   location TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  app_version TEXT
+  app_version TEXT,
+  earthing_system TEXT
 );
 
 CREATE TABLE IF NOT EXISTS panels (
