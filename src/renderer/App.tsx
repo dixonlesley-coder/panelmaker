@@ -5,6 +5,7 @@ import {
   IconSitemap,
   IconAdjustmentsBolt,
   IconBox,
+  IconReceipt,
   IconSettings,
   IconBolt,
 } from '@tabler/icons-react';
@@ -13,6 +14,7 @@ import { useProjectStore, type Screen } from '@renderer/state/projectStore';
 import { SystemView } from '@renderer/screens/SystemView';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
+import { Pricelist } from '@renderer/screens/Pricelist';
 import { Settings } from '@renderer/screens/Settings';
 
 interface NavItem {
@@ -25,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { screen: 'system', label: 'System', icon: <IconSitemap size={18} /> },
   { screen: 'panel', label: 'Panel Editor', icon: <IconAdjustmentsBolt size={18} /> },
   { screen: 'parts', label: 'Parts Catalog', icon: <IconBox size={18} /> },
+  { screen: 'pricelist', label: 'Pricelist', icon: <IconReceipt size={18} /> },
   { screen: 'settings', label: 'Settings', icon: <IconSettings size={18} /> },
 ];
 
@@ -55,6 +58,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
       return <PanelEditor />;
     case 'parts':
       return <PartsCatalog />;
+    case 'pricelist':
+      return <Pricelist />;
     case 'settings':
       return <Settings />;
   }

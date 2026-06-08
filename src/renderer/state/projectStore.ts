@@ -15,7 +15,7 @@ import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 
-export type Screen = 'system' | 'panel' | 'parts' | 'settings';
+export type Screen = 'system' | 'panel' | 'parts' | 'pricelist' | 'settings';
 
 /** A monotonic id generator for circuits/panels created at runtime. */
 let runtimeSeq = 0;
@@ -49,6 +49,10 @@ export interface ProjectState {
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
+
+  // pricing
+  /** Merge imported unit prices (partId -> price) into the active price map. */
+  mergePrices: (prices: Record<string, number>) => void;
 
   // control schematics
   /** Build the schematic from the assembly the first time it is requested. */
@@ -194,6 +198,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
         ),
       };
     }),
+
+  mergePrices: (prices) => set((s) => ({ prices: { ...s.prices, ...prices } })),
 
   ensureSchematic: (circuitId, assembly) =>
     set((s) => {
