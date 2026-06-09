@@ -19,6 +19,7 @@ import {
   CURVE_TRIP_MULTIPLE,
   DEFAULT_LV_UTILITY_FAULT_KA,
   NOMINAL_PHASE_VOLTAGE_V,
+  ZS_FAULT_TEMP_FACTOR,
   ZS_VOLTAGE_FACTOR,
   breakerKa,
 } from '../standards/fault';
@@ -135,8 +136,12 @@ export interface ZsInput {
  * RCD (already modelled), so it is reported as satisfied (relaxed) here.
  */
 export function checkZs(i: ZsInput): ZsCheck {
-  const phaseZ = conductorImpedance(i.phaseCsaMm2, i.lengthM);
-  const peZ = conductorImpedance(i.peCsaMm2, i.lengthM);
+  // Evaluate the loop conductor R at the fault temperature (conservative for ADS):
+  // a higher Zs is the unfavourable case for guaranteed disconnection.
+  const phaseZ0 = conductorImpedance(i.phaseCsaMm2, i.lengthM);
+  const peZ0 = conductorImpedance(i.peCsaMm2, i.lengthM);
+  const phaseZ = { rOhm: phaseZ0.rOhm * ZS_FAULT_TEMP_FACTOR, xOhm: phaseZ0.xOhm };
+  const peZ = { rOhm: peZ0.rOhm * ZS_FAULT_TEMP_FACTOR, xOhm: peZ0.xOhm };
   const loop = addImpedance(addImpedance(i.sourceZ, phaseZ), peZ);
   const zsOhm = impedanceMagnitude(loop);
 

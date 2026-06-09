@@ -28,6 +28,16 @@ export const NOMINAL_PHASE_VOLTAGE_V = 230;
 export const ZS_VOLTAGE_FACTOR = 0.95;
 
 /**
+ * Conductor resistance rises with temperature. For the worst-case earth-fault
+ * loop (ADS) the loop R must be evaluated near the conductor's fault temperature,
+ * not the ~70 °C value tabulated for voltage drop — a higher Zs is the
+ * unfavourable case for disconnection. ~1.28× lifts the 70 °C R toward the PVC
+ * fault limit (~160 °C), making the Zs / disconnection check conservative
+ * (IEC 60364-4-41 / IEC 60909 temperature correction).
+ */
+export const ZS_FAULT_TEMP_FACTOR = 1.28;
+
+/**
  * Magnetic (instantaneous) trip multiple of rated current for each MCB curve
  * (IEC 60898): the current Ia = multiple x In that guarantees fast tripping.
  * MCCB instantaneous settings are typically ~10x and are treated as a 'C'.

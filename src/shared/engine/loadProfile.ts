@@ -1,15 +1,21 @@
 import { hourlyFactors } from '../standards/schedule';
-import type { CircuitInput, ProjectInput } from '../types/project';
+import type { CircuitInput, PanelInput, ProjectInput } from '../types/project';
 import type { LoadProfileResult } from '../types/results';
+import { circuitDemandFactor } from './occupancy';
 import { round } from './util';
 
-/** A circuit's peak demand (kW): motor kW for motors, else connected kW, x demand factor. */
-function circuitDemandKw(c: CircuitInput): number {
+/**
+ * A circuit's peak demand (kW): motor kW for motors, else connected kW, times the
+ * occupancy-resolved demand factor — the same factor the sizing/PF paths use, so
+ * the load profile (and the energy bill derived from it) stays consistent with
+ * the sized design.
+ */
+function circuitDemandKw(c: CircuitInput, panel: PanelInput): number {
   const base =
     (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined
       ? c.motorKw
       : c.loadW / 1000;
-  return base * (c.demandFactor ?? 1);
+  return base * circuitDemandFactor(c, panel);
 }
 
 /**
@@ -26,7 +32,7 @@ export function computeLoadProfile(project: ProjectInput): LoadProfileResult {
     const panelHourly = new Array<number>(24).fill(0);
     for (const c of panel.circuits) {
       if (c.role !== 'branch' || c.feedsPanelId) continue; // skip feeders (counted at the leaf)
-      const kw = circuitDemandKw(c);
+      const kw = circuitDemandKw(c, panel);
       const factors = hourlyFactors(c.schedule);
       const ch = factors.map((x) => x * kw);
       for (let h = 0; h < 24; h++) {

@@ -7,9 +7,9 @@
 /** Standard MCB ratings (A), IEC 60898. */
 export const MCB_RATINGS_A = [6, 10, 16, 20, 25, 32, 40, 50, 63] as const;
 
-/** Standard MCCB preferred ratings (A), IEC 60947-2. */
+/** Standard MCCB preferred ratings (A), IEC 60947-2 (R10 series). */
 export const MCCB_RATINGS_A = [
-  80, 100, 125, 160, 200, 250, 400, 630, 800, 1000, 1250, 1600,
+  80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
 ] as const;
 
 /** All standard breaker frame ratings, ascending. */
