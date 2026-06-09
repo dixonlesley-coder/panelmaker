@@ -8,7 +8,10 @@
  */
 
 import type { TFontDictionary } from 'pdfmake/interfaces';
-import vfsFonts from 'pdfmake/build/vfs_fonts';
+// Explicit `.js`: pdfmake has no `exports` entry for this deep file, so the
+// packaged ESM main process can't resolve it without the extension (the dev
+// bundler tolerates the bare specifier, but Node's ESM loader does not).
+import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 
 /** The vfs is a `{ filename: base64 }` map. */
 const vfs = vfsFonts as unknown as Record<string, string>;
