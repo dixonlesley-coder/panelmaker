@@ -531,6 +531,10 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
           </Table.Tfoot>
         </Table>
       </Card>
+
+      <Text size="xs" c="dimmed">
+        {t('results.standardsRef')}: {t('results.standardsRefHint')}
+      </Text>
     </Stack>
   );
 }

@@ -35,6 +35,7 @@ import {
   costBom,
   computeQuotation,
 } from '@shared/engine';
+import { STANDARD_REFERENCES } from '@shared/standards';
 import { robotoFonts } from './pdfFonts';
 import { computeProject, computePanelResult } from './calc.service';
 
@@ -161,6 +162,40 @@ function panelDiagramsBlock(
     { svg: panelSldSvg(panel, result, titleStripFor(project, 'Single-line diagram')), width: 515 },
     { text: 'General arrangement', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
     { svg: panelGaSvg(panel, result, titleStripFor(project, 'General arrangement')), fit: [515, 360] },
+  ];
+}
+
+/**
+ * A "Standards references" section listing each sizing rule the engine applies
+ * and the PUIL 2011 (SNI 0225:2011) / IEC 60364 / IEC 60947 clause it follows.
+ * The data comes from `@shared/standards` (STANDARD_REFERENCES), so the printed
+ * citations stay in step with the engine's reference constants. English /
+ * standard clause numbers only — this is a main-process document, no i18n.
+ */
+function standardsReferencesBlock(): Content[] {
+  const header: TableCell[] = ['Sizing rule', 'PUIL 2011 / IEC clause'].map((t) => ({
+    text: t,
+    bold: true,
+  }));
+  const body: TableCell[][] = [header];
+  for (const ref of STANDARD_REFERENCES) {
+    body.push([ref.topic, ref.clause]);
+  }
+  return [
+    heading('Standards references (PUIL 2011 / IEC 60364)'),
+    {
+      table: { headerRows: 1, widths: ['*', '*'], body },
+      layout: 'lightHorizontalLines',
+      fontSize: 7,
+    },
+    {
+      text:
+        'Results are engineering estimates — verify against PUIL 2011 (SNI 0225:2011) and the ' +
+        'cited IEC standards before construction.',
+      style: 'subtitle',
+      fontSize: 7,
+      margin: [0, 4, 0, 0],
+    },
   ];
 }
 
@@ -343,6 +378,7 @@ function panelDocDefinition(
       bomTable(bomLinesForPanel(panel)),
       ...revisionBlock(project),
       ...warningsBlock(panel.warnings),
+      ...standardsReferencesBlock(),
       {
         text: `Standards: ${panel.standardsVersion}`,
         style: 'subtitle',
@@ -392,6 +428,7 @@ function systemDocDefinition(
   content.push(bomTable(allBom));
   content.push(...revisionBlock(project));
   content.push(...warningsBlock(system.warnings));
+  content.push(...standardsReferencesBlock());
 
   return {
     defaultStyle: DEFAULT_STYLE,
