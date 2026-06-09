@@ -20,7 +20,7 @@ import { round } from './util';
 export const DEFAULT_LABOR_RATE_PER_HOUR = 150_000;
 /** Default overhead loading on (material + labor), percent. */
 export const DEFAULT_OVERHEAD_PCT = 10;
-/** Default profit margin on the loaded cost base, percent. */
+/** Default gross profit margin as a percent of the sell price. */
 export const DEFAULT_MARGIN_PCT = 15;
 /** Default contingency / risk allowance on (material + labor), percent. */
 export const DEFAULT_CONTINGENCY_PCT = 5;
@@ -72,10 +72,14 @@ export function computeQuotation(input: QuotationInput): QuotationResult {
   const overhead = round(primeCost * (overheadPct / 100), 2);
   const contingency = round(primeCost * (contingencyPct / 100), 2);
 
-  // Margin is taken on the fully loaded cost base.
+  // True gross margin: profit as a fraction of the SELL price, so
+  // sell = cost / (1 − margin). (Applying cost·(1+margin) would be a *markup* and
+  // realise a smaller margin than entered — a "15% margin" would yield ~13%.)
+  // Clamp below 100% to keep the result finite.
   const marginBase = round(primeCost + overhead + contingency, 2);
-  const margin = round(marginBase * (marginPct / 100), 2);
-  const grandTotal = round(marginBase + margin, 2);
+  const marginFraction = Math.min(Math.max(marginPct, 0), 99.9) / 100;
+  const grandTotal = round(marginBase / (1 - marginFraction), 2);
+  const margin = round(grandTotal - marginBase, 2);
 
   const sections = [
     { label: 'Material', amount: materialSubtotal },

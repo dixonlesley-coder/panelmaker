@@ -91,8 +91,11 @@ describe('computeQuotation', () => {
     expect(q.contingency).toBeCloseTo(prime * 0.05, 2);
     const base = prime + q.overhead + q.contingency;
     expect(q.marginBase).toBeCloseTo(base, 2);
-    expect(q.margin).toBeCloseTo(base * 0.2, 2);
-    expect(q.grandTotal).toBeCloseTo(base + q.margin, 2);
+    // True gross margin: sell = base / (1 − margin); a 20% margin → base / 0.8.
+    expect(q.grandTotal).toBeCloseTo(base / (1 - 0.2), 2);
+    expect(q.margin).toBeCloseTo(q.grandTotal - base, 2);
+    // The realised profit is 20% of the SELL price.
+    expect(q.margin / q.grandTotal).toBeCloseTo(0.2, 4);
   });
 
   it('uses the documented defaults when settings are absent', () => {

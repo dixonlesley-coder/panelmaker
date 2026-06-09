@@ -58,9 +58,10 @@ export interface PpeBand {
  * above it, no listed arc-rated PPE applies and the work must be de-energized.
  */
 export const PPE_BANDS: readonly PpeBand[] = [
-  { label: 'PPE 0/1 (≤1.2 cal/cm²)', maxCalCm2: 1.2 },
+  { label: 'No arc-rated PPE (<1.2 cal/cm²)', maxCalCm2: 1.2 },
+  { label: 'CAT 1 (≤4 cal/cm²)', maxCalCm2: 4 },
   { label: 'CAT 2 (≤8 cal/cm²)', maxCalCm2: 8 },
-  { label: 'CAT 3/4 (≤25 cal/cm²)', maxCalCm2: 25 },
+  { label: 'CAT 3 (≤25 cal/cm²)', maxCalCm2: 25 },
   { label: 'CAT 4 (≤40 cal/cm²)', maxCalCm2: 40 },
 ];
 

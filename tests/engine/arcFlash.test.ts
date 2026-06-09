@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeArcFlash, computeSystem } from '@shared/engine';
+import { computeArcFlash, computeSystem, arcFlashWarnings } from '@shared/engine';
 import { ppeCategory } from '@shared/standards';
 import type { CircuitInput, PanelInput, ProjectInput } from '@shared/types';
 
@@ -32,9 +32,10 @@ function panel(p: Partial<PanelInput> & { id: string; name: string }): PanelInpu
 
 describe('ppeCategory thresholds (NFPA 70E)', () => {
   it('maps incident energy to the standard cal/cm² bands', () => {
-    expect(ppeCategory(1.0)).toMatch(/PPE 0/);
+    expect(ppeCategory(1.0)).toMatch(/No arc-rated|<1\.2/);
+    expect(ppeCategory(3)).toMatch(/CAT 1/);
     expect(ppeCategory(5)).toMatch(/CAT 2/);
-    expect(ppeCategory(20)).toMatch(/CAT 3\/4/);
+    expect(ppeCategory(20)).toMatch(/CAT 3/);
     expect(ppeCategory(35)).toMatch(/CAT 4/);
     expect(ppeCategory(50)).toMatch(/de-energize/i);
   });
@@ -55,11 +56,34 @@ describe('computeArcFlash (Lee-method estimate)', () => {
     expect(mccb.arcFlashBoundaryMm).toBeGreaterThan(mccb.workingDistanceMm);
   });
 
-  it('flags a de-energize condition at very high fault / slow clearing', () => {
+  it('gives a realistic CAT-3 magnitude for a 60 kA / 400 V MCCB bus', () => {
+    // Lee: 2.142e6 · 0.4 · 60 · 0.2 / 455² / 4.184 ≈ 11.9 cal/cm² (CAT 3, not de-energize).
     const a = computeArcFlash({ boltedFaultA: 60000, voltageV: 400, incomerClass: 'MCCB' })!;
+    expect(a.incidentEnergyCalCm2).toBeGreaterThan(8);
+    expect(a.incidentEnergyCalCm2).toBeLessThan(20);
+    expect(a.ppeCategory).toMatch(/CAT 3/);
+  });
+
+  it('flags a de-energize condition at very high energy (close working distance)', () => {
+    const a = computeArcFlash({
+      boltedFaultA: 60000,
+      voltageV: 400,
+      incomerClass: 'MCCB',
+      workingDistanceMm: 75,
+    })!;
     expect(a.incidentEnergyCalCm2).toBeGreaterThan(40);
     expect(a.ppeCategory).toMatch(/de-energize/i);
     expect(a.note).toMatch(/de-energize/i);
+  });
+
+  it('raises an extreme warning for a high-energy bus', () => {
+    const a = computeArcFlash({
+      boltedFaultA: 60000,
+      voltageV: 400,
+      incomerClass: 'MCCB',
+      workingDistanceMm: 75,
+    })!;
+    expect(arcFlashWarnings(a, 'P1').some((w) => w.code === 'arc-flash-extreme')).toBe(true);
   });
 });
 
@@ -83,7 +107,7 @@ describe('arc-flash wired through computeSystem', () => {
     expect(main.arcFlash!.ppeCategory).toBeTruthy();
   });
 
-  it('raises an arc-flash warning on a high-fault MV-fed bus', () => {
+  it('attaches a sane arc-flash category on an MV-fed bus', () => {
     const project: ProjectInput = {
       id: 'PRJ',
       name: 'B',
@@ -100,9 +124,9 @@ describe('arc-flash wired through computeSystem', () => {
     };
     const sys = computeSystem(project);
     expect(sys.supply.type).toBe('MV');
-    expect(sys.panels['MAIN']!.arcFlash).toBeDefined();
-    expect(
-      sys.warnings.some((w) => w.code === 'arc-flash-high' || w.code === 'arc-flash-extreme'),
-    ).toBe(true);
+    const af = sys.panels['MAIN']!.arcFlash!;
+    expect(af).toBeDefined();
+    expect(af.incidentEnergyCalCm2).toBeGreaterThan(0);
+    expect(af.ppeCategory).toBeTruthy();
   });
 });

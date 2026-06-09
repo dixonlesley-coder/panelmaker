@@ -7,8 +7,8 @@
  * IEEE 1584-2018 study — it does not model arc-current reduction, enclosure
  * geometry, or device time-current curves. See `standards/arcFlash`.
  *
- * Lee method (maximum-power-transfer, conservative for LV):
- *   E[J/cm²] = 5.12e5 · V[kV] · I_bf[kA] · ( t[s] / D[cm]² )
+ * Lee method (maximum-power-transfer, conservative for LV), distance in mm:
+ *   E[J/cm²]   = 2.142e6 · V[kV] · I_bf[kA] · t[s] / D[mm]²
  *   E[cal/cm²] = E[J/cm²] / 4.184
  * The arc-flash boundary is the distance at which E falls to 1.2 cal/cm².
  */
@@ -40,8 +40,9 @@ export interface ArcFlashInput {
 }
 
 /**
- * Lee-method incident energy (cal/cm²) at a distance D for a given fault.
- *   E[J/cm²] = 5.12e5 · Vkv · Ika · t / Dcm²
+ * Lee-method incident energy (cal/cm²) at distance D (mm) for a given fault.
+ *   E[J/cm²]   = 2.142e6 · V[kV] · I_bf[kA] · t[s] / D[mm]²
+ *   E[cal/cm²] = E[J/cm²] / 4.184
  */
 function leeIncidentEnergyCalCm2(
   voltageV: number,
@@ -49,11 +50,12 @@ function leeIncidentEnergyCalCm2(
   arcingTimeS: number,
   distanceMm: number,
 ): number {
+  if (distanceMm <= 0) return Infinity;
   const vKv = voltageV / 1000;
   const iKa = boltedFaultA / 1000;
-  const dCm = distanceMm / 10;
-  if (dCm <= 0) return Infinity;
-  const eJ = 5.12e5 * vKv * iKa * (arcingTimeS / (dCm * dCm));
+  // Distance stays in MILLIMETRES here — the 2.142e6 coefficient is defined for
+  // D in mm; converting to cm would inflate E by 100x.
+  const eJ = (2.142e6 * vKv * iKa * arcingTimeS) / (distanceMm * distanceMm);
   return eJ / J_PER_CAL;
 }
 

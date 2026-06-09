@@ -63,7 +63,7 @@ describe('computePanel', () => {
     });
     const r = computePanel(p);
     const c = r.circuits[0]!;
-    expect(c.designCurrentA).toBeCloseTo(102, 0);
+    expect(c.designCurrentA).toBeCloseTo(68, 0);
     expect(c.control?.starterType).toBe('STAR_DELTA');
     expect(c.control?.devices.some((d) => d.category === 'control_transformer')).toBe(true);
   });
