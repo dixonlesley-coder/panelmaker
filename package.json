@@ -5,6 +5,7 @@
   "description": "Offline electrical panel & system designer (PUIL 2011 / IEC 60364 / IEC 60947)",
   "license": "MIT",
   "type": "module",
+  "main": "out/main/index.js",
   "engines": {
     "node": ">=20"
   },
