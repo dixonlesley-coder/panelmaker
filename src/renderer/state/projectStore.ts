@@ -66,6 +66,11 @@ export interface ProjectState {
   past: ProjectInput[];
   /** Redo stack: states undone away from, newest first. */
   future: ProjectInput[];
+  /**
+   * A copied circuit held outside project history, ready to paste into any
+   * panel. Stored as a deep clone so later edits never mutate the clipboard.
+   */
+  circuitClipboard: CircuitInput | null;
 
   // navigation
   setScreen: (screen: Screen) => void;
@@ -75,6 +80,12 @@ export interface ProjectState {
   updateCircuit: (panelId: string, circuitId: string, patch: Partial<CircuitInput>) => void;
   addCircuit: (panelId: string) => void;
   removeCircuit: (panelId: string, circuitId: string) => void;
+  /** Clone a circuit in place: fresh id, "(copy)" name, inserted after the source. */
+  duplicateCircuit: (panelId: string, circuitId: string) => void;
+  /** Copy a circuit to the clipboard (deep clone, outside project history). */
+  copyCircuit: (panelId: string, circuitId: string) => void;
+  /** Paste the clipboard circuit (fresh id) onto a panel, enabling cross-panel copy. */
+  pasteCircuit: (panelId: string) => void;
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
@@ -150,6 +161,16 @@ function mapPanel(
   };
 }
 
+/** A structural deep clone (circuits are plain JSON-safe data). */
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/** Deep-clone a circuit, assigning it a fresh runtime id. */
+function cloneCircuit(circuit: CircuitInput): CircuitInput {
+  return { ...deepClone(circuit), id: nextId('c') };
+}
+
 /** Immutably map over a panel's circuits, replacing the one matching `circuitId`. */
 function mapCircuit(
   panel: PanelInput,
@@ -210,6 +231,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   schematics: {},
   past: [],
   future: [],
+  circuitClipboard: null,
 
   setScreen: (screen) => set({ activeScreen: screen }),
   setActivePanel: (panelId) => set({ activePanelId: panelId }),
@@ -252,6 +274,42 @@ export const useProjectStore = create<ProjectState>((set) => ({
         })),
       ),
     ),
+
+  duplicateCircuit: (panelId, circuitId) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          const index = panel.circuits.findIndex((c) => c.id === circuitId);
+          if (index === -1) return panel;
+          const source = panel.circuits[index]!;
+          const copy: CircuitInput = { ...cloneCircuit(source), name: `${source.name} (copy)` };
+          const circuits = [...panel.circuits];
+          circuits.splice(index + 1, 0, copy);
+          return { ...panel, circuits };
+        }),
+      ),
+    ),
+
+  copyCircuit: (panelId, circuitId) =>
+    set((s) => {
+      const panel = s.project.panels.find((p) => p.id === panelId);
+      const circuit = panel?.circuits.find((c) => c.id === circuitId);
+      if (!circuit) return s;
+      // Deep clone so subsequent edits never reach back into the clipboard.
+      return { circuitClipboard: deepClone(circuit) };
+    }),
+
+  pasteCircuit: (panelId) =>
+    set((s) => {
+      const clip = s.circuitClipboard;
+      if (!clip) return s;
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: [...panel.circuits, cloneCircuit(clip)],
+        })),
+      );
+    }),
 
   updatePanel: (panelId, patch) =>
     set((s) =>
@@ -510,3 +568,6 @@ export const selectCanUndo = (s: ProjectState): boolean => s.past.length > 0;
 
 /** Selector: whether a redo is currently available (the future stack is non-empty). */
 export const selectCanRedo = (s: ProjectState): boolean => s.future.length > 0;
+
+/** Selector: whether a copied circuit is available to paste. */
+export const selectHasClipboard = (s: ProjectState): boolean => s.circuitClipboard !== null;

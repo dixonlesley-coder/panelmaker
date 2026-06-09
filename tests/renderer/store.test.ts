@@ -3,6 +3,7 @@ import {
   useProjectStore,
   selectCanUndo,
   selectCanRedo,
+  selectHasClipboard,
 } from '@renderer/state/projectStore';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { computeSystem } from '@shared/engine';
@@ -23,8 +24,13 @@ function findVoltageDropWarning() {
 
 describe('projectStore', () => {
   beforeEach(() => {
-    // reset to a fresh sample project (and clear history) between tests
-    useProjectStore.setState({ project: createSampleProject(), past: [], future: [] });
+    // reset to a fresh sample project (and clear history/clipboard) between tests
+    useProjectStore.setState({
+      project: createSampleProject(),
+      past: [],
+      future: [],
+      circuitClipboard: null,
+    });
   });
 
   it('seeds the realistic sample building', () => {
@@ -141,6 +147,82 @@ describe('projectStore', () => {
       useProjectStore.getState().updatePanel(panelId, { name: 'Second' });
       expect(selectCanRedo(useProjectStore.getState())).toBe(false);
       expect(useProjectStore.getState().project.panels[0]!.name).toBe('Second');
+    });
+  });
+
+  describe('duplicate / copy / paste circuits', () => {
+    /** A panel id with at least one branch circuit, plus that circuit. */
+    function pickBranch() {
+      const { project } = useProjectStore.getState();
+      const panel = project.panels.find((p) => p.circuits.some((c) => c.role === 'branch'))!;
+      const circuit = panel.circuits.find((c) => c.role === 'branch')!;
+      return { panelId: panel.id, circuit };
+    }
+
+    it('duplicateCircuit inserts a fresh-id "(copy)" right after the source', () => {
+      const { panelId, circuit } = pickBranch();
+      const before = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      const startCount = before.circuits.length;
+      const srcIndex = before.circuits.findIndex((c) => c.id === circuit.id);
+
+      useProjectStore.getState().duplicateCircuit(panelId, circuit.id);
+
+      const after = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      expect(after.circuits.length).toBe(startCount + 1);
+      const copy = after.circuits[srcIndex + 1]!;
+      expect(copy.id).not.toBe(circuit.id);
+      expect(copy.name).toBe(`${circuit.name} (copy)`);
+      expect(copy.loadW).toBe(circuit.loadW);
+      // ids are unique across the panel
+      const ids = after.circuits.map((c) => c.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('duplicateCircuit is undoable', () => {
+      const { panelId, circuit } = pickBranch();
+      const startCount = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!
+        .circuits.length;
+      useProjectStore.getState().duplicateCircuit(panelId, circuit.id);
+      useProjectStore.getState().undo();
+      expect(
+        useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits.length,
+      ).toBe(startCount);
+    });
+
+    it('copyCircuit + pasteCircuit clones into any panel with a fresh id', () => {
+      const { project } = useProjectStore.getState();
+      const source = project.panels.find((p) => p.circuits.some((c) => c.role === 'branch'))!;
+      const target = project.panels.find((p) => p.id !== source.id)!;
+      const circuit = source.circuits.find((c) => c.role === 'branch')!;
+
+      expect(selectHasClipboard(useProjectStore.getState())).toBe(false);
+      useProjectStore.getState().copyCircuit(source.id, circuit.id);
+      expect(selectHasClipboard(useProjectStore.getState())).toBe(true);
+      // copying is not an undoable project edit
+      expect(selectCanUndo(useProjectStore.getState())).toBe(false);
+
+      const targetStart = useProjectStore.getState().project.panels.find((p) => p.id === target.id)!
+        .circuits.length;
+      useProjectStore.getState().pasteCircuit(target.id);
+
+      const after = useProjectStore.getState().project.panels.find((p) => p.id === target.id)!;
+      expect(after.circuits.length).toBe(targetStart + 1);
+      const pasted = after.circuits[after.circuits.length - 1]!;
+      expect(pasted.id).not.toBe(circuit.id);
+      expect(pasted.name).toBe(circuit.name);
+      expect(pasted.loadKind).toBe(circuit.loadKind);
+      // paste is undoable
+      expect(selectCanUndo(useProjectStore.getState())).toBe(true);
+    });
+
+    it('pasteCircuit is a no-op with an empty clipboard', () => {
+      const { panelId } = pickBranch();
+      const start = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!
+        .circuits.length;
+      useProjectStore.getState().pasteCircuit(panelId);
+      expect(
+        useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits.length,
+      ).toBe(start);
     });
   });
 });

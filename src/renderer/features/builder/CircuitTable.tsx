@@ -1,8 +1,8 @@
 import { ActionIcon, Button, Group, NumberInput, Select, Table, Text, TextInput, Tooltip } from '@mantine/core';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconClipboard, IconCopy, IconCopyPlus, IconPlus, IconTrash } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
 import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor } from '@shared/standards';
-import { useProjectStore } from '@renderer/state/projectStore';
+import { selectHasClipboard, useProjectStore } from '@renderer/state/projectStore';
 
 /** Load-kind options for the editable Select (full catalog). */
 const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
@@ -34,6 +34,8 @@ interface RowProps {
 function CircuitRow({ panelId, circuit }: RowProps) {
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
+  const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
+  const copyCircuit = useProjectStore((s) => s.copyCircuit);
 
   const motor = isMotorKind(circuit.loadKind);
 
@@ -151,16 +153,38 @@ function CircuitRow({ panelId, circuit }: RowProps) {
       </Table.Td>
 
       <Table.Td>
-        <Tooltip label="Delete circuit">
-          <ActionIcon
-            variant="subtle"
-            color="red"
-            aria-label="Delete circuit"
-            onClick={() => removeCircuit(panelId, circuit.id)}
-          >
-            <IconTrash size={16} />
-          </ActionIcon>
-        </Tooltip>
+        <Group gap={2} wrap="nowrap" justify="flex-end">
+          <Tooltip label="Duplicate circuit">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              aria-label="Duplicate circuit"
+              onClick={() => duplicateCircuit(panelId, circuit.id)}
+            >
+              <IconCopyPlus size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Copy circuit">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              aria-label="Copy circuit"
+              onClick={() => copyCircuit(panelId, circuit.id)}
+            >
+              <IconCopy size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Delete circuit">
+            <ActionIcon
+              variant="subtle"
+              color="red"
+              aria-label="Delete circuit"
+              onClick={() => removeCircuit(panelId, circuit.id)}
+            >
+              <IconTrash size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Table.Td>
     </Table.Tr>
   );
@@ -172,6 +196,8 @@ export function CircuitTable({ panelId }: { panelId: string }) {
     (s) => s.project.panels.find((p) => p.id === panelId)?.circuits ?? [],
   );
   const addCircuit = useProjectStore((s) => s.addCircuit);
+  const pasteCircuit = useProjectStore((s) => s.pasteCircuit);
+  const hasClipboard = useProjectStore(selectHasClipboard);
 
   const branches = circuits.filter((c) => c.role === 'branch');
 
@@ -188,7 +214,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
               <Table.Th w={80}>pf</Table.Th>
               <Table.Th w={170}>Usage</Table.Th>
               <Table.Th w={160}>Starter</Table.Th>
-              <Table.Th w={44} />
+              <Table.Th w={108} />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -213,6 +239,15 @@ export function CircuitTable({ panelId }: { panelId: string }) {
           onClick={() => addCircuit(panelId)}
         >
           Add circuit
+        </Button>
+        <Button
+          leftSection={<IconClipboard size={16} />}
+          variant="default"
+          size="xs"
+          disabled={!hasClipboard}
+          onClick={() => pasteCircuit(panelId)}
+        >
+          Paste circuit
         </Button>
       </Group>
     </div>
