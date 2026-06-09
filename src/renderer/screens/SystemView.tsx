@@ -27,17 +27,21 @@ import {
   IconCash,
   IconDeviceFloppy,
   IconDownload,
+  IconFileSpreadsheet,
+  IconFileTypeCsv,
+  IconListDetails,
   IconSitemap,
   IconSolarPanel,
   IconStack2,
   IconTags,
 } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
-import type { PanelInput, ProjectInput, SystemResult } from '@shared/types';
+import type { CostResult, PanelInput, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
 import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
-import { costSystem } from '@renderer/lib/bom';
+import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
+import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { exportLabelsPdf, exportSystemPdf, saveProjectToDisk } from '@renderer/api';
@@ -142,6 +146,12 @@ export function SystemView() {
   const cost = useMemo(() => {
     const priceMap = new Map<string, number>(Object.entries(prices));
     return costSystem(system, parts, priceMap);
+  }, [system, parts, prices]);
+
+  // Consolidated project-wide BOM (per-panel lines merged by part/description).
+  const projectBom = useMemo(() => {
+    const priceMap = new Map<string, number>(Object.entries(prices));
+    return costSystemConsolidated(system, parts, priceMap);
   }, [system, parts, prices]);
 
   const openPanel = (panelId: string) => {
@@ -323,7 +333,116 @@ export function SystemView() {
           </Tabs.Panel>
         </Tabs>
       </Card>
+
+      <ProjectBomCard cost={projectBom} projectName={project.name} />
     </Stack>
+  );
+}
+
+/**
+ * The consolidated project-wide bill of materials: every panel's lines merged by
+ * part/description and category, with a grand total and CSV/Excel export. Reuses
+ * the per-panel BOM export helpers — the only difference is the consolidated
+ * line set.
+ */
+function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: string }) {
+  const { lines } = cost;
+  if (lines.length === 0) return null;
+
+  const safeName = projectName.replace(/[^\w.-]+/g, '_');
+
+  return (
+    <Card withBorder radius="md" padding="md">
+      <Group justify="space-between" mb="xs">
+        <Group gap="xs">
+          <ThemeIcon variant="light" color="indigo">
+            <IconListDetails size={16} />
+          </ThemeIcon>
+          <Text fw={600} size="sm">
+            Project bill of materials
+          </Text>
+          <Text size="xs" c="dimmed">
+            {lines.length} line{lines.length === 1 ? '' : 's'} · consolidated across all panels
+          </Text>
+        </Group>
+        <Group gap="xs">
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconFileTypeCsv size={14} />}
+            onClick={() => downloadBomCsv(`${safeName} - project BOM.csv`, lines, cost.currency)}
+          >
+            Export project BOM (CSV)
+          </Button>
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconFileSpreadsheet size={14} />}
+            onClick={() => downloadBomXlsx(`${safeName} - project BOM.xlsx`, lines, cost.currency)}
+          >
+            Export project BOM (Excel)
+          </Button>
+        </Group>
+      </Group>
+      <Table.ScrollContainer minWidth={620}>
+        <Table verticalSpacing="xs" fz="sm" highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Item</Table.Th>
+              <Table.Th w={120}>Category</Table.Th>
+              <Table.Th w={120}>Order code</Table.Th>
+              <Table.Th w={60} ta="right">
+                Qty
+              </Table.Th>
+              <Table.Th w={150} ta="right">
+                Line total
+              </Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {lines.map((l, i) => (
+              <Table.Tr key={`${l.partId ?? l.description}-${i}`}>
+                <Table.Td>{l.description}</Table.Td>
+                <Table.Td>
+                  <Badge variant="light" color="gray" size="sm" tt="none">
+                    {l.category}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>
+                  {l.sku ? (
+                    <Text size="xs" ff="monospace">
+                      {l.sku}
+                    </Text>
+                  ) : (
+                    <Text size="xs" c="dimmed">
+                      —
+                    </Text>
+                  )}
+                </Table.Td>
+                <Table.Td ta="right">{l.qty}</Table.Td>
+                <Table.Td ta="right">
+                  {l.matched && l.lineTotal !== undefined ? (
+                    formatIdr(l.lineTotal)
+                  ) : (
+                    <Badge size="xs" variant="light" color="gray">
+                      no price
+                    </Badge>
+                  )}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
+      <Group justify="space-between" mt="sm">
+        <Text size="xs" c="dimmed">
+          {cost.unmatchedCount > 0
+            ? `${cost.unmatchedCount} line(s) unpriced (excluded from the total)`
+            : 'all lines priced'}
+        </Text>
+        <Text fw={700}>{formatIdr(cost.grandTotal)}</Text>
+      </Group>
+    </Card>
   );
 }
 
