@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at TEXT NOT NULL,
   app_version TEXT,
   earthing_system TEXT,
-  sources_json TEXT
+  sources_json TEXT,
+  meta_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS panels (
@@ -184,6 +185,31 @@ CREATE TABLE IF NOT EXISTS system_edges (
   payload_json TEXT
 );
 `;
+
+/**
+ * Idempotent column back-fills for tables that already exist in older databases.
+ * `CREATE TABLE IF NOT EXISTS` only creates missing tables — it never alters an
+ * existing one — so columns added to the schema after a table was first created
+ * must be added defensively here. Each ALTER is wrapped so a re-run (where the
+ * column already exists) is a no-op rather than a hard failure.
+ */
+const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
+  // Project branding / title-block metadata (added after initial release).
+  { table: 'projects', column: 'meta_json', ddl: 'ALTER TABLE projects ADD COLUMN meta_json TEXT' },
+];
+
+/** Add any missing columns to existing tables (safe to run repeatedly). */
+function backfillColumns(): void {
+  const { sqlite } = getConnection();
+  for (const { ddl } of COLUMN_BACKFILLS) {
+    try {
+      sqlite.exec(ddl);
+    } catch {
+      // Column already exists (or the table is brand-new with it included) —
+      // a duplicate-column error here is expected and safe to ignore.
+    }
+  }
+}
 
 /** True when the migrations directory exists and holds at least one `.sql` file. */
 function hasMigrations(): boolean {

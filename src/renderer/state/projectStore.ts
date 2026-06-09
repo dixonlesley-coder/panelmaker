@@ -8,6 +8,7 @@ import type {
   PanelInput,
   Part,
   ProjectInput,
+  ProjectMeta,
   SchematicRung,
   SchematicSymbol,
   SchematicSymbolType,
@@ -94,6 +95,10 @@ export interface ProjectState {
   // earthing
   /** Set the installation earthing system. */
   setEarthingSystem: (system: EarthingSystem) => void;
+
+  // branding / title-block metadata
+  /** Merge a partial branding/title-block metadata patch into the project. */
+  setProjectMeta: (patch: Partial<ProjectMeta>) => void;
 
   // undo / redo (project edits only)
   /** Restore the previous project state (no-op when the past stack is empty). */
@@ -313,6 +318,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setEarthingSystem: (system) =>
     set((s) => withHistory(s, (project) => ({ ...project, earthingSystem: system }))),
+
+  setProjectMeta: (patch) =>
+    set((s) =>
+      withHistory(s, (project) => ({
+        ...project,
+        meta: { ...project.meta, ...patch },
+      })),
+    ),
 
   undo: () =>
     set((s) => {

@@ -197,6 +197,7 @@ export function assembleProject(
   panels: PanelInput[],
   earthingSystem?: string | null,
   sourcesJson?: string | null,
+  metaJson?: string | null,
 ): ProjectInput {
   const project: ProjectInput = { id, name, panels };
   const es = nullToUndef(earthingSystem);
@@ -207,6 +208,14 @@ export function assembleProject(
       project.sources = JSON.parse(sj) as ProjectInput['sources'];
     } catch {
       /* corrupt sources blob — ignore */
+    }
+  }
+  const mj = nullToUndef(metaJson);
+  if (mj) {
+    try {
+      project.meta = JSON.parse(mj) as ProjectInput['meta'];
+    } catch {
+      /* corrupt meta blob — ignore */
     }
   }
   return project;

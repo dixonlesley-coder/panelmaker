@@ -48,6 +48,7 @@ export function saveProject(project: ProjectInput, db: Db = getDb()): { id: stri
           appVersion: APP_VERSION,
           earthingSystem: project.earthingSystem ?? null,
           sourcesJson: project.sources ? JSON.stringify(project.sources) : null,
+          metaJson: project.meta ? JSON.stringify(project.meta) : null,
         })
         .run();
     } else {
@@ -57,6 +58,7 @@ export function saveProject(project: ProjectInput, db: Db = getDb()): { id: stri
           updatedAt: ts,
           earthingSystem: project.earthingSystem ?? null,
           sourcesJson: project.sources ? JSON.stringify(project.sources) : null,
+          metaJson: project.meta ? JSON.stringify(project.meta) : null,
         })
         .where(eq(projects.id, project.id))
         .run();
@@ -101,6 +103,7 @@ export function loadProject(id: string, db: Db = getDb()): ProjectInput | null {
     builtPanels,
     projectRow.earthingSystem,
     projectRow.sourcesJson,
+    projectRow.metaJson,
   );
 }
 

@@ -71,6 +71,44 @@ export interface PanelInput {
   circuits: CircuitInput[];
 }
 
+/** One entry in a drawing's revision history (title-block revision block). */
+export interface ProjectRevision {
+  /** Revision label, e.g. "A", "B", "01". */
+  rev: string;
+  /** Issue date (free-text or ISO; rendered verbatim). */
+  date: string;
+  /** Description of what changed at this revision. */
+  note: string;
+  /** Who issued the revision (initials/name). */
+  by?: string;
+}
+
+/**
+ * Optional project-level branding / title-block metadata. Drives the PDF title
+ * block, the revision block, and the small drawing title-strip. Every field is
+ * optional so existing projects (which have no `meta`) keep working unchanged.
+ */
+export interface ProjectMeta {
+  /** End client / owner the design is prepared for. */
+  client?: string;
+  /** Site / installation location. */
+  location?: string;
+  /** Responsible engineer (name / initials). */
+  engineer?: string;
+  /** Designing company / consultancy name. */
+  companyName?: string;
+  /** Drawing number stamped in the title block. */
+  drawingNumber?: string;
+  /** Project / job number. */
+  projectNumber?: string;
+  /** Current revision label, e.g. "A". */
+  revision?: string;
+  /** Company logo as a base64 data URL (offline-friendly, embedded in PDFs). */
+  logoDataUrl?: string;
+  /** Revision history rendered as the title-block revision table. */
+  revisions?: ProjectRevision[];
+}
+
 export interface ProjectInput {
   id: string;
   name: string;
@@ -79,4 +117,6 @@ export interface ProjectInput {
   earthingSystem?: EarthingSystem;
   /** Optional distributed energy sources (generator / solar / battery). */
   sources?: SourcesConfig;
+  /** Optional project branding / title-block metadata. */
+  meta?: ProjectMeta;
 }

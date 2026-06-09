@@ -38,12 +38,31 @@ describe('SQLite persistence', () => {
 
     const project = createSampleProject();
     project.earthingSystem = 'TT';
+    project.meta = {
+      client: 'PT Contoh',
+      location: 'Jakarta',
+      engineer: 'L. Dixon',
+      companyName: 'PanelMaker Co.',
+      drawingNumber: 'E-101',
+      projectNumber: 'JOB-42',
+      revision: 'B',
+      logoDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      revisions: [
+        { rev: 'A', date: '2026-01-01', note: 'Issued for review', by: 'LD' },
+        { rev: 'B', date: '2026-02-01', note: 'Issued for construction' },
+      ],
+    };
     saveProject(project);
 
     const loaded = loadProject(project.id);
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe(project.name);
     expect(loaded!.earthingSystem).toBe('TT');
+
+    // branding / title-block metadata round-trips via the meta_json column
+    expect(loaded!.meta).toEqual(project.meta);
+    expect(loaded!.meta?.revisions?.[0]?.rev).toBe('A');
+    expect(loaded!.meta?.revisions?.[1]?.by).toBeUndefined();
     expect(loaded!.sources?.generator?.enabled).toBe(true);
     expect(loaded!.sources?.solar?.enabled).toBe(true);
     expect(loaded!.panels.length).toBe(project.panels.length);

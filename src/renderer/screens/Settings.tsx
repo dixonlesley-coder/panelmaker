@@ -1,18 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
   Card,
   Group,
+  Image,
   NumberInput,
   Select,
   SimpleGrid,
   Stack,
   Text,
+  TextInput,
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconInfoCircle, IconRefresh, IconShieldBolt } from '@tabler/icons-react';
+import {
+  IconBuildingFactory2,
+  IconInfoCircle,
+  IconPhoto,
+  IconRefresh,
+  IconShieldBolt,
+  IconX,
+} from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
@@ -34,8 +43,23 @@ export function Settings() {
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const setEarthingSystem = useProjectStore((s) => s.setEarthingSystem);
+  const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
+  const meta = project.meta ?? {};
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  /** Read a chosen image file as a base64 data URL and store it on the project. */
+  function onLogoFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setProjectMeta({ logoDataUrl: reader.result });
+    };
+    reader.onerror = () =>
+      notifications.show({ message: 'Could not read the logo file.', color: 'red' });
+    reader.readAsDataURL(file);
+  }
 
   const system = useMemo(() => computeSystem(project), [project]);
   const standardsVersion = Object.values(system.panels)[0]?.standardsVersion ?? 'unknown';
@@ -80,6 +104,111 @@ export function Settings() {
         </Text>
         <Title order={3}>Panel defaults — {panel.name}</Title>
       </div>
+
+      <Card withBorder radius="md" padding="md">
+        <Group gap="xs" mb="md">
+          <IconBuildingFactory2 size={18} color="var(--mantine-color-indigo-6)" />
+          <Text fw={600}>Project details &amp; title block</Text>
+        </Group>
+        <Text size="xs" c="dimmed" mb="md">
+          Branding shown on PDF reports and drawing title blocks. Stored with the project.
+        </Text>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <TextInput
+            label="Company name"
+            placeholder="Designing consultancy / contractor"
+            value={meta.companyName ?? ''}
+            onChange={(e) => setProjectMeta({ companyName: e.currentTarget.value })}
+          />
+          <TextInput
+            label="Client"
+            placeholder="End client / owner"
+            value={meta.client ?? ''}
+            onChange={(e) => setProjectMeta({ client: e.currentTarget.value })}
+          />
+          <TextInput
+            label="Location"
+            placeholder="Site / installation location"
+            value={meta.location ?? ''}
+            onChange={(e) => setProjectMeta({ location: e.currentTarget.value })}
+          />
+          <TextInput
+            label="Engineer"
+            placeholder="Responsible engineer"
+            value={meta.engineer ?? ''}
+            onChange={(e) => setProjectMeta({ engineer: e.currentTarget.value })}
+          />
+          <TextInput
+            label="Drawing number"
+            placeholder="e.g. E-101"
+            value={meta.drawingNumber ?? ''}
+            onChange={(e) => setProjectMeta({ drawingNumber: e.currentTarget.value })}
+          />
+          <TextInput
+            label="Project number"
+            placeholder="Job / project no."
+            value={meta.projectNumber ?? ''}
+            onChange={(e) => setProjectMeta({ projectNumber: e.currentTarget.value })}
+          />
+          <TextInput
+            label="Revision"
+            placeholder="e.g. A"
+            value={meta.revision ?? ''}
+            onChange={(e) => setProjectMeta({ revision: e.currentTarget.value })}
+            maw={160}
+          />
+        </SimpleGrid>
+
+        <Group align="flex-end" mt="md" gap="md">
+          <div>
+            <Text size="sm" fw={500} mb={4}>
+              Company logo
+            </Text>
+            {meta.logoDataUrl ? (
+              <Group gap="sm" align="center">
+                <Image
+                  src={meta.logoDataUrl}
+                  alt="Company logo"
+                  h={48}
+                  w="auto"
+                  fit="contain"
+                  style={{ maxWidth: 160, border: '1px solid var(--mantine-color-gray-3)' }}
+                />
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="red"
+                  leftSection={<IconX size={14} />}
+                  onClick={() => setProjectMeta({ logoDataUrl: undefined })}
+                >
+                  Clear
+                </Button>
+              </Group>
+            ) : (
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<IconPhoto size={14} />}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                Upload logo
+              </Button>
+            )}
+            {/* Hidden native file picker; reads the chosen image as a data URL. */}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                onLogoFile(e.currentTarget.files?.[0] ?? null);
+                // Reset so re-selecting the same file fires change again.
+                e.currentTarget.value = '';
+              }}
+            />
+          </div>
+        </Group>
+      </Card>
 
       <Card withBorder radius="md" padding="md">
         <Text fw={600} mb="md">

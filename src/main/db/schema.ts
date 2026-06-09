@@ -61,6 +61,8 @@ export const projects = sqliteTable('projects', {
   earthingSystem: text('earthing_system'),
   /** Energy-sources config (generator/solar/battery) as JSON. */
   sourcesJson: text('sources_json'),
+  /** Project branding / title-block metadata (ProjectMeta) as JSON. */
+  metaJson: text('meta_json'),
 });
 
 export const panels = sqliteTable('panels', {
