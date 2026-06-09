@@ -4,7 +4,7 @@
  * these shapes; the engine never imports DB or DOM code.
  */
 
-import type { SystemType, LoadKind, InstallMethod, EarthingSystem } from './electrical';
+import type { SystemType, LoadKind, InstallMethod, EarthingSystem, OccupancyType } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { SourcesConfig } from './sources';
 
@@ -59,6 +59,12 @@ export interface PanelInput {
   groupingCount: number;
   /** Diversity factor applied to the aggregated load when feeding upstream. */
   diversityFactor: number;
+  /**
+   * Building occupancy class. When set, the engine applies the occupancy's
+   * recommended diversity / per-load demand factors wherever the panel/circuit
+   * has been left at the neutral default (1). Explicit values always win.
+   */
+  occupancy?: OccupancyType;
   /** Fed by the utility, or by a parent panel's feeder circuit. */
   sourceType: 'utility' | 'feeder';
   fedByCircuitId?: string;

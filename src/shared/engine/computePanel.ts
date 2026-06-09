@@ -7,6 +7,7 @@ import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC } from './control/motorFLC';
+import { circuitDemandFactor } from './occupancy';
 import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
@@ -33,17 +34,22 @@ export interface ComputePanelOptions {
   sourceZ?: Impedance;
 }
 
-/** A leaf circuit's connected demand (W): motor kW for motors, else connected W, x demand factor. */
-export function circuitConnectedW(c: CircuitInput): number {
+/**
+ * A leaf circuit's connected demand (W): motor kW for motors, else connected W,
+ * times the demand factor. `demandFactor` lets the caller pass an occupancy-
+ * resolved factor; absent, the circuit's own value (default 1) is used.
+ */
+export function circuitConnectedW(c: CircuitInput, demandFactor?: number): number {
   const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
-  return (isMotor ? c.motorKw! * 1000 : c.loadW) * (c.demandFactor ?? 1);
+  const df = demandFactor ?? c.demandFactor ?? 1;
+  return (isMotor ? c.motorKw! * 1000 : c.loadW) * df;
 }
 
-function effectiveLoadW(c: CircuitInput, opts: ComputePanelOptions): number {
+function effectiveLoadW(c: CircuitInput, panel: PanelInput, opts: ComputePanelOptions): number {
   if (c.feedsPanelId && opts.feederLoadW && opts.feederLoadW[c.feedsPanelId] !== undefined) {
     return opts.feederLoadW[c.feedsPanelId]!;
   }
-  return circuitConnectedW(c);
+  return circuitConnectedW(c, circuitDemandFactor(c, panel));
 }
 
 interface CircuitComputation {
@@ -62,7 +68,7 @@ function computeCircuit(
   df: number,
   opts: ComputePanelOptions,
 ): CircuitComputation {
-  const loadW = effectiveLoadW(c, opts);
+  const loadW = effectiveLoadW(c, panel, opts);
   const def = LOAD_DEFAULTS[c.loadKind];
   const isFeeder = c.loadKind === 'feeder' || c.feedsPanelId !== undefined;
 

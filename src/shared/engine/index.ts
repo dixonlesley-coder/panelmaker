@@ -17,6 +17,7 @@ export * from './sources';
 export * from './capacitor';
 export * from './harmonics';
 export * from './arcFlash';
+export * from './occupancy';
 export * from './loadProfile';
 export * from './powerOneline';
 export * from './computePanel';

@@ -24,6 +24,18 @@ export type PhaseAssignment = 'L1' | 'L2' | 'L3' | '3ph';
 /** Earthing (grounding) system arrangement. */
 export type EarthingSystem = 'TN-S' | 'TN-C-S' | 'TT';
 
+/**
+ * Building occupancy class, used to pick standard demand-factor / diversity
+ * presets. See `standards/occupancy`.
+ */
+export type OccupancyType =
+  | 'residential'
+  | 'office'
+  | 'commercial'
+  | 'industrial'
+  | 'hospitality'
+  | 'mixed';
+
 export type InstallMethod = 'conduit' | 'trunking' | 'wall' | 'air' | 'tray' | 'buried';
 
 /** Nominal LV voltages used in Indonesia: 220 V single-phase, 400 V three-phase. */

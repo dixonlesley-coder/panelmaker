@@ -2,6 +2,7 @@ import type { ProjectInput } from '../types/project';
 import type { PanelResult, SelectivityEntry, SystemResult, Warning } from '../types/results';
 import { peConductorSize } from '../standards/grounding';
 import { circuitConnectedW, computePanel } from './computePanel';
+import { circuitDemandFactor, effectiveDiversityFactor } from './occupancy';
 import { determineSupply } from './transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
@@ -93,12 +94,14 @@ export function computeSystem(project: ProjectInput): SystemResult {
     let connectedW = 0;
     for (const c of panel.circuits) {
       if (c.role !== 'branch') continue;
-      const load = c.feedsPanelId ? (panelDemandW.get(c.feedsPanelId) ?? 0) : circuitConnectedW(c);
+      const load = c.feedsPanelId
+        ? (panelDemandW.get(c.feedsPanelId) ?? 0)
+        : circuitConnectedW(c, circuitDemandFactor(c, panel));
       if (c.feedsPanelId) feederLoadW[c.feedsPanelId] = load;
       connectedW += load;
     }
     feederLoadWByPanel.set(id, feederLoadW);
-    panelDemandW.set(id, connectedW * panel.diversityFactor);
+    panelDemandW.set(id, connectedW * effectiveDiversityFactor(panel));
   }
 
   // True building connected load = leaf loads only (feeders are aggregations, so
@@ -107,7 +110,11 @@ export function computeSystem(project: ProjectInput): SystemResult {
     (sum, p) =>
       sum +
       p.circuits.reduce(
-        (s, c) => s + (c.role === 'branch' && !c.feedsPanelId ? circuitConnectedW(c) : 0),
+        (s, c) =>
+          s +
+          (c.role === 'branch' && !c.feedsPanelId
+            ? circuitConnectedW(c, circuitDemandFactor(c, p))
+            : 0),
         0,
       ),
     0,

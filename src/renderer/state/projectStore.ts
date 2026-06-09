@@ -4,6 +4,7 @@ import type {
   ControlAssembly,
   ControlSchematic,
   EarthingSystem,
+  OccupancyType,
   PanelInput,
   Part,
   ProjectInput,
@@ -76,6 +77,8 @@ export interface ProjectState {
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
   addPanel: () => void;
+  /** Set (or clear) a panel's building occupancy class. */
+  setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
@@ -271,6 +274,19 @@ export const useProjectStore = create<ProjectState>((set) => ({
         activeScreen: 'panel',
       };
     }),
+
+  setPanelOccupancy: (panelId, occupancy) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          if (occupancy === undefined) {
+            const { occupancy: _drop, ...rest } = panel;
+            return rest;
+          }
+          return { ...panel, occupancy };
+        }),
+      ),
+    ),
 
   applyFix: (panelId, circuitId, fix) =>
     set((s) => {

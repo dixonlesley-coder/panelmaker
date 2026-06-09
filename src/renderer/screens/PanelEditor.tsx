@@ -10,6 +10,8 @@ import {
   IconTable,
 } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
+import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
+import type { OccupancyType } from '@shared/types';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
@@ -24,6 +26,7 @@ export function PanelEditor() {
   const project = useProjectStore((s) => s.project);
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
+  const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
 
   // Compute the whole system so feeder loads aggregate correctly, then pick this panel.
   const system = useMemo(() => computeSystem(project), [project]);
@@ -32,6 +35,7 @@ export function PanelEditor() {
   const result = panel ? system.panels[panel.id] : undefined;
 
   const panelOptions = project.panels.map((p) => ({ value: p.id, label: p.name }));
+  const occupancyOptions = OCCUPANCY_TYPES.map((t) => ({ value: t, label: OCCUPANCY_PRESETS[t].label }));
 
   if (!panel || !result) {
     return (
@@ -52,14 +56,26 @@ export function PanelEditor() {
           </Text>
           <Title order={3}>{panel.name}</Title>
         </div>
-        <Select
-          label="Active panel"
-          data={panelOptions}
-          value={activePanelId}
-          allowDeselect={false}
-          onChange={(v) => v && setActivePanel(v)}
-          w={280}
-        />
+        <Group gap="sm" align="flex-end">
+          <Select
+            label="Occupancy"
+            placeholder="Not set"
+            description="Applies standard diversity / demand presets"
+            data={occupancyOptions}
+            value={panel.occupancy ?? null}
+            clearable
+            onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
+            w={210}
+          />
+          <Select
+            label="Active panel"
+            data={panelOptions}
+            value={activePanelId}
+            allowDeselect={false}
+            onChange={(v) => v && setActivePanel(v)}
+            w={240}
+          />
+        </Group>
       </Group>
 
       <Grid gutter="md" align="stretch">
