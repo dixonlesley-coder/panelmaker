@@ -72,20 +72,91 @@ function primToSvg(p: Prim): string {
 }
 
 /**
+ * A small drawing title-strip rendered bottom-right of an SVG drawing. Every
+ * field is optional; the strip is omitted entirely when nothing is supplied so
+ * existing callers are unaffected.
+ */
+export interface TitleStrip {
+  /** Designing company / consultancy name. */
+  company?: string;
+  /** Project name (top line of the strip). */
+  project?: string;
+  /** Sheet / drawing title (e.g. "Single-line diagram"). */
+  sheet?: string;
+  /** Drawing number stamped in the strip. */
+  drawingNumber?: string;
+  /** Current revision label. */
+  revision?: string;
+}
+
+/** True when at least one title-strip field carries content. */
+function hasTitleStrip(t: TitleStrip): boolean {
+  return Boolean(t.company || t.project || t.sheet || t.drawingNumber || t.revision);
+}
+
+/**
+ * Build the SVG primitives for a bottom-right title block, anchored to the
+ * drawing's extents (mm coordinates). Returns an empty string when the strip has
+ * no content. The box sits just inside the bottom-right corner of the drawing.
+ */
+function titleStripSvg(d: Drawing, t: TitleStrip): string {
+  if (!hasTitleStrip(t)) return '';
+  // Fixed-size strip in the same user units as the drawing.
+  const w = Math.max(Math.min(d.width * 0.42, d.width), 150);
+  const h = 64;
+  const x = d.width - w;
+  const y = d.height - h;
+  const fs = Math.max(h / 7, MIN_FONT);
+  const pad = fs * 0.7;
+  const parts: string[] = [];
+  // Outer frame + header divider.
+  parts.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="#ffffff" stroke="${INK}" stroke-width="1"/>`);
+  parts.push(`<line x1="${n(x)}" y1="${n(y + fs * 2)}" x2="${n(x + w)}" y2="${n(y + fs * 2)}" stroke="${INK}" stroke-width="0.75"/>`);
+  // Header: company (or project) name.
+  const header = t.company || t.project || '';
+  if (header) {
+    parts.push(
+      `<text x="${n(x + pad)}" y="${n(y + fs * 1.4)}" font-size="${n(fs * 1.1)}" fill="${INK}">${escapeXml(header)}</text>`,
+    );
+  }
+  // Body lines.
+  let ly = y + fs * 3.2;
+  const line = (label: string, value: string) => {
+    parts.push(
+      `<text x="${n(x + pad)}" y="${n(ly)}" font-size="${n(fs)}" fill="${DIM}">${escapeXml(label)}</text>` +
+        `<text x="${n(x + w - pad)}" y="${n(ly)}" font-size="${n(fs)}" text-anchor="end" fill="${INK}">${escapeXml(value)}</text>`,
+    );
+    ly += fs * 1.4;
+  };
+  if (t.project && t.company) line('Project', t.project);
+  if (t.sheet) line('Sheet', t.sheet);
+  if (t.drawingNumber) line('Dwg', t.drawingNumber);
+  if (t.revision) line('Rev', t.revision);
+  return parts.join('');
+}
+
+/**
  * Wrap a {@link Drawing} into a self-contained `<svg>` document string. A small
  * margin is added around the extents so edge labels are not clipped, and the
  * viewBox carries the real mm coordinates (callers fit the SVG to a box).
+ *
+ * When a {@link TitleStrip} with content is supplied, a small title block is
+ * drawn at the bottom-right of the drawing. Omitting it (the default) leaves the
+ * output byte-for-byte identical to before, so existing callers/tests are
+ * unaffected.
  */
-export function drawingToSvg(d: Drawing, title: string): string {
+export function drawingToSvg(d: Drawing, title: string, titleStrip?: TitleStrip): string {
   const m = 24; // mm margin around the drawing for outer dimension labels
   const vbW = d.width + 2 * m;
   const vbH = d.height + 2 * m;
   const body = d.prims.map(primToSvg).join('');
+  const strip = titleStrip ? titleStripSvg(d, titleStrip) : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${n(vbW)}" height="${n(vbH)}" ` +
     `viewBox="${n(-m)} ${n(-m)} ${n(vbW)} ${n(vbH)}" ` +
     `font-family="Helvetica, Arial, sans-serif" role="img" aria-label="${escapeXml(title)}">` +
     body +
+    strip +
     `</svg>`
   );
 }
@@ -178,8 +249,8 @@ export function gaDrawing(panel: PanelInput, result: PanelResult): Drawing {
  * rails as a to-scale rectangle (width = poles × DIN module + control gear),
  * filling left-to-right and wrapping to the next rail.
  */
-export function panelGaSvg(panel: PanelInput, result: PanelResult): string {
-  return drawingToSvg(gaDrawing(panel, result), `${panel.name} general arrangement`);
+export function panelGaSvg(panel: PanelInput, result: PanelResult, titleStrip?: TitleStrip): string {
+  return drawingToSvg(gaDrawing(panel, result), `${panel.name} general arrangement`, titleStrip);
 }
 
 /* -------------------------------- SLD view -------------------------------- */
@@ -189,6 +260,6 @@ export function panelGaSvg(panel: PanelInput, result: PanelResult): string {
  * → busbar → each branch breaker → load, with labels (breaker rating/curve,
  * cable spec, load name). A clean vertical-bus schematic.
  */
-export function panelSldSvg(panel: PanelInput, result: PanelResult): string {
-  return drawingToSvg(layoutSld(panel, result), `${panel.name} single-line diagram`);
+export function panelSldSvg(panel: PanelInput, result: PanelResult, titleStrip?: TitleStrip): string {
+  return drawingToSvg(layoutSld(panel, result), `${panel.name} single-line diagram`, titleStrip);
 }

@@ -102,6 +102,38 @@ describe('panel single-line SVG', () => {
   });
 });
 
+describe('drawing title-strip (optional branding)', () => {
+  it('is omitted by default, leaving the diagram unchanged', () => {
+    const result = computePanel(SAMPLE);
+    const plain = panelSldSvg(SAMPLE, result);
+    const withEmpty = panelSldSvg(SAMPLE, result, {});
+    // An empty strip has no content → no extra markup is emitted.
+    expect(withEmpty).toBe(plain);
+  });
+
+  it('renders the supplied title-block fields when provided', () => {
+    const result = computePanel(SAMPLE);
+    const svg = panelSldSvg(SAMPLE, result, {
+      company: 'Acme Engineering',
+      project: 'Tower 5',
+      sheet: 'Single-line diagram',
+      drawingNumber: 'E-101',
+      revision: 'B',
+    });
+    expect(svg).toContain('Acme Engineering');
+    expect(svg).toContain('E-101');
+    // still a self-contained, attribute-styled SVG
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).not.toContain('class=');
+  });
+
+  it('escapes XML-significant characters in title-strip text', () => {
+    const result = computePanel(SAMPLE);
+    const svg = panelGaSvg(SAMPLE, result, { company: 'A & B <co>' });
+    expect(svg).toContain('A &amp; B &lt;co&gt;');
+  });
+});
+
 describe('panel DXF export', () => {
   it('emits a well-formed R12 ENTITIES document', () => {
     const dxf = panelGaDxf(SAMPLE, computePanel(SAMPLE));

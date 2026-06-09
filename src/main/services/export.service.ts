@@ -18,7 +18,7 @@ import type {
   TableCell,
   TDocumentDefinitions,
 } from 'pdfmake/interfaces';
-import type { PanelInput, ProjectInput } from '@shared/types/project';
+import type { PanelInput, ProjectInput, ProjectMeta } from '@shared/types/project';
 import type {
   BomLine,
   PanelResult,
@@ -26,7 +26,7 @@ import type {
   Warning,
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
-import { panelGaSvg, panelSldSvg } from '@shared/drawing';
+import { panelGaSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
 import { robotoFonts } from './pdfFonts';
 import { computeProject, computePanelResult } from './calc.service';
 
@@ -117,17 +117,42 @@ function panelSpecTable(panel: PanelResult): Content {
 }
 
 /**
+ * Build the drawing title-strip from the project metadata for a given sheet, so
+ * the embedded SLD/GA carry a small bottom-right title block. Returns `undefined`
+ * when no branding is present, leaving the diagrams unchanged.
+ */
+function titleStripFor(
+  project: ProjectInput,
+  sheet: string,
+): TitleStrip | undefined {
+  const meta = project.meta;
+  if (!meta) return undefined;
+  const strip: TitleStrip = { project: project.name, sheet };
+  if (meta.companyName) strip.company = meta.companyName;
+  if (meta.drawingNumber) strip.drawingNumber = meta.drawingNumber;
+  if (meta.revision) strip.revision = meta.revision;
+  return strip;
+}
+
+/**
  * Vector single-line + general-arrangement diagrams for a panel, embedded as SVG
  * (pdfmake renders them via svg-to-pdfkit). The SLD is fitted to the text width;
  * the GA is fitted within a box so the to-scale elevation never overflows. The GA
  * goes on its own block (`pageBreak: 'before'`) so a tall cabinet is not split.
+ *
+ * When the project carries branding metadata, each diagram gets a small
+ * bottom-right title-strip.
  */
-function panelDiagramsBlock(panel: PanelInput, result: PanelResult): Content[] {
+function panelDiagramsBlock(
+  panel: PanelInput,
+  result: PanelResult,
+  project: ProjectInput,
+): Content[] {
   return [
     heading('Single-line diagram'),
-    { svg: panelSldSvg(panel, result), width: 515 },
+    { svg: panelSldSvg(panel, result, titleStripFor(project, 'Single-line diagram')), width: 515 },
     { text: 'General arrangement', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
-    { svg: panelGaSvg(panel, result), fit: [515, 360] },
+    { svg: panelGaSvg(panel, result, titleStripFor(project, 'General arrangement')), fit: [515, 360] },
   ];
 }
 
@@ -204,16 +229,82 @@ const STYLES = {
   h2: { fontSize: 12, bold: true },
 } as const;
 
-/** Cover block shared by both reports. */
-function coverBlock(project: ProjectInput, reportTitle: string): Content[] {
+/** Today's date as an ISO calendar date (YYYY-MM-DD). */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * A professional title block shared by both reports: the company logo + name on
+ * the left, and a key/value table of the project's title-block fields on the
+ * right. Falls back to a minimal "PanelMaker" header when no branding metadata is
+ * present, so reports for un-branded projects still read cleanly.
+ */
+function titleBlock(project: ProjectInput, reportTitle: string): Content[] {
+  const meta: ProjectMeta = project.meta ?? {};
+
+  // Left column: logo (when present) over the company / app name.
+  const left: Content[] = [];
+  if (meta.logoDataUrl) {
+    left.push({ image: meta.logoDataUrl, fit: [150, 60], margin: [0, 0, 0, 6] });
+  }
+  left.push({ text: meta.companyName || 'PanelMaker', style: 'h1' });
+  left.push({ text: reportTitle, style: 'subtitle', margin: [0, 2, 0, 0] });
+
+  // Right column: the title-block key/value pairs (only rows with a value).
+  const rows: TableCell[][] = [];
+  const row = (label: string, value?: string) => {
+    if (value) rows.push([{ text: label, bold: true, color: '#555' }, value]);
+  };
+  row('Project', project.name);
+  row('Client', meta.client);
+  row('Location', meta.location);
+  row('Drawing no.', meta.drawingNumber);
+  row('Project no.', meta.projectNumber);
+  row('Revision', meta.revision);
+  row('Engineer', meta.engineer);
+  row('Date', today());
+
+  const right: Content = {
+    table: { widths: ['auto', '*'], body: rows.length ? rows : [['Project', project.name]] },
+    layout: 'noBorders',
+    fontSize: 9,
+  };
+
   return [
-    { text: 'PanelMaker', style: 'subtitle' },
-    { text: reportTitle, style: 'title' },
-    { text: project.name, style: 'h1', margin: [0, 4, 0, 0] },
     {
-      text: `Generated ${new Date().toISOString().slice(0, 10)} · ${project.panels.length} panel(s)`,
-      style: 'subtitle',
-      margin: [0, 2, 0, 8],
+      columns: [
+        { width: '*', stack: left },
+        { width: 'auto', stack: [right] },
+      ],
+      columnGap: 16,
+    },
+    // Rule under the title block.
+    {
+      canvas: [{ type: 'line', x1: 0, y1: 0, x2: 523, y2: 0, lineWidth: 0.8, lineColor: '#888' }],
+      margin: [0, 8, 0, 10],
+    },
+  ];
+}
+
+/**
+ * The revision-history block (Rev | Date | Note | By), rendered from
+ * `meta.revisions`. Returns an empty list when there is no revision history.
+ */
+function revisionBlock(project: ProjectInput): Content[] {
+  const revisions = project.meta?.revisions ?? [];
+  if (revisions.length === 0) return [];
+  const header: TableCell[] = ['Rev', 'Date', 'Note', 'By'].map((t) => ({ text: t, bold: true }));
+  const body: TableCell[][] = [header];
+  for (const r of revisions) {
+    body.push([r.rev, r.date, r.note, r.by ?? '']);
+  }
+  return [
+    heading('Revision history'),
+    {
+      table: { headerRows: 1, widths: ['auto', 'auto', '*', 'auto'], body },
+      layout: 'lightHorizontalLines',
+      fontSize: 8,
     },
   ];
 }
@@ -234,14 +325,15 @@ function panelDocDefinition(
     styles: STYLES,
     pageMargins: [36, 36, 36, 48],
     content: [
-      ...coverBlock(project, 'Panel Report'),
+      ...titleBlock(project, 'Panel Report'),
       heading(`Panel: ${panel.name}`),
       panelSpecTable(panel),
       heading('Circuit Schedule'),
       circuitScheduleTable(panel),
-      ...(input ? panelDiagramsBlock(input, panel) : []),
+      ...(input ? panelDiagramsBlock(input, panel, project) : []),
       heading('Bill of Materials'),
       bomTable(bomLinesForPanel(panel)),
+      ...revisionBlock(project),
       ...warningsBlock(panel.warnings),
       {
         text: `Standards: ${panel.standardsVersion}`,
@@ -257,7 +349,7 @@ function systemDocDefinition(
   system: SystemResult,
   project: ProjectInput,
 ): TDocumentDefinitions {
-  const content: Content[] = [...coverBlock(project, 'System Report')];
+  const content: Content[] = [...titleBlock(project, 'System Report')];
 
   // System summary.
   content.push(heading('System Summary'));
@@ -283,13 +375,14 @@ function systemDocDefinition(
     content.push({ text: 'Circuit Schedule', style: 'h2', margin: [0, 6, 0, 4] });
     content.push(circuitScheduleTable(panel));
     const input = panelInputFor(project, panel.panelId);
-    if (input) content.push(...panelDiagramsBlock(input, panel));
+    if (input) content.push(...panelDiagramsBlock(input, panel, project));
     allBom.push(...bomLinesForPanel(panel));
   }
 
-  // Consolidated BOM + system warnings.
+  // Consolidated BOM + revision history + system warnings.
   content.push(heading('Consolidated Bill of Materials'));
   content.push(bomTable(allBom));
+  content.push(...revisionBlock(project));
   content.push(...warningsBlock(system.warnings));
 
   return {
