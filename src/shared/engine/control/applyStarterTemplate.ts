@@ -10,6 +10,7 @@ import type {
 } from '../../types';
 import { round } from '../util';
 import { motorFLC } from './motorFLC';
+import { startingAnalysis } from './startingAnalysis';
 import { selectContactor } from './selectContactor';
 import { selectOverload } from './selectOverload';
 import { selectVFD } from './selectVFD';
@@ -22,6 +23,8 @@ export interface ApplyStarterInput {
   motorPoles?: number;
   voltageV?: number;
   startingDuty?: StartingDuty;
+  /** Variable-torque load (pump/fan) — affects VSD energy-saving note. */
+  variableTorque?: boolean;
 }
 
 function contactorWidth(ac3A: number): number {
@@ -56,6 +59,7 @@ export function applyStarterTemplate(input: ApplyStarterInput): ControlAssembly 
   const flcA = round(motorFLC(motorKw, voltageV), 1);
   const def = starterTemplate(starterType);
   const warnings: string[] = [];
+  const starting = startingAnalysis(starterType, flcA, input.variableTorque);
 
   if (!def) {
     return {
@@ -64,6 +68,7 @@ export function applyStarterTemplate(input: ApplyStarterInput): ControlAssembly 
       motor: { kw: motorKw, flcA, poles: motorPoles },
       devices: [],
       interlocks: [],
+      starting,
       warnings: [`Unknown starter type: ${starterType}`],
     };
   }
@@ -172,6 +177,7 @@ export function applyStarterTemplate(input: ApplyStarterInput): ControlAssembly 
     motor: { kw: motorKw, flcA, poles: motorPoles },
     devices,
     interlocks,
+    starting,
     warnings,
   };
 }

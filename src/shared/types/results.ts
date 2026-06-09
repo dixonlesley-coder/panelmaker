@@ -178,6 +178,21 @@ export interface LoadProfileResult {
   peakContributors: { circuitId: string; name: string; panelName: string; kw: number }[];
 }
 
+/** Power-factor analysis and capacitor-bank (PFC) recommendation. */
+export interface CapacitorBankResult {
+  totalKw: number;
+  totalKvar: number;
+  existingPf: number;
+  targetPf: number;
+  /** True when correction is recommended (PF below the penalty threshold). */
+  needed: boolean;
+  requiredKvar: number;
+  bankKvar: number;
+  steps: number;
+  stepKvar: number;
+  note: string;
+}
+
 export interface SystemResult {
   projectId: string;
   panels: Record<string, PanelResult>;
@@ -186,6 +201,8 @@ export interface SystemResult {
   supply: SupplyResult;
   /** Installation earthing-system design. */
   earthing: EarthingResult;
+  /** Power-factor analysis + capacitor-bank recommendation. */
+  powerFactor: CapacitorBankResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
   totals: {

@@ -88,6 +88,18 @@ export interface Interlock {
   note?: string;
 }
 
+/** Motor starting characteristics for the chosen starting method. */
+export interface StartingAnalysis {
+  method: string;
+  /** Starting current (A). */
+  startCurrentA: number;
+  /** Starting current as a multiple of FLC. */
+  startCurrentMultiple: number;
+  /** Starting torque (% of full-load torque). */
+  startTorquePct: number;
+  note: string;
+}
+
 /** The complete control gear bill produced for one motor/control circuit. */
 export interface ControlAssembly {
   circuitId: string;
@@ -95,6 +107,8 @@ export interface ControlAssembly {
   motor?: { kw: number; flcA: number; poles: number };
   devices: AssemblyDevice[];
   interlocks: Interlock[];
+  /** Starting current/torque analysis for the chosen method. */
+  starting?: StartingAnalysis;
   /** Pump/level configuration, when the circuit is a pump control. */
   pump?: {
     mode: PumpControlMode;

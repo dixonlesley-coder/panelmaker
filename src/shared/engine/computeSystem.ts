@@ -5,6 +5,7 @@ import { computePanel } from './computePanel';
 import { determineSupply } from './transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
+import { computePowerFactor } from './capacitor';
 import { selectBreaker } from './breakerSelect';
 import { sizeCable } from './cableSizing';
 
@@ -110,6 +111,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
     project.earthingSystem ?? 'TN-C-S',
     peConductorSize(mainCable.csaMm2),
   );
+  const powerFactor = computePowerFactor(project);
 
   return {
     projectId: project.id,
@@ -117,6 +119,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
     order: [...postOrder].reverse(), // root-first
     supply,
     earthing,
+    powerFactor,
     ...(sources ? { sources } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
     warnings,

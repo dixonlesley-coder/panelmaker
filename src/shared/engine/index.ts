@@ -13,6 +13,7 @@ export * from './phase';
 export * from './transformer';
 export * from './grounding';
 export * from './sources';
+export * from './capacitor';
 export * from './loadProfile';
 export * from './powerOneline';
 export * from './computePanel';

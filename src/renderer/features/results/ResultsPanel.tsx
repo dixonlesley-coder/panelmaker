@@ -68,6 +68,14 @@ function ControlDetail({ circuit }: { circuit: CircuitResult }) {
         )}
       </Group>
 
+      {control.starting && (
+        <Text size="xs" c="dimmed" mb={6}>
+          <b>Starting</b> ({control.starting.method}): {formatAmps(control.starting.startCurrentA)} inrush (~
+          {control.starting.startCurrentMultiple}× FLC), {control.starting.startTorquePct}% torque —{' '}
+          {control.starting.note}
+        </Text>
+      )}
+
       <Table withTableBorder withColumnBorders verticalSpacing={4} fz="xs">
         <Table.Thead>
           <Table.Tr>

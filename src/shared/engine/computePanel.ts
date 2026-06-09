@@ -125,6 +125,7 @@ function computeCircuit(
       motorPoles: c.motorPoles,
       voltageV: panel.voltageV,
       startingDuty: c.startingDuty,
+      variableTorque: c.loadKind === 'pump' || c.loadKind === 'hvac',
     });
     if (c.controlMode) control = applyPumpControl(control, c.controlMode, c.sensing);
     for (const d of control.devices) {

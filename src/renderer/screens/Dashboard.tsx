@@ -191,7 +191,56 @@ export function Dashboard() {
           </Stack>
         </Card>
       </SimpleGrid>
+
+      <Card withBorder radius="md" padding="md">
+        <Group justify="space-between" mb="xs">
+          <Group gap="xs">
+            <ThemeIcon variant="light" color={system.powerFactor.needed ? 'orange' : 'teal'}>
+              <IconBolt size={16} />
+            </ThemeIcon>
+            <Text fw={600} size="sm">
+              Power factor &amp; capacitor bank
+            </Text>
+          </Group>
+          <Badge variant="light" color={system.powerFactor.needed ? 'orange' : 'teal'}>
+            {system.powerFactor.needed ? 'correction recommended' : 'PF adequate'}
+          </Badge>
+        </Group>
+        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
+          <KeyValStat k="Existing PF" v={system.powerFactor.existingPf.toFixed(2)} />
+          <KeyValStat k="Target PF" v={system.powerFactor.targetPf.toFixed(2)} />
+          <KeyValStat
+            k="Demand"
+            v={`${system.powerFactor.totalKw} kW · ${system.powerFactor.totalKvar} kVAR`}
+          />
+          {system.powerFactor.bankKvar > 0 ? (
+            <KeyValStat
+              k="Capacitor bank"
+              v={`${system.powerFactor.bankKvar} kVAR (${system.powerFactor.steps}×${system.powerFactor.stepKvar})`}
+            />
+          ) : (
+            <KeyValStat k="Capacitor bank" v="not required" />
+          )}
+        </SimpleGrid>
+        <Text size="xs" c="dimmed">
+          {system.powerFactor.note}
+        </Text>
+      </Card>
     </Stack>
+  );
+}
+
+/** Compact key/value stat block for the power-factor card. */
+function KeyValStat({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {k}
+      </Text>
+      <Text size="sm" fw={700}>
+        {v}
+      </Text>
+    </div>
   );
 }
 
