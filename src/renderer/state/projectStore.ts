@@ -91,6 +91,8 @@ export interface ProjectState {
   bulkUpdateCircuits: (panelId: string, ids: string[], patch: Partial<CircuitInput>) => void;
   /** Remove several circuits from a panel in a single undoable step. */
   removeCircuits: (panelId: string, ids: string[]) => void;
+  /** Append a fully-configured circuit (fresh id) to a panel — used by the wizard. */
+  addCircuitConfigured: (panelId: string, circuit: Omit<CircuitInput, 'id'>) => void;
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
@@ -341,6 +343,16 @@ export const useProjectStore = create<ProjectState>((set) => ({
         })),
       );
     }),
+
+  addCircuitConfigured: (panelId, circuit) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: [...panel.circuits, { ...circuit, id: nextId('c') }],
+        })),
+      ),
+    ),
 
   updatePanel: (panelId, patch) =>
     set((s) =>

@@ -12,10 +12,12 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core';
-import { IconClipboard, IconCopy, IconCopyPlus, IconPlus, IconTrash } from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
+import { IconClipboard, IconCopy, IconCopyPlus, IconPlus, IconWand, IconTrash } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
 import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor } from '@shared/standards';
 import { selectHasClipboard, useProjectStore } from '@renderer/state/projectStore';
+import { CircuitWizard } from '@renderer/features/builder/CircuitWizard';
 
 /** Load-kind options for the editable Select (full catalog). */
 const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
@@ -306,6 +308,8 @@ export function CircuitTable({ panelId }: { panelId: string }) {
   const pasteCircuit = useProjectStore((s) => s.pasteCircuit);
   const hasClipboard = useProjectStore(selectHasClipboard);
 
+  const [wizardOpened, wizard] = useDisclosure(false);
+
   // Local selection state for bulk editing, keyed by circuit id.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -393,6 +397,15 @@ export function CircuitTable({ panelId }: { panelId: string }) {
           Add circuit
         </Button>
         <Button
+          leftSection={<IconWand size={16} />}
+          variant="light"
+          color="grape"
+          size="xs"
+          onClick={wizard.open}
+        >
+          New circuit (wizard)
+        </Button>
+        <Button
           leftSection={<IconClipboard size={16} />}
           variant="default"
           size="xs"
@@ -402,6 +415,8 @@ export function CircuitTable({ panelId }: { panelId: string }) {
           Paste circuit
         </Button>
       </Group>
+
+      <CircuitWizard panelId={panelId} opened={wizardOpened} onClose={wizard.close} />
     </div>
   );
 }

@@ -327,4 +327,39 @@ describe('projectStore', () => {
       expect(useProjectStore.getState().project.panels.length).toBe(start);
     });
   });
+
+  describe('addCircuitConfigured (wizard)', () => {
+    it('appends a fully-configured circuit with a fresh id (undoable)', () => {
+      const { project } = useProjectStore.getState();
+      const panelId = project.panels[0]!.id;
+      const start = useProjectStore.getState().project.panels[0]!.circuits.length;
+
+      useProjectStore.getState().addCircuitConfigured(panelId, {
+        name: 'Wizard motor',
+        role: 'branch',
+        loadW: 0,
+        cosPhi: 0.85,
+        lengthM: 18,
+        loadKind: 'motor',
+        isLighting: false,
+        demandFactor: 1,
+        motorKw: 7.5,
+        motorPoles: 4,
+        starterType: 'STAR_DELTA',
+        startingDuty: 'normal',
+      });
+
+      const panel = useProjectStore.getState().project.panels[0]!;
+      expect(panel.circuits.length).toBe(start + 1);
+      const added = panel.circuits[panel.circuits.length - 1]!;
+      expect(added.id).toBeTruthy();
+      expect(added.name).toBe('Wizard motor');
+      expect(added.starterType).toBe('STAR_DELTA');
+      // id is unique within the panel
+      expect(panel.circuits.filter((c) => c.id === added.id).length).toBe(1);
+
+      useProjectStore.getState().undo();
+      expect(useProjectStore.getState().project.panels[0]!.circuits.length).toBe(start);
+    });
+  });
 });
