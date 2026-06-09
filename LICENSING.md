@@ -89,42 +89,67 @@ as-yet-unconfigured desktop app are all unaffected.
 
 ### 2. Configure PanelMaker
 
-Provide three values via **environment variables** _or_ a gitignored
-`license.config.json`.
+You supply three values — `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and
+`ALLOWED_HD` (your Workspace primary domain, e.g. `company.example` — the bare
+domain, **not** an email address). **No secret is ever committed to the repo.**
 
-`ALLOWED_HD` is your Workspace primary domain, e.g. `company.example` (the bare
-domain, **not** an email address).
+#### Option A — build-time injection (recommended for distribution)
 
-**Option A — environment variables** (handy in dev):
+`electron.vite.config.ts` bakes the three values **present in the build
+environment** into the packaged main bundle (via Vite `define`). The packaged
+binary then carries the credentials, so end-user machines need **no** config
+file, and the values live only in your build/CI environment and the compiled
+`out/` bundle — never in source or git history.
+
+Set them for the build (and only the build):
 
 ```bash
-export GOOGLE_CLIENT_ID="1234567890-abc.apps.googleusercontent.com"
-export GOOGLE_CLIENT_SECRET="GOCSPX-xxxxxxxxxxxxxxxx"
-export ALLOWED_HD="company.example"
+GOOGLE_CLIENT_ID="1234567890-abc.apps.googleusercontent.com" \
+GOOGLE_CLIENT_SECRET="GOCSPX-xxxxxxxxxxxxxxxx" \
+ALLOWED_HD="company.example" \
+  npx electron-vite build && npx electron-builder --publish always
 ```
 
-**Option B — `license.config.json`** in the app's `userData` directory
-(production). The directory is OS-specific:
+In **GitHub Actions**, store them as repository/organization **secrets** and pass
+them as `env:` on the build step — never in the workflow file:
+
+```yaml
+      - name: Build & publish
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ALLOWED_HD: ${{ secrets.ALLOWED_HD }}
+        run: npx electron-vite build && npx electron-builder --publish always
+```
+
+When the variables are absent at build time the bundle bakes empty strings, so
+the gate stays **fail-open**. Baked values are authoritative in a packaged build
+(they cannot be overridden by a runtime env var, which is the point).
+
+#### Option B — `license.config.json` per machine (no baked creds)
+
+Ship the app **without** baked credentials and deploy a gitignored
+`license.config.json` to each machine's `userData` directory (e.g. pushed via
+Workspace MDM / group policy). This is the runtime fallback used when nothing was
+baked at build time. The directory is OS-specific:
 
 - macOS: `~/Library/Application Support/PanelMaker/license.config.json`
 - Windows: `%APPDATA%\PanelMaker\license.config.json`
 - Linux: `~/.config/PanelMaker/license.config.json`
 
-```json
-{
-  "GOOGLE_CLIENT_ID": "1234567890-abc.apps.googleusercontent.com",
-  "GOOGLE_CLIENT_SECRET": "GOCSPX-xxxxxxxxxxxxxxxx",
-  "ALLOWED_HD": "company.example"
-}
-```
+See **`license.config.example.json`** in the repo root for the shape. For local
+development you can also `export` the three env vars before `electron-vite dev`.
 
-Environment variables take precedence over the file. Both `license.config.json`
-and the generated `license.json` / `machine.id` are gitignored.
+Both `license.config.json` and the generated `license.json` / `machine.id` are
+gitignored.
 
 ### 3. Build & ship
 
-Package as usual (`npx electron-vite build` then `electron-builder`). The gate
-activates automatically on the packaged build once the config above is present.
+Package as usual. With **Option A** set the three build env vars (above) so the
+gate activates automatically on the packaged build. With Option B, ship
+unconfigured and deploy the config file to machines. Either way, **no secret
+belongs in the git repo** — the client id + secret live in your build secrets
+and/or the per-machine config, and the compiled `out/` bundle is gitignored.
 
 ---
 
