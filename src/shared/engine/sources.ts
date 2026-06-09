@@ -10,7 +10,7 @@ import {
   selectInverterKw,
   BATTERY_MODULE_LFP,
   DEPTH_OF_DISCHARGE,
-  BATTERY_EFFICIENCY,
+  BATTERY_DISCHARGE_EFFICIENCY,
   type BatteryModule,
 } from '../standards/sources';
 import type {
@@ -73,7 +73,8 @@ export function sizeSolar(cfg: SolarConfig, sunHours = PEAK_SUN_HOURS): SolarRes
 /** Size a backup battery bank and its inverter/charger for a load + autonomy. */
 export function sizeBattery(cfg: BatteryConfig, module: BatteryModule = BATTERY_MODULE_LFP): BatteryResult {
   const dod = DEPTH_OF_DISCHARGE[cfg.chemistry];
-  const requiredKwh = (cfg.backupKw * cfg.autonomyHours) / (dod * BATTERY_EFFICIENCY);
+  // Backup autonomy only loses the discharge path, not the full round trip.
+  const requiredKwh = (cfg.backupKw * cfg.autonomyHours) / (dod * BATTERY_DISCHARGE_EFFICIENCY);
   const moduleCount = Math.max(1, Math.ceil(requiredKwh / module.kwh));
   const installedKwh = round(moduleCount * module.kwh, 2);
   const usableKwh = round(installedKwh * dod, 2);
@@ -89,7 +90,7 @@ export function sizeBattery(cfg: BatteryConfig, module: BatteryModule = BATTERY_
     inverterKw,
     note: `${cfg.backupKw} kW for ${cfg.autonomyHours} h (${cfg.chemistry}, DoD ${Math.round(
       dod * 100,
-    )}%, eff ${Math.round(BATTERY_EFFICIENCY * 100)}%) → ${round(requiredKwh, 1)} kWh ⇒ ${moduleCount} x ${module.kwh} kWh = ${installedKwh} kWh; ${inverterKw} kW inverter/charger.`,
+    )}%, discharge eff ${Math.round(BATTERY_DISCHARGE_EFFICIENCY * 100)}%) → ${round(requiredKwh, 1)} kWh ⇒ ${moduleCount} x ${module.kwh} kWh = ${installedKwh} kWh; ${inverterKw} kW inverter/charger.`,
   };
 }
 

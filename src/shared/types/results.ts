@@ -107,6 +107,12 @@ export interface CircuitResult {
   zsMaxOhm?: number;
   /** True when Zs <= Zs_max (automatic disconnection within the limit). */
   disconnectsInTime?: boolean;
+  /** Prospective earth-fault current at the circuit (A), U0/Zs — TN systems. */
+  earthFaultA?: number;
+  /** Minimum PE CSA for adiabatic thermal withstand of the earth fault (mm²). */
+  peMinAdiabaticMm2?: number;
+  /** True when the PE conductor meets the adiabatic thermal-withstand minimum. */
+  peAdiabaticOk?: boolean;
   /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
   containment?: ContainmentResult;
 }
@@ -348,8 +354,18 @@ export interface SelectivityEntry {
   downstreamRatingA: number;
   /** Upstream rating / downstream rating. */
   ratio: number;
-  /** True when ratio meets the discrimination rule of thumb. */
+  /** True when ratio meets the overload discrimination rule of thumb. */
   selective: boolean;
+  /**
+   * Current up to which short-circuit discrimination holds (A): the upstream
+   * device's lower magnetic-trip threshold, below which only the downstream
+   * device trips instantaneously. Above it, both may trip (loss of selectivity).
+   */
+  selectivityLimitA?: number;
+  /** Prospective fault at the downstream bus (A), compared against the limit. */
+  downstreamFaultA?: number;
+  /** True when the downstream fault stays within the short-circuit limit. */
+  scSelective?: boolean;
   marginNote: string;
 }
 

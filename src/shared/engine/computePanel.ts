@@ -202,6 +202,9 @@ function computeCircuit(
     result.zsOhm = zs.zsOhm;
     result.zsMaxOhm = zs.zsMaxOhm;
     result.disconnectsInTime = zs.disconnectsInTime;
+    result.earthFaultA = zs.earthFaultA;
+    result.peMinAdiabaticMm2 = zs.peMinAdiabaticMm2;
+    result.peAdiabaticOk = zs.peAdiabaticOk;
 
     warnings.push(
       ...protectionWarnings(result, {

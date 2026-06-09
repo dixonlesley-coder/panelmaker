@@ -167,7 +167,9 @@ describe('energy cost', () => {
     const base = computeEnergyEconomics(project, system);
     const dearer = computeEnergyEconomics(project, system, { tariffIdrPerKwh: base.tariffIdrPerKwh * 2 });
     expect(dearer.tariffIdrPerKwh).toBeCloseTo(base.tariffIdrPerKwh * 2, 5);
-    expect(dearer.monthlyEnergyCost).toBeCloseTo(base.monthlyEnergyCost * 2, 0);
+    // Doubling the tariff doubles the bill; compare the ratio so an independent
+    // ±1 IDR rounding of two multi-million-rupiah totals doesn't flake the test.
+    expect(dearer.monthlyEnergyCost / base.monthlyEnergyCost).toBeCloseTo(2, 4);
   });
 
   it('scales loss energy by load factor when requested', () => {

@@ -41,8 +41,14 @@ export function recommendedCurve(loadKind: 'lighting' | 'general' | 'motor'): Br
   }
 }
 
-/** Rule-of-thumb continuous current density for copper busbar (A/mm^2). */
-export const COPPER_CURRENT_DENSITY_A_PER_MM2 = 1.5;
+/**
+ * Conservative continuous current density for sizing a copper busbar that exceeds
+ * the tabulated sizes (A/mm²). Large bars cool worse than small ones, so the
+ * fallback uses ~1.3 A/mm² — in line with the top of {@link COPPER_BUSBAR_TABLE}
+ * (1000 mm² → 1430 A ≈ 1.43 A/mm²) and slightly conservative beyond it, rather
+ * than the ~1.5 A/mm² that only holds for small, edge-cooled bars.
+ */
+export const COPPER_CURRENT_DENSITY_A_PER_MM2 = 1.3;
 
 export interface BusbarSize {
   /** Bar width (mm). */

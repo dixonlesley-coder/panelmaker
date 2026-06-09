@@ -19,6 +19,9 @@ import {
   CURVE_TRIP_MULTIPLE,
   DEFAULT_LV_UTILITY_FAULT_KA,
   NOMINAL_PHASE_VOLTAGE_V,
+  PE_ADIABATIC_K,
+  PE_FAULT_CLEAR_TIME_S,
+  SOURCE_XR_RATIO,
   ZS_FAULT_TEMP_FACTOR,
   ZS_VOLTAGE_FACTOR,
   breakerKa,
@@ -55,12 +58,17 @@ export function conductorImpedance(csaMm2: number, lengthM: number): Impedance {
 
 /**
  * Source impedance (per phase, ohms) backing a prospective fault current at a
- * given line voltage: Z = V_LL / (sqrt(3) * Isc). Treated as a pure reactance
- * (X >> R upstream of the LV bus), which is the conservative assumption for Isc.
+ * given line voltage: |Z| = V_LL / (sqrt(3) * Isc). The magnitude is split into
+ * R and X using a typical source X/R ratio (transformer/utility-dominated, so
+ * X >> R) — |Z| (hence Isc) is preserved, while the small source R is made
+ * explicit so the earth-fault loop (Zs) carries a physical, non-zero source R.
  */
 export function sourceImpedanceFromIsc(iscA: number, lineVoltageV: number): Impedance {
   if (iscA <= 0) return { rOhm: 0, xOhm: 0 };
-  return { rOhm: 0, xOhm: lineVoltageV / (Math.sqrt(3) * iscA) };
+  const z = lineVoltageV / (Math.sqrt(3) * iscA);
+  // X/R = k ⇒ R = |Z| / √(1+k²), X = k·R, and √(R²+X²) = |Z|.
+  const rOhm = z / Math.sqrt(1 + SOURCE_XR_RATIO * SOURCE_XR_RATIO);
+  return { rOhm, xOhm: SOURCE_XR_RATIO * rOhm };
 }
 
 /**
@@ -114,6 +122,12 @@ export interface ZsCheck {
   zsMaxOhm: number;
   /** True when Zs <= Zs_max (automatic disconnection within the limit). */
   disconnectsInTime: boolean;
+  /** Prospective earth-fault current available at the circuit (A), U0 / Zs. */
+  earthFaultA: number;
+  /** Minimum PE CSA to survive the fault energy adiabatically (mm²). */
+  peMinAdiabaticMm2: number;
+  /** True when the PE conductor meets the adiabatic thermal-withstand minimum. */
+  peAdiabaticOk: boolean;
 }
 
 export interface ZsInput {
@@ -152,10 +166,21 @@ export function checkZs(i: ZsInput): ZsCheck {
   // check rather than flagging an (expected) high loop impedance.
   const disconnectsInTime = i.earthingSystem === 'TT' ? true : zsOhm <= zsMaxOhm + 1e-9;
 
+  // Adiabatic thermal withstand of the PE: S ≥ √(I²·t)/k (IEC 60364-5-54
+  // §543.1.2). The earth-fault current is U0/Zs; on TT the loop fault current is
+  // electrode-limited and cleared by the RCD, so the check is relaxed (as for ADS).
+  const earthFaultA = zsOhm > 0 ? NOMINAL_PHASE_VOLTAGE_V / zsOhm : 0;
+  const peMinAdiabaticMm2 = (earthFaultA * Math.sqrt(PE_FAULT_CLEAR_TIME_S)) / PE_ADIABATIC_K;
+  const peAdiabaticOk =
+    i.earthingSystem === 'TT' ? true : i.peCsaMm2 + 1e-9 >= peMinAdiabaticMm2;
+
   return {
     zsOhm: round(zsOhm, 3),
     zsMaxOhm: zsMaxOhm === Infinity ? zsMaxOhm : round(zsMaxOhm, 3),
     disconnectsInTime,
+    earthFaultA: round(earthFaultA, 0),
+    peMinAdiabaticMm2: round(peMinAdiabaticMm2, 2),
+    peAdiabaticOk,
   };
 }
 

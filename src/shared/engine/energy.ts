@@ -12,12 +12,15 @@
 import { conductorResistanceOhmPerKm } from '../standards/conductors';
 import {
   BATTERY_CAPEX_IDR_PER_KWH,
+  DAYS_PER_MONTH,
+  DAYS_PER_YEAR,
   SOLAR_CAPEX_IDR_PER_KWP,
   SOLAR_LIFETIME_YEARS,
   TRANSFORMER_LOAD_LOSS_PCT,
   TRANSFORMER_NO_LOAD_LOSS_PCT,
   tariffForClass,
 } from '../standards/tariff';
+import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import type { ProjectInput } from '../types/project';
 import type { SystemResult } from '../types/results';
 import type { EnergyOptions, EnergyResult, LossResult } from '../types/energy';
@@ -80,10 +83,11 @@ export function computeEnergyEconomics(
   const transformer = transformerLossW(system);
   const totalLossW = copper + transformer;
 
-  // Loss % is referenced to the demand power (kW), i.e. demand kVA × the
-  // building power factor used to derive it, so it reads as a sensible fraction
-  // of the actual delivered load.
-  const demandKw = system.supply.demandKva * system.powerFactor.existingPf;
+  // Loss % is referenced to the delivered real power (kW). demand kVA was derived
+  // as kW / ASSUMED_BUILDING_PF, so multiplying back by the *same* factor recovers
+  // the diversified demand kW exactly (using the live `existingPf` here instead
+  // would double-count power factor and skew the base).
+  const demandKw = system.supply.demandKva * ASSUMED_BUILDING_PF;
   const lossPercent = demandKw > 0 ? (totalLossW / 1000 / demandKw) * 100 : 0;
 
   const losses: LossResult = {
@@ -115,14 +119,14 @@ export function computeEnergyEconomics(
       : `PLN ${system.supply.type} tariff ${tariff} IDR/kWh (non-subsidised business default).`,
   );
 
-  const monthlyKwh = (dailyKwh + dailyLossKwh) * 30;
+  const monthlyKwh = (dailyKwh + dailyLossKwh) * DAYS_PER_MONTH;
   const monthlyEnergyCost = monthlyKwh * tariff;
-  const annualLossCost = dailyLossKwh * 365 * tariff;
+  const annualLossCost = dailyLossKwh * DAYS_PER_YEAR * tariff;
 
   // --- Solar ROI -----------------------------------------------------------
   const solarSized = system.sources?.solar;
   const solarDailyKwh = solarSized?.dailyKwh ?? 0;
-  const solarAnnualSavings = solarDailyKwh * 365 * tariff;
+  const solarAnnualSavings = solarDailyKwh * DAYS_PER_YEAR * tariff;
   const solarCapex = solarSized ? solarSized.arrayKwp * SOLAR_CAPEX_IDR_PER_KWP : 0;
   // Payback only defined when there is an array generating real savings.
   const paybackYears =

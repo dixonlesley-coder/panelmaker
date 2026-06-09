@@ -109,6 +109,20 @@ export function protectionWarnings(result: CircuitResult, ctx: ProtectionWarning
     });
   }
 
+  // Adiabatic thermal withstand of the PE conductor (TN; IEC 60364-5-54 §543.1.2).
+  if (
+    ctx.earthingSystem !== 'TT' &&
+    result.peAdiabaticOk === false &&
+    result.peMinAdiabaticMm2 !== undefined
+  ) {
+    out.push({
+      code: 'pe-undersized-adiabatic',
+      severity: 'error',
+      message: `${result.name}: PE conductor ${result.grounding.peCsaMm2} mm² is below the ${result.peMinAdiabaticMm2} mm² adiabatic minimum for the ${result.earthFaultA} A earth fault — increase the PE cross-section.`,
+      ...base,
+    });
+  }
+
   return out;
 }
 

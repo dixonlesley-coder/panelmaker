@@ -80,5 +80,13 @@ export const DEPTH_OF_DISCHARGE: Readonly<Record<BatteryChemistry, number>> = {
   lead_acid: 0.5,
 };
 
-/** Round-trip (charge/discharge + inverter) efficiency. */
+/** Round-trip (charge → store → discharge + inverter) efficiency, for arbitrage. */
 export const BATTERY_EFFICIENCY = 0.9;
+
+/**
+ * One-way discharge-path efficiency (battery DC → inverter → AC load). Backup
+ * autonomy sizing only incurs the discharge side, so applying the full round-trip
+ * efficiency here would double-count the charging loss. ~0.95 for a modern
+ * battery inverter at backup load.
+ */
+export const BATTERY_DISCHARGE_EFFICIENCY = 0.95;

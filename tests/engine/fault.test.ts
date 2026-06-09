@@ -92,6 +92,16 @@ describe('fault decay down a feeder', () => {
     expect(downstreamFaultA(400, nearZ, upstream)).toBeLessThanOrEqual(upstream);
     expect(downstreamFaultA(400, nearZ, upstream)).toBeGreaterThan(upstream * 0.95);
   });
+
+  it('splits the source impedance into R and X at the source X/R, preserving |Z|', () => {
+    const z = sourceImpedanceFromIsc(16000, 400);
+    // Magnitude is unchanged (so Isc is preserved) ...
+    expect(impedanceMagnitude(z)).toBeCloseTo(400 / (Math.sqrt(3) * 16000), 6);
+    // ... but the source is no longer a pure reactance: it carries a physical R,
+    // with X/R ≈ 7 (transformer/utility-dominated source).
+    expect(z.rOhm).toBeGreaterThan(0);
+    expect(z.xOhm / z.rOhm).toBeCloseTo(7, 1);
+  });
 });
 
 describe('breaker breaking-capacity adequacy', () => {
@@ -202,6 +212,53 @@ describe('earth-fault loop impedance (Zs) and ADS', () => {
     expect(c.zsOhm).toBeDefined();
     expect(c.disconnectsInTime).toBe(false);
     expect(sys.warnings.some((w) => w.code === 'zs-too-high')).toBe(true);
+  });
+
+  it('flags a PE that fails the adiabatic thermal-withstand check (TN)', () => {
+    // A very short run on a stiff bus ⇒ very low Zs ⇒ a large earth fault that a
+    // 2.5 mm² PE cannot carry for the clearing time.
+    const zs = checkZs({
+      earthingSystem: 'TN-S',
+      sourceZ: { rOhm: 0.005, xOhm: 0.01 },
+      phaseCsaMm2: 2.5,
+      peCsaMm2: 2.5,
+      lengthM: 1,
+      curve: 'C',
+      breakerRatingA: 16,
+    });
+    expect(zs.earthFaultA).toBeGreaterThan(1000);
+    expect(zs.peMinAdiabaticMm2).toBeGreaterThan(2.5);
+    expect(zs.peAdiabaticOk).toBe(false);
+    // The ADS loop itself still clears (low Zs) — the failure is purely thermal.
+    expect(zs.disconnectsInTime).toBe(true);
+  });
+
+  it('relaxes the adiabatic PE check on TT (RCD-cleared, electrode-limited fault)', () => {
+    const zs = checkZs({
+      earthingSystem: 'TT',
+      sourceZ: { rOhm: 0.005, xOhm: 0.01 },
+      phaseCsaMm2: 2.5,
+      peCsaMm2: 2.5,
+      lengthM: 1,
+      curve: 'C',
+      breakerRatingA: 16,
+    });
+    expect(zs.peAdiabaticOk).toBe(true);
+  });
+
+  it('raises a pe-undersized-adiabatic error for a short stub on a stiff bus (TN)', () => {
+    const project: ProjectInput = {
+      id: 'PRJ',
+      name: 'B',
+      earthingSystem: 'TN-S',
+      panels: [
+        panel({ id: 'P', name: 'DB', circuits: [branch({ id: 'c', name: 'Short stub', loadW: 4000, lengthM: 1 })] }),
+      ],
+    };
+    const sys = computeSystem(project);
+    const c = sys.panels['P']!.circuits[0]!;
+    expect(c.peAdiabaticOk).toBe(false);
+    expect(sys.warnings.some((w) => w.code === 'pe-undersized-adiabatic')).toBe(true);
   });
 });
 
@@ -327,5 +384,12 @@ describe('selectivity report (margins)', () => {
     expect(entry.selective).toBe(true);
     expect(entry.ratio).toBeGreaterThanOrEqual(1.6);
     expect(sys.warnings.some((w) => w.code === 'selectivity-risk')).toBe(false);
+
+    // Overload-discriminating, but the prospective fault at the sub-bus exceeds
+    // the upstream's instantaneous pickup ⇒ only partial short-circuit selectivity.
+    expect(entry.selectivityLimitA).toBeGreaterThan(0);
+    expect(entry.downstreamFaultA).toBeGreaterThan(entry.selectivityLimitA!);
+    expect(entry.scSelective).toBe(false);
+    expect(sys.warnings.some((w) => w.code === 'selectivity-partial')).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import { peConductorSize } from '../standards/grounding';
 import { circuitConnectedW, computePanel } from './computePanel';
 import { circuitDemandFactor, effectiveDiversityFactor } from './occupancy';
 import { determineSupply } from './transformer';
+import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
@@ -19,6 +20,7 @@ import {
 } from './fault';
 import { selectBreaker } from './breakerSelect';
 import { sizeCable } from './cableSizing';
+import { CURVE_TRIP_MULTIPLE_LOWER } from '../standards/fault';
 import { round } from './util';
 
 /**
@@ -122,10 +124,9 @@ export function computeSystem(project: ProjectInput): SystemResult {
 
   // Determine the supply (LV direct vs MV + transformer) from the diversified
   // demand presented by the root panel(s). kVA = kW / power-factor.
-  const BUILDING_PF = 0.85;
   const rootDemandW = roots.reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
   const lvVoltageV = roots[0]?.voltageV ?? 400;
-  const totalDemandKva = rootDemandW / 1000 / BUILDING_PF;
+  const totalDemandKva = rootDemandW / 1000 / ASSUMED_BUILDING_PF;
   const supply = determineSupply(totalDemandKva, lvVoltageV);
   const sources = computeSources(project.sources, totalDemandKva);
 
@@ -181,6 +182,16 @@ export function computeSystem(project: ProjectInput): SystemResult {
         code: 'selectivity-risk',
         severity: 'warning',
         message: `Feeder "${e.upstreamName}" (${e.upstreamRatingA} A) may not discriminate with ${e.downstreamName}'s ${e.downstreamRatingA} A branch — ${e.marginNote} Verify with manufacturer curves.`,
+        panelId: e.upstreamPanelId,
+        circuitId: e.upstreamCircuitId,
+      });
+    } else if (e.scSelective === false && e.selectivityLimitA !== undefined) {
+      // Overload-discriminating, but a thermal-magnetic cascade only discriminates
+      // up to the upstream's instantaneous pickup; above it both trip together.
+      warnings.push({
+        code: 'selectivity-partial',
+        severity: 'info',
+        message: `Feeder "${e.upstreamName}" (${e.upstreamRatingA} A) discriminates with ${e.downstreamName} on overload, but only up to ~${e.selectivityLimitA} A; the ${round((e.downstreamFaultA ?? 0) / 1000, 1)} kA prospective fault there exceeds this, so short-circuit selectivity is only partial — confirm with manufacturer let-through / discrimination tables.`,
         panelId: e.upstreamPanelId,
         circuitId: e.upstreamCircuitId,
       });
@@ -254,6 +265,14 @@ function selectivityReport(
       ? `ratio ${ratio} ≥ ${SELECTIVITY_RATIO}× — discriminates (screen).`
       : `upstream rating below ${requiredA} A (${SELECTIVITY_RATIO}×); ratio ${ratio}.`;
 
+    // Short-circuit discrimination ceiling: the upstream device stays out of its
+    // instantaneous region (so only the downstream trips) up to its lower magnetic
+    // pickup. Above the prospective fault at the child bus, both trip together.
+    const selectivityLimitA = round(CURVE_TRIP_MULTIPLE_LOWER[feederResult.breaker.curve] * upstreamIn, 0);
+    const childFaultA =
+      childResult.faultLevelKa !== undefined ? round(childResult.faultLevelKa * 1000, 0) : undefined;
+    const scSelective = childFaultA === undefined ? true : childFaultA <= selectivityLimitA + 1e-9;
+
     out.push({
       upstreamPanelId: parentId,
       upstreamCircuitId: feeder.id,
@@ -264,6 +283,9 @@ function selectivityReport(
       downstreamRatingA: downstreamIn,
       ratio,
       selective,
+      selectivityLimitA,
+      downstreamFaultA: childFaultA,
+      scSelective,
       marginNote,
     });
   }
