@@ -4,6 +4,10 @@
   "private": true,
   "description": "Offline electrical panel & system designer (PUIL 2011 / IEC 60364 / IEC 60947)",
   "license": "MIT",
+  "author": {
+    "name": "PanelMaker",
+    "email": "support@panelmaker.app"
+  },
   "type": "module",
   "main": "out/main/index.js",
   "engines": {
@@ -28,7 +32,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "drizzle-kit": "^0.30.1",
     "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.15.2",
     "electron-vite": "^2.3.0",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",

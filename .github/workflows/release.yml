@@ -64,15 +64,16 @@ jobs:
           ALLOWED_HD: ${{ secrets.ALLOWED_HD }}
           # --- GitHub Releases publish (auto-update feed) ---
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # --- Code signing (per-OS). Each CSC_LINK is a BASE64-encoded cert.
-          #     Unset secrets resolve to '' -> electron-builder builds UNSIGNED, so
-          #     this whole block stays dormant until you add the secrets:
+          # --- Code signing (per-OS). Each *_CSC_LINK is a BASE64-encoded cert.
+          #     Passed under NEUTRAL names (SIGN_*) so an empty value is never seen
+          #     by electron-builder as a (broken) cert path — the script exports the
+          #     real CSC_LINK only when a cert exists. Add these to enable signing:
           #       Windows (Authenticode .pfx): WINDOWS_CSC_LINK / WINDOWS_CSC_KEY_PASSWORD
           #       macOS  (Developer ID .p12):  MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD
           #     (EV / HSM-backed Windows certs can't be a .pfx file — those need a
           #     cloud-signing integration, e.g. Azure Trusted Signing; not wired here.)
-          CSC_LINK: ${{ (matrix.os == 'macos-latest' && secrets.MAC_CSC_LINK) || (matrix.os == 'windows-latest' && secrets.WINDOWS_CSC_LINK) || '' }}
-          CSC_KEY_PASSWORD: ${{ (matrix.os == 'macos-latest' && secrets.MAC_CSC_KEY_PASSWORD) || (matrix.os == 'windows-latest' && secrets.WINDOWS_CSC_KEY_PASSWORD) || '' }}
+          SIGN_CSC_LINK: ${{ (matrix.os == 'macos-latest' && secrets.MAC_CSC_LINK) || (matrix.os == 'windows-latest' && secrets.WINDOWS_CSC_LINK) || '' }}
+          SIGN_CSC_KEY_PASSWORD: ${{ (matrix.os == 'macos-latest' && secrets.MAC_CSC_KEY_PASSWORD) || (matrix.os == 'windows-latest' && secrets.WINDOWS_CSC_KEY_PASSWORD) || '' }}
           # --- macOS notarization (Apple). Used only on mac when all three are set. ---
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -84,26 +85,33 @@ jobs:
           # Publish to a GitHub Release only on a version tag; otherwise just build.
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then PUBLISH=always; else PUBLISH=never; fi
 
-          # No signing cert for this OS -> disable mac identity auto-discovery so
-          # electron-builder builds unsigned instead of hunting for a keychain id.
-          if [[ -z "${CSC_LINK}" ]]; then
+          # Export CSC_LINK only when a cert exists; an empty CSC_LINK is mis-read
+          # by electron-builder as a (broken) cert file path (fatal on the macOS
+          # post-fuse re-sign). With no cert, disable identity auto-discovery so the
+          # build is unsigned / ad-hoc (which the fuse re-sign needs on macOS).
+          if [[ -n "${SIGN_CSC_LINK}" ]]; then
+            export CSC_LINK="${SIGN_CSC_LINK}"
+            export CSC_KEY_PASSWORD="${SIGN_CSC_KEY_PASSWORD}"
+            echo "Code signing: enabled for ${RUNNER_OS}"
+          else
             export CSC_IDENTITY_AUTO_DISCOVERY=false
             echo "Code signing: skipped (no cert configured for ${RUNNER_OS})"
-          else
-            echo "Code signing: enabled for ${RUNNER_OS}"
           fi
 
           # Enable macOS notarization only when all three Apple credentials exist.
-          EXTRA=()
+          # Use a plain string (not a bash array): macOS runners ship bash 3.2,
+          # where expanding an empty "${arr[@]}" errors under `set -u`.
+          NOTARIZE_FLAG=""
           if [[ "${RUNNER_OS}" == "macOS" && -n "${APPLE_ID}" && -n "${APPLE_APP_SPECIFIC_PASSWORD}" && -n "${APPLE_TEAM_ID}" ]]; then
-            EXTRA+=("-c.mac.notarize=true")
+            NOTARIZE_FLAG="-c.mac.notarize=true"
             echo "macOS notarization: enabled"
           elif [[ "${RUNNER_OS}" == "macOS" ]]; then
             echo "macOS notarization: skipped (Apple credentials not set)"
           fi
 
           npx electron-vite build
-          npx electron-builder --publish "${PUBLISH}" "${EXTRA[@]}"
+          # NOTARIZE_FLAG is intentionally unquoted (empty = no extra arg).
+          npx electron-builder --publish "${PUBLISH}" ${NOTARIZE_FLAG}
 
       - name: Upload installers as workflow artifacts
         if: always()
