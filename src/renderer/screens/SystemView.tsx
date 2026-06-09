@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   Group,
+  Menu,
   SimpleGrid,
   Stack,
   Table,
@@ -25,11 +26,14 @@ import { notifications } from '@mantine/notifications';
 import {
   IconBolt,
   IconCash,
+  IconChevronDown,
   IconDeviceFloppy,
   IconDownload,
   IconFileSpreadsheet,
   IconFileTypeCsv,
+  IconLayoutGridAdd,
   IconListDetails,
+  IconPlus,
   IconSitemap,
   IconSolarPanel,
   IconStack2,
@@ -43,6 +47,7 @@ import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
 import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
+import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { exportLabelsPdf, exportSystemPdf, saveProjectToDisk } from '@renderer/api';
 
@@ -139,6 +144,8 @@ export function SystemView() {
   const prices = useProjectStore((s) => s.prices);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const setScreen = useProjectStore((s) => s.setScreen);
+  const addPanel = useProjectStore((s) => s.addPanel);
+  const addPanelFromTemplate = useProjectStore((s) => s.addPanelFromTemplate);
 
   const system = useMemo(() => computeSystem(project), [project]);
   const { nodes, edges } = useMemo(() => buildGraph(project, system), [project, system]);
@@ -177,6 +184,40 @@ export function SystemView() {
           <Title order={3}>{project.name}</Title>
         </div>
         <Group gap="xs">
+          <Menu position="bottom-end" withinPortal shadow="md" width={300}>
+            <Menu.Target>
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<IconPlus size={14} />}
+                rightSection={<IconChevronDown size={14} />}
+              >
+                Add panel
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<IconLayoutGridAdd size={14} />}
+                onClick={() => addPanel()}
+              >
+                Blank panel
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Label>From template</Menu.Label>
+              {PANEL_TEMPLATES.map((t) => (
+                <Menu.Item
+                  key={t.id}
+                  leftSection={<IconSitemap size={14} />}
+                  onClick={() => addPanelFromTemplate(t.id)}
+                >
+                  <Text size="sm">{t.label}</Text>
+                  <Text size="xs" c="dimmed">
+                    {t.description}
+                  </Text>
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
           <Button
             size="xs"
             variant="default"

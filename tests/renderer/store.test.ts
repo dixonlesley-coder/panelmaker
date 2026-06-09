@@ -6,6 +6,7 @@ import {
   selectHasClipboard,
 } from '@renderer/state/projectStore';
 import { createSampleProject } from '@renderer/data/sampleProject';
+import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { computeSystem } from '@shared/engine';
 import type { Warning } from '@shared/types';
 
@@ -275,6 +276,55 @@ describe('projectStore', () => {
       expect(
         useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits.length,
       ).toBe(start);
+    });
+  });
+
+  describe('panel templates', () => {
+    it('addPanelFromTemplate appends a panel with the template circuits and unique ids', () => {
+      const template = PANEL_TEMPLATES.find((t) => t.id === 'pump-control')!;
+      const expectedCircuits = template.build().circuits.length;
+      const startPanels = useProjectStore.getState().project.panels.length;
+
+      useProjectStore.getState().addPanelFromTemplate(template.id);
+
+      const project = useProjectStore.getState().project;
+      expect(project.panels.length).toBe(startPanels + 1);
+      const added = project.panels[project.panels.length - 1]!;
+      expect(added.circuits.length).toBe(expectedCircuits);
+      // the new panel becomes active and opens the editor
+      expect(useProjectStore.getState().activePanelId).toBe(added.id);
+      expect(useProjectStore.getState().activeScreen).toBe('panel');
+
+      // every panel id and circuit id in the project is unique
+      const allIds = [
+        ...project.panels.map((p) => p.id),
+        ...project.panels.flatMap((p) => p.circuits.map((c) => c.id)),
+      ];
+      expect(new Set(allIds).size).toBe(allIds.length);
+    });
+
+    it('adding the same template twice yields independent fresh-id panels', () => {
+      useProjectStore.getState().addPanelFromTemplate('mcc');
+      useProjectStore.getState().addPanelFromTemplate('mcc');
+
+      const panels = useProjectStore.getState().project.panels;
+      const a = panels[panels.length - 2]!;
+      const b = panels[panels.length - 1]!;
+      expect(a.id).not.toBe(b.id);
+      const aIds = new Set(a.circuits.map((c) => c.id));
+      // no circuit id is shared between the two added panels
+      expect(b.circuits.some((c) => aIds.has(c.id))).toBe(false);
+    });
+
+    it('addPanelFromTemplate is undoable and ignores unknown ids', () => {
+      const start = useProjectStore.getState().project.panels.length;
+      useProjectStore.getState().addPanelFromTemplate('does-not-exist');
+      expect(useProjectStore.getState().project.panels.length).toBe(start);
+
+      useProjectStore.getState().addPanelFromTemplate('lighting-db');
+      expect(useProjectStore.getState().project.panels.length).toBe(start + 1);
+      useProjectStore.getState().undo();
+      expect(useProjectStore.getState().project.panels.length).toBe(start);
     });
   });
 });

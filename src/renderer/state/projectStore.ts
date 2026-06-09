@@ -17,6 +17,7 @@ import type {
 } from '@shared/types';
 import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
+import { findPanelTemplate } from '@renderer/data/panelTemplates';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 import {
   deleteProject as registryDeleteProject,
@@ -96,6 +97,8 @@ export interface ProjectState {
   addPanel: () => void;
   /** Set (or clear) a panel's building occupancy class. */
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
+  /** Append a new panel built from a template (fresh ids) and select it. */
+  addPanelFromTemplate: (templateId: string) => void;
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
@@ -360,6 +363,21 @@ export const useProjectStore = create<ProjectState>((set) => ({
         sourceType: 'utility',
         circuits: [],
       };
+      return {
+        ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
+        activePanelId: newPanel.id,
+        activeScreen: 'panel',
+      };
+    }),
+
+  addPanelFromTemplate: (templateId) =>
+    set((s) => {
+      const template = findPanelTemplate(templateId);
+      if (!template) return s;
+      const newPanel = template.build();
+      // Disambiguate the name if a panel with this template name already exists.
+      const sameName = s.project.panels.filter((p) => p.name.startsWith(newPanel.name)).length;
+      if (sameName > 0) newPanel.name = `${newPanel.name} ${sameName + 1}`;
       return {
         ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
         activePanelId: newPanel.id,
