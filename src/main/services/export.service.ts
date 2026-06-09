@@ -18,7 +18,7 @@ import type {
   TableCell,
   TDocumentDefinitions,
 } from 'pdfmake/interfaces';
-import type { ProjectInput } from '@shared/types/project';
+import type { PanelInput, ProjectInput } from '@shared/types/project';
 import type {
   BomLine,
   PanelResult,
@@ -26,6 +26,7 @@ import type {
   Warning,
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
+import { panelGaSvg, panelSldSvg } from '@shared/drawing';
 import { robotoFonts } from './pdfFonts';
 import { computeProject, computePanelResult } from './calc.service';
 
@@ -115,6 +116,21 @@ function panelSpecTable(panel: PanelResult): Content {
   };
 }
 
+/**
+ * Vector single-line + general-arrangement diagrams for a panel, embedded as SVG
+ * (pdfmake renders them via svg-to-pdfkit). The SLD is fitted to the text width;
+ * the GA is fitted within a box so the to-scale elevation never overflows. The GA
+ * goes on its own block (`pageBreak: 'before'`) so a tall cabinet is not split.
+ */
+function panelDiagramsBlock(panel: PanelInput, result: PanelResult): Content[] {
+  return [
+    heading('Single-line diagram'),
+    { svg: panelSldSvg(panel, result), width: 515 },
+    { text: 'General arrangement', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
+    { svg: panelGaSvg(panel, result), fit: [515, 360] },
+  ];
+}
+
 /** Render a warnings list (if any). */
 function warningsBlock(warnings: Warning[]): Content[] {
   if (warnings.length === 0) return [];
@@ -202,11 +218,17 @@ function coverBlock(project: ProjectInput, reportTitle: string): Content[] {
   ];
 }
 
+/** Find a panel's engine input within the project, by id. */
+function panelInputFor(project: ProjectInput, panelId: string): PanelInput | undefined {
+  return project.panels.find((p) => p.id === panelId);
+}
+
 /** Build the document definition for a single panel report. */
 function panelDocDefinition(
   panel: PanelResult,
   project: ProjectInput,
 ): TDocumentDefinitions {
+  const input = panelInputFor(project, panel.panelId);
   return {
     defaultStyle: DEFAULT_STYLE,
     styles: STYLES,
@@ -217,6 +239,7 @@ function panelDocDefinition(
       panelSpecTable(panel),
       heading('Circuit Schedule'),
       circuitScheduleTable(panel),
+      ...(input ? panelDiagramsBlock(input, panel) : []),
       heading('Bill of Materials'),
       bomTable(bomLinesForPanel(panel)),
       ...warningsBlock(panel.warnings),
@@ -259,6 +282,8 @@ function systemDocDefinition(
     content.push(panelSpecTable(panel));
     content.push({ text: 'Circuit Schedule', style: 'h2', margin: [0, 6, 0, 4] });
     content.push(circuitScheduleTable(panel));
+    const input = panelInputFor(project, panel.panelId);
+    if (input) content.push(...panelDiagramsBlock(input, panel));
     allBom.push(...bomLinesForPanel(panel));
   }
 
