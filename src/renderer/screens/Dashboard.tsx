@@ -12,10 +12,18 @@ import {
   Title,
 } from '@mantine/core';
 import { AreaChart } from '@mantine/charts';
-import { IconBolt, IconChartAreaLine, IconClockHour4, IconSun } from '@tabler/icons-react';
+import {
+  IconBolt,
+  IconChartAreaLine,
+  IconClockHour4,
+  IconCoin,
+  IconSun,
+  IconTrendingDown,
+} from '@tabler/icons-react';
 import { computeLoadProfile, computeSystem } from '@shared/engine';
+import { computeEnergyEconomics } from '@shared/engine/energy';
 import { Stat } from '@renderer/features/components/Stat';
-import { formatKw } from '@renderer/lib/format';
+import { formatIdr, formatKw } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
 
 const PALETTE = ['indigo.6', 'teal.6', 'grape.6', 'orange.6', 'blue.6', 'lime.6', 'pink.6', 'cyan.6'];
@@ -27,6 +35,7 @@ export function Dashboard() {
   const project = useProjectStore((s) => s.project);
   const profile = useMemo(() => computeLoadProfile(project), [project]);
   const system = useMemo(() => computeSystem(project), [project]);
+  const energy = useMemo(() => computeEnergyEconomics(project, system), [project, system]);
 
   const data = useMemo(
     () =>
@@ -226,7 +235,136 @@ export function Dashboard() {
           {system.powerFactor.note}
         </Text>
       </Card>
+
+      <div>
+        <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+          Energy, losses & ROI
+        </Text>
+        <Title order={4} mt={2}>
+          Where energy goes — and what it costs
+        </Title>
+      </div>
+
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="sm">
+        <Stat
+          label="System losses"
+          value={formatKw(energy.losses.totalLossW)}
+          hint={`${energy.losses.lossPercent}% of demand`}
+          icon={<IconTrendingDown size={18} />}
+          color="orange"
+        />
+        <Stat
+          label="Copper (I²R)"
+          value={formatKw(energy.losses.copperLossW)}
+          hint="conductor heating"
+          icon={<IconBolt size={18} />}
+          color="grape"
+        />
+        <Stat
+          label="Monthly energy cost"
+          value={formatIdr(energy.monthlyEnergyCost)}
+          hint={`${energy.monthlyKwh.toLocaleString('id-ID')} kWh @ ${energy.tariffIdrPerKwh.toLocaleString('id-ID')}/kWh`}
+          icon={<IconCoin size={18} />}
+          color="teal"
+        />
+        <Stat
+          label="Solar payback"
+          value={energy.solar.paybackYears !== undefined ? `${energy.solar.paybackYears} yr` : '—'}
+          hint={energy.solar.paybackYears !== undefined ? 'simple, before escalation' : 'no PV configured'}
+          icon={<IconSun size={18} />}
+          color="yellow"
+        />
+      </SimpleGrid>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
+        <Card withBorder radius="md" padding="md">
+          <Group gap="xs" mb="xs">
+            <ThemeIcon variant="light" color="orange">
+              <IconTrendingDown size={16} />
+            </ThemeIcon>
+            <Text fw={600} size="sm">
+              Loss & cost breakdown
+            </Text>
+          </Group>
+          <Table verticalSpacing={6} fz="sm" withRowBorders={false}>
+            <Table.Tbody>
+              <RoiRow k="Copper (I²R) loss" v={formatKw(energy.losses.copperLossW)} />
+              <RoiRow
+                k="Transformer loss"
+                v={energy.losses.transformerLossW > 0 ? formatKw(energy.losses.transformerLossW) : '— (LV supply)'}
+              />
+              <RoiRow k="Total loss" v={`${formatKw(energy.losses.totalLossW)} · ${energy.losses.lossPercent}%`} strong />
+              <RoiRow k="Daily energy" v={`${energy.dailyKwh.toLocaleString('id-ID')} kWh (+${energy.dailyLossKwh} kWh loss)`} />
+              <RoiRow k="Monthly energy cost" v={formatIdr(energy.monthlyEnergyCost)} strong />
+              <RoiRow k="Annual cost of losses" v={formatIdr(energy.annualLossCost)} />
+            </Table.Tbody>
+          </Table>
+        </Card>
+
+        <Card withBorder radius="md" padding="md">
+          <Group gap="xs" mb="xs">
+            <ThemeIcon variant="light" color="yellow">
+              <IconSun size={16} />
+            </ThemeIcon>
+            <Text fw={600} size="sm">
+              Solar & battery economics
+            </Text>
+          </Group>
+          {energy.solar.capex > 0 || energy.battery.capex > 0 ? (
+            <Table verticalSpacing={6} fz="sm" withRowBorders={false}>
+              <Table.Tbody>
+                <RoiRow k="Solar capex" v={energy.solar.capex > 0 ? formatIdr(energy.solar.capex) : '—'} />
+                <RoiRow k="Annual solar savings" v={energy.solar.annualSavings > 0 ? formatIdr(energy.solar.annualSavings) : '—'} />
+                <RoiRow
+                  k="Simple payback"
+                  v={energy.solar.paybackYears !== undefined ? `${energy.solar.paybackYears} yr` : '—'}
+                  strong
+                />
+                <RoiRow k="25-yr net value" v={energy.solar.capex > 0 ? formatIdr(energy.solar.lifetimeNet) : '—'} />
+                <RoiRow k="Battery capex" v={energy.battery.capex > 0 ? formatIdr(energy.battery.capex) : '—'} />
+              </Table.Tbody>
+            </Table>
+          ) : (
+            <Text c="dimmed" size="sm" py="sm">
+              Enable solar PV or battery storage in the project sources to see ROI.
+            </Text>
+          )}
+        </Card>
+      </SimpleGrid>
+
+      {energy.notes.length > 0 && (
+        <Card withBorder radius="md" padding="md">
+          <Text fw={600} size="sm" mb="xs">
+            Assumptions
+          </Text>
+          <Stack gap={4}>
+            {energy.notes.map((note, i) => (
+              <Text key={i} size="xs" c="dimmed">
+                • {note}
+              </Text>
+            ))}
+          </Stack>
+        </Card>
+      )}
     </Stack>
+  );
+}
+
+/** A key/value row for the loss & ROI breakdown tables. */
+function RoiRow({ k, v, strong = false }: { k: string; v: string; strong?: boolean }) {
+  return (
+    <Table.Tr>
+      <Table.Td>
+        <Text size="sm" c={strong ? undefined : 'dimmed'} fw={strong ? 600 : 400}>
+          {k}
+        </Text>
+      </Table.Td>
+      <Table.Td ta="right">
+        <Text size="sm" fw={strong ? 700 : 500}>
+          {v}
+        </Text>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 

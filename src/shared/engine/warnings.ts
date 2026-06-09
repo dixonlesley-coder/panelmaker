@@ -1,4 +1,5 @@
 import type { ControlAssembly } from '../types/control';
+import type { EarthingSystem } from '../types/electrical';
 import type { CircuitResult, Warning } from '../types/results';
 import { suggestCableUpsize, suggestCableForVoltageDrop } from './recommendations';
 
@@ -49,6 +50,50 @@ export function circuitWarnings(result: CircuitResult, ctx: CircuitWarningContex
     for (const cw of result.control.warnings) {
       out.push({ code: 'control', severity: 'warning', message: `${name}: ${cw}`, ...base });
     }
+  }
+
+  return out;
+}
+
+export interface ProtectionWarningContext {
+  earthingSystem: EarthingSystem;
+  /** Prospective 3-phase fault at this circuit's bus (kA), for the message. */
+  prospectiveKa: number;
+  panelId?: string;
+}
+
+/**
+ * Flag protection-coordination faults on a computed circuit: a breaker whose
+ * breaking capacity is below the prospective fault (a safety defect — the device
+ * may not clear a short), and, on TN systems, an earth-fault loop too high for
+ * automatic disconnection within the required time.
+ */
+export function protectionWarnings(result: CircuitResult, ctx: ProtectionWarningContext): Warning[] {
+  const out: Warning[] = [];
+  const base = { panelId: ctx.panelId, circuitId: result.circuitId };
+
+  if (result.kaAdequate === false && result.breakerKa !== undefined) {
+    out.push({
+      code: 'breaking-capacity-inadequate',
+      severity: 'error',
+      message: `${result.name}: breaker breaking capacity ${result.breakerKa} kA < prospective fault ${ctx.prospectiveKa} kA.`,
+      ...base,
+    });
+  }
+
+  // ADS (Zs) only governs on TN earthing; TT relies on the RCD already modelled.
+  if (
+    ctx.earthingSystem !== 'TT' &&
+    result.disconnectsInTime === false &&
+    result.zsOhm !== undefined &&
+    result.zsMaxOhm !== undefined
+  ) {
+    out.push({
+      code: 'zs-too-high',
+      severity: 'warning',
+      message: `${result.name}: earth-fault loop Zs ${result.zsOhm} Ω exceeds ${result.zsMaxOhm} Ω — automatic disconnection not guaranteed; reduce run length or increase CSA.`,
+      ...base,
+    });
   }
 
   return out;

@@ -1,6 +1,7 @@
 export * from './version';
 export * from './conductors';
 export * from './protection';
+export * from './fault';
 export * from './enclosure';
 export * from './loads';
 export * from './schedule';

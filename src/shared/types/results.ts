@@ -91,6 +91,16 @@ export interface CircuitResult {
   grounding: GroundingResult;
   rcd: RcdSpec;
   control?: ControlAssembly;
+  /** Specified device breaking capacity (kA, Icu). */
+  breakerKa?: number;
+  /** True when the breaker's kA covers the prospective fault at its bus. */
+  kaAdequate?: boolean;
+  /** Earth-fault loop impedance over the run (ohm), TN systems. */
+  zsOhm?: number;
+  /** Maximum permissible Zs for disconnection in the required time (ohm). */
+  zsMaxOhm?: number;
+  /** True when Zs <= Zs_max (automatic disconnection within the limit). */
+  disconnectsInTime?: boolean;
 }
 
 export interface BusbarResult {
@@ -159,6 +169,8 @@ export interface PanelResult {
   phaseBalance: PhaseBalanceResult;
   warnings: Warning[];
   standardsVersion: string;
+  /** Prospective 3-phase symmetrical fault current at this panel's bus (kA). */
+  faultLevelKa?: number;
 }
 
 /** A 24-hour building demand profile and peak analysis. */

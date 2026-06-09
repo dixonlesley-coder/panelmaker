@@ -16,8 +16,14 @@ import type {
 import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
+import {
+  deleteProject as registryDeleteProject,
+  loadProject as registryLoadProject,
+  saveProject as registrySaveProject,
+} from '@renderer/lib/projectsRegistry';
 
 export type Screen =
+  | 'projects'
   | 'system'
   | 'dashboard'
   | 'panel'
@@ -34,6 +40,17 @@ const nextId = (prefix: string) => `${prefix}-rt${(runtimeSeq += 1)}`;
 let schematicSeq = 0;
 const nextSchematicId = (prefix: string) => `${prefix}-rt${(schematicSeq += 1)}`;
 
+/** Maximum number of undoable project states retained. */
+const HISTORY_LIMIT = 50;
+
+/** A fresh, collision-resistant project id for new/duplicated projects. */
+function freshProjectId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `PRJ-${crypto.randomUUID()}`;
+  }
+  return nextId('PRJ');
+}
+
 export interface ProjectState {
   project: ProjectInput;
   parts: Part[];
@@ -42,6 +59,10 @@ export interface ProjectState {
   activeScreen: Screen;
   /** Control/ladder schematics, keyed by circuitId. */
   schematics: Record<string, ControlSchematic>;
+  /** Undo stack: prior project states, oldest first (capped at HISTORY_LIMIT). */
+  past: ProjectInput[];
+  /** Redo stack: states undone away from, newest first. */
+  future: ProjectInput[];
 
   // navigation
   setScreen: (screen: Screen) => void;
@@ -71,9 +92,25 @@ export interface ProjectState {
   /** Set the installation earthing system. */
   setEarthingSystem: (system: EarthingSystem) => void;
 
+  // undo / redo (project edits only)
+  /** Restore the previous project state (no-op when the past stack is empty). */
+  undo: () => void;
+  /** Re-apply the most recently undone project state. */
+  redo: () => void;
+
   // project lifecycle
-  /** Replace the entire working project (e.g. autosave restore on launch). */
+  /** Replace the entire working project (e.g. autosave restore on launch). Resets history. */
   replaceProject: (project: ProjectInput) => void;
+  /** Start a fresh project (seeded sample with a new id/name). Resets history + persists. */
+  newProject: (name?: string) => Promise<void>;
+  /** Load a stored project by id and make it the working project. */
+  openProject: (id: string) => Promise<boolean>;
+  /** Duplicate the active project under a new id (and "(copy)" name); persists it. */
+  duplicateActiveProject: () => Promise<string>;
+  /** Rename the active project (persisted; not an undoable edit). */
+  renameProject: (name: string) => Promise<void>;
+  /** Delete a stored project by id; if it was active, falls back to a fresh project. */
+  deleteProjectById: (id: string) => Promise<boolean>;
 
   // control schematics
   /** Build the schematic from the assembly the first time it is requested. */
@@ -137,6 +174,22 @@ function nextFreeCol(schematic: ControlSchematic, rungId: string): number {
   return cols.length === 0 ? 0 : Math.max(...cols) + 1;
 }
 
+/**
+ * Apply an undoable project edit: compute the next project from the current
+ * state and, when it actually changed, push the PREVIOUS project onto the undo
+ * stack (capped at {@link HISTORY_LIMIT}) and clear the redo stack. Schematic and
+ * price edits do not flow through here and stay out of project history.
+ */
+function withHistory(
+  s: ProjectState,
+  next: (project: ProjectInput) => ProjectInput,
+): Pick<ProjectState, 'project' | 'past' | 'future'> {
+  const project = next(s.project);
+  if (project === s.project) return { project: s.project, past: s.past, future: s.future };
+  const past = [...s.past, s.project].slice(-HISTORY_LIMIT);
+  return { project, past, future: [] };
+}
+
 const initialProject = createSampleProject();
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -146,6 +199,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activePanelId: initialProject.panels[0]?.id ?? '',
   activeScreen: 'system',
   schematics: {},
+  past: [],
+  future: [],
 
   setScreen: (screen) => set({ activeScreen: screen }),
   setActivePanel: (panelId) => set({ activePanelId: panelId }),

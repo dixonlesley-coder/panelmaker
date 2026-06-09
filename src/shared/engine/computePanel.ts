@@ -14,16 +14,21 @@ import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
+import { checkBreakerKa, checkZs, type Impedance } from './fault';
 import { circuitRcd, sizeGrounding } from './grounding';
 import { round } from './util';
 import { voltageDrop } from './voltageDrop';
-import { circuitWarnings, validateInterlocks } from './warnings';
+import { circuitWarnings, protectionWarnings, validateInterlocks } from './warnings';
 
 export interface ComputePanelOptions {
   /** Aggregated downstream demand (W) keyed by the child panel id a feeder serves. */
   feederLoadW?: Record<string, number>;
   /** Installation earthing system (drives RCD requirements). */
   earthingSystem?: EarthingSystem;
+  /** Prospective 3-phase symmetrical fault current at this panel's bus (A). */
+  faultLevelA?: number;
+  /** Per-phase source impedance up to this panel's bus (ohm), for Zs. */
+  sourceZ?: Impedance;
 }
 
 /** A leaf circuit's connected demand (W): motor kW for motors, else connected W, x demand factor. */
@@ -155,6 +160,36 @@ function computeCircuit(
     rcd,
     control,
   };
+
+  // Protection / fault analysis (only when the panel's prospective fault is known).
+  if (opts.faultLevelA !== undefined) {
+    const prospectiveKa = round(opts.faultLevelA / 1000, 1);
+    const ka = checkBreakerKa(breaker, prospectiveKa);
+    result.breakerKa = ka.breakerKa;
+    result.kaAdequate = ka.adequate;
+
+    const zs = checkZs({
+      earthingSystem: opts.earthingSystem ?? 'TN-C-S',
+      sourceZ: opts.sourceZ ?? { rOhm: 0, xOhm: 0 },
+      phaseCsaMm2: cable.csaMm2,
+      peCsaMm2: grounding.peCsaMm2,
+      lengthM: c.lengthM,
+      curve: breaker.curve,
+      breakerRatingA: breaker.ratingA,
+    });
+    result.zsOhm = zs.zsOhm;
+    result.zsMaxOhm = zs.zsMaxOhm;
+    result.disconnectsInTime = zs.disconnectsInTime;
+
+    warnings.push(
+      ...protectionWarnings(result, {
+        earthingSystem: opts.earthingSystem ?? 'TN-C-S',
+        prospectiveKa,
+        panelId: panel.id,
+      }),
+    );
+  }
+
   warnings.push(
     ...circuitWarnings(result, { deratingFactor: df, minSectionMm2: minSection, panelId: panel.id }),
   );
@@ -244,5 +279,6 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     },
     warnings,
     standardsVersion: STANDARDS_VERSION,
+    ...(opts.faultLevelA !== undefined ? { faultLevelKa: round(opts.faultLevelA / 1000, 1) } : {}),
   };
 }

@@ -4,6 +4,7 @@ export * from './derating';
 export * from './breakerSelect';
 export * from './cableSizing';
 export * from './voltageDrop';
+export * from './fault';
 export * from './busbar';
 export * from './enclosure';
 export * from './costing';
