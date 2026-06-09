@@ -25,9 +25,21 @@ function headerId(circuitId: string): string {
   return `sch-${circuitId}`;
 }
 
+/** Parse a payload JSON column, tolerating corrupt/empty rows. */
+function safeParse<T>(json: string | null): T | undefined {
+  if (!json) return undefined;
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Upsert a schematic, fully replacing its rungs/symbols/connections. */
 export function saveSchematic(schematic: ControlSchematic, db: Db = getDb()): { id: string } {
   const id = headerId(schematic.circuitId);
+
+  const rungIds = new Set(schematic.rungs.map((r) => r.id));
 
   db.transaction((tx) => {
     // Replace any existing schematic for this circuit (cascades to children).
@@ -42,6 +54,8 @@ export function saveSchematic(schematic: ControlSchematic, db: Db = getDb()): { 
         .run();
     });
     for (const sym of schematic.symbols) {
+      // Skip symbols whose rung was removed, to avoid a foreign-key abort.
+      if (sym.rungId && !rungIds.has(sym.rungId)) continue;
       tx.insert(schematicSymbols)
         .values({ id: sym.id, schematicId: id, rungId: sym.rungId, payloadJson: JSON.stringify(sym) })
         .run();
@@ -84,10 +98,15 @@ export function loadSchematic(circuitId: string, db: Db = getDb()): ControlSchem
     .all();
 
   const rungs = rungRows
-    .map((r) => JSON.parse(r.payloadJson ?? '{}') as SchematicRung)
+    .map((r) => safeParse<SchematicRung>(r.payloadJson))
+    .filter((r): r is SchematicRung => r !== undefined)
     .sort((a, b) => a.order - b.order);
-  const symbols = symRows.map((s) => JSON.parse(s.payloadJson ?? '{}') as SchematicSymbol);
-  const connections = connRows.map((c) => JSON.parse(c.payloadJson ?? '{}') as SchematicConnection);
+  const symbols = symRows
+    .map((s) => safeParse<SchematicSymbol>(s.payloadJson))
+    .filter((s): s is SchematicSymbol => s !== undefined);
+  const connections = connRows
+    .map((c) => safeParse<SchematicConnection>(c.payloadJson))
+    .filter((c): c is SchematicConnection => c !== undefined);
 
   return { circuitId, rungs, symbols, connections };
 }

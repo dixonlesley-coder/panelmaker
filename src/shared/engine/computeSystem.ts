@@ -1,7 +1,7 @@
 import type { ProjectInput } from '../types/project';
 import type { PanelResult, SystemResult, Warning } from '../types/results';
 import { peConductorSize } from '../standards/grounding';
-import { computePanel } from './computePanel';
+import { circuitConnectedW, computePanel } from './computePanel';
 import { determineSupply } from './transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
@@ -86,7 +86,17 @@ export function computeSystem(project: ProjectInput): SystemResult {
     pr.warnings.forEach((w) => warnings.push(w));
   }
 
-  const connectedLoadW = Object.values(results).reduce((s, r) => s + r.totalConnectedLoadW, 0);
+  // True building connected load = leaf loads only (feeders are aggregations, so
+  // summing every panel's total would double-count sub-panels).
+  const connectedLoadW = project.panels.reduce(
+    (sum, p) =>
+      sum +
+      p.circuits.reduce(
+        (s, c) => s + (c.role === 'branch' && !c.feedsPanelId ? circuitConnectedW(c) : 0),
+        0,
+      ),
+    0,
+  );
 
   // Determine the supply (LV direct vs MV + transformer) from the diversified
   // demand presented by the root panel(s). kVA = kW / power-factor.

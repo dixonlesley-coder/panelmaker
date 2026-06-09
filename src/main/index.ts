@@ -78,7 +78,9 @@ function bootstrap(): void {
 
     app.on('activate', () => {
       // macOS: re-create a window when the dock icon is clicked and none exist.
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+      if (BrowserWindow.getAllWindows().length === 0) {
+        initAutoUpdater(createMainWindow());
+      }
     });
   });
 

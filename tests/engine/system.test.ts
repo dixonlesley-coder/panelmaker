@@ -114,6 +114,35 @@ describe('computeSystem (building tree aggregation)', () => {
     expect(feeder.designCurrentA).toBeCloseTo(expectedA, 0);
   });
 
+  it('aggregates a motor sub-panel load onto the parent feeder (motorKw counted)', () => {
+    const project: ProjectInput = {
+      id: 'PRJ-M',
+      name: 'Motors',
+      panels: [
+        panel({
+          id: 'MAIN',
+          name: 'Main',
+          circuits: [branch({ id: 'f', name: 'Feeder → MCC', loadKind: 'feeder', feedsPanelId: 'MCC' })],
+        }),
+        panel({
+          id: 'MCC',
+          name: 'MCC',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f',
+          circuits: [
+            branch({ id: 'm', name: 'Motor', loadKind: 'motor', motorKw: 37, starterType: 'STAR_DELTA' }),
+          ],
+        }),
+      ],
+    };
+    const r = computeSystem(project);
+    // the feeder carries the motor demand, not ~0 A
+    const feeder = r.panels['MAIN']!.circuits.find((c) => c.circuitId === 'f')!;
+    expect(feeder.designCurrentA).toBeGreaterThan(40);
+    // connected load counts the motor and is not double-counted across the feeder
+    expect(r.totals.connectedLoadW).toBe(37000);
+  });
+
   it('detects a feeder cycle', () => {
     const project: ProjectInput = {
       id: 'PRJ2',

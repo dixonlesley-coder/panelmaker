@@ -18,7 +18,7 @@ export interface PricelistMatch {
   unmatched: RawPriceRow[];
 }
 
-const PRICE_RE = /price|harga|unit|cost|amount|rp/i;
+const PRICE_RE = /price|harga|cost|amount|\brp\b/i;
 const KEY_RE = /model|sku|part|name|kode|item|desc|type/i;
 
 function isFiniteNumber(v: unknown): boolean {
@@ -27,16 +27,31 @@ function isFiniteNumber(v: unknown): boolean {
   return false;
 }
 
-/** Parse a number from a value that may carry currency formatting ("Rp 1.250.000"). */
+/**
+ * Parse a number from a value that may carry currency formatting. Handles both
+ * IDR-style thousands ("Rp 1.250.000" -> 1250000) and decimal currencies
+ * ("1,250.50" or "1.250,50" -> 1250.5) by treating the last separator as a
+ * decimal point only when 1-2 digits follow it.
+ */
 export function toNumber(v: unknown): number {
   if (typeof v === 'number') return v;
   if (typeof v !== 'string') return NaN;
-  // strip everything but digits, separators and sign, then drop thousands separators
-  const cleaned = v.replace(/[^0-9.,-]/g, '');
-  // if both separators present, assume '.'/' ' thousands and ',' decimal or vice-versa;
-  // for IDR (no decimals typically) just remove separators
-  const digitsOnly = cleaned.replace(/[.,]/g, '');
-  return Number(digitsOnly);
+  const s = v.replace(/[^0-9.,-]/g, '');
+  if (s === '' || s === '-') return NaN;
+
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+
+  if (lastSep === -1) return Number(s);
+
+  const frac = s.slice(lastSep + 1).replace(/[.,]/g, '');
+  const isDecimal = frac.length >= 1 && frac.length <= 2;
+  if (isDecimal) {
+    const intPart = s.slice(0, lastSep).replace(/[.,]/g, '');
+    return Number(`${intPart}.${frac}`);
+  }
+  return Number(s.replace(/[.,]/g, '')); // separators are thousands groupings
 }
 
 /**

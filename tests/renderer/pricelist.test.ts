@@ -3,10 +3,13 @@ import { parseRows, matchToParts, pricesFromMatches, toNumber } from '@renderer/
 import { SAMPLE_PARTS } from '@renderer/data/sampleParts';
 
 describe('pricelist import parsing', () => {
-  it('parses currency-formatted IDR values', () => {
-    expect(toNumber('Rp 1.250.000')).toBe(1250000);
+  it('parses IDR thousands and decimal-currency values', () => {
+    expect(toNumber('Rp 1.250.000')).toBe(1250000); // IDR thousands
     expect(toNumber('420000')).toBe(420000);
     expect(toNumber(185000)).toBe(185000);
+    expect(toNumber('1,250.50')).toBeCloseTo(1250.5, 2); // US decimal
+    expect(toNumber('1.250,50')).toBeCloseTo(1250.5, 2); // EU decimal
+    expect(toNumber('2499.99')).toBeCloseTo(2499.99, 2);
   });
 
   it('detects key + price columns from labelled rows', () => {

@@ -13,18 +13,33 @@ import { IPC, type UpdateStatus } from '@shared/ipc-contract';
 const { autoUpdater } = electronUpdater;
 
 let targetWindow: BrowserWindow | undefined;
+let lastStatus: UpdateStatus | undefined;
+let started = false;
 
 function send(status: UpdateStatus): void {
+  lastStatus = status;
   targetWindow?.webContents.send(IPC.updateStatus, status);
 }
 
-/** Wire update events and start the periodic check (packaged builds only). */
+/**
+ * Point the updater at `win` and start the periodic check (packaged builds
+ * only). Safe to call again when the window is recreated (e.g. macOS activate):
+ * it re-points the target and replays the last status, but only wires the
+ * autoUpdater listeners + interval once.
+ */
 export function initAutoUpdater(win: BrowserWindow): void {
   targetWindow = win;
+  // The renderer subscribes after its page loads — replay the latest status then.
+  win.webContents.on('did-finish-load', () => {
+    if (lastStatus) win.webContents.send(IPC.updateStatus, lastStatus);
+  });
+
   if (!app.isPackaged) {
     send({ state: 'disabled', reason: 'Auto-update runs in the installed app.' });
     return;
   }
+  if (started) return;
+  started = true;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;

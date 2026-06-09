@@ -36,7 +36,6 @@ const PALETTE_SYMBOLS: { type: SchematicSymbolType; label: string }[] = [
  */
 export function SchematicView({ result }: { panel: PanelInput; result: PanelResult }) {
   const schematics = useProjectStore((s) => s.schematics);
-  const ensureSchematic = useProjectStore((s) => s.ensureSchematic);
   const regenerateSchematic = useProjectStore((s) => s.regenerateSchematic);
   const addRung = useProjectStore((s) => s.addRung);
   const addSymbol = useProjectStore((s) => s.addSymbol);
@@ -61,10 +60,15 @@ export function SchematicView({ result }: { panel: PanelInput; result: PanelResu
   const active = controlCircuits.find((c) => c.circuitId === circuitId);
   const assembly = active?.control;
 
-  // generate the schematic the first time a circuit is shown
+  // (Re)generate the auto rungs when the circuit or its starter/motor signature
+  // changes; hand-authored rungs are preserved by mergeSchematic.
+  const assemblySig = assembly
+    ? `${assembly.starterType}|${assembly.motor?.kw ?? ''}|${assembly.motor?.flcA ?? ''}|${assembly.pump?.mode ?? ''}`
+    : '';
   useEffect(() => {
-    if (circuitId && assembly) ensureSchematic(circuitId, assembly);
-  }, [circuitId, assembly, ensureSchematic]);
+    if (circuitId && assembly) regenerateSchematic(circuitId, assembly);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circuitId, assemblySig]);
 
   if (controlCircuits.length === 0) {
     return (

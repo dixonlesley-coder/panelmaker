@@ -11,11 +11,12 @@ function IssueCard({ panelId, warning }: { panelId: string; warning: Warning }) 
 
   const onApply = (fix: SuggestedFix) => {
     if (!warning.circuitId) return;
+    const handled = fix.action?.type === 'set-cable';
     applyFix(panelId, warning.circuitId, fix);
     notifications.show({
-      title: 'Fix applied',
-      message: fix.description,
-      color: 'teal',
+      title: handled ? 'Fix applied' : 'Apply manually',
+      message: handled ? fix.description : 'This suggestion must be applied by hand.',
+      color: handled ? 'teal' : 'gray',
     });
   };
 

@@ -26,11 +26,17 @@ export interface ComputePanelOptions {
   earthingSystem?: EarthingSystem;
 }
 
+/** A leaf circuit's connected demand (W): motor kW for motors, else connected W, x demand factor. */
+export function circuitConnectedW(c: CircuitInput): number {
+  const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
+  return (isMotor ? c.motorKw! * 1000 : c.loadW) * (c.demandFactor ?? 1);
+}
+
 function effectiveLoadW(c: CircuitInput, opts: ComputePanelOptions): number {
   if (c.feedsPanelId && opts.feederLoadW && opts.feederLoadW[c.feedsPanelId] !== undefined) {
     return opts.feederLoadW[c.feedsPanelId]!;
   }
-  return c.loadW * (c.demandFactor ?? 1);
+  return circuitConnectedW(c);
 }
 
 interface CircuitComputation {
@@ -213,8 +219,10 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     });
   }
 
+  // Busbar / incomer carry the worst-loaded phase's line current, not the scalar
+  // sum of mixed single- and three-phase currents.
   const totalDemandCurrentA = round(
-    circuits.reduce((s, c) => s + c.designCurrentA, 0),
+    panel.system === '3ph' ? Math.max(balance.L1, balance.L2, balance.L3) : balance.L1,
     1,
   );
   const busbar = sizeBusbar(totalDemandCurrentA);
