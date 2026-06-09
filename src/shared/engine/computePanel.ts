@@ -103,6 +103,16 @@ function computeCircuit(
     breakerRatingA: breaker.ratingA,
     deratingFactor: df,
     minSectionMm2: minSection,
+    // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the
+    // resulting `vd` below is then within limit by construction in normal cases,
+    // and any residual over-limit is the genuinely-impossible (max-section) case.
+    vd: {
+      lengthM: c.lengthM,
+      cosPhi: c.cosPhi,
+      system: circuitSystem,
+      voltageV: useVoltage,
+      isLighting: c.isLighting,
+    },
   });
   const vd = voltageDrop({
     currentA: ib,

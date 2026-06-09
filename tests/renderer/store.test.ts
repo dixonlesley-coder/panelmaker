@@ -10,15 +10,15 @@ import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { computeSystem } from '@shared/engine';
 import type { Warning } from '@shared/types';
 
-/** Find the first voltage-drop warning across all panels in the project. */
-function findVoltageDropWarning() {
+/** Find the first auto-upsized-for-voltage-drop circuit across all panels. */
+function findVoltageDropUpsize() {
   const { project } = useProjectStore.getState();
   const result = computeSystem(project);
   for (const panelId of Object.keys(result.panels)) {
     const w = result.panels[panelId]!.warnings.find(
-      (x: Warning) => x.code === 'voltage-drop-exceeded' && (x.fixes?.length ?? 0) > 0,
+      (x: Warning) => x.code === 'voltage-drop-upsized',
     );
-    if (w) return { panelId, warning: w };
+    if (w?.circuitId) return { panelId, circuitId: w.circuitId, result, warning: w };
   }
   return undefined;
 }
@@ -56,25 +56,40 @@ describe('projectStore', () => {
     expect(after.designCurrentA).toBeGreaterThan(before.designCurrentA);
   });
 
-  it('applyFix resolves the seeded voltage-drop violation end-to-end', () => {
-    const found = findVoltageDropWarning();
-    expect(found, 'sample project should contain a voltage-drop warning').toBeDefined();
-    const { panelId, warning } = found!;
-    const circuitId = warning.circuitId!;
-    const fix = warning.fixes![0]!;
+  it('auto-upsizes a long run for voltage drop and notes it (no manual fix needed)', () => {
+    const found = findVoltageDropUpsize();
+    expect(found, 'sample project should auto-upsize a long run for voltage drop').toBeDefined();
+    const { panelId, circuitId, result, warning } = found!;
 
-    // before: the circuit is flagged
-    const before = computeSystem(useProjectStore.getState().project)
-      .panels[panelId]!.warnings.filter((w: Warning) => w.circuitId === circuitId);
-    expect(before.some((w) => w.code === 'voltage-drop-exceeded')).toBe(true);
+    // the note is purely informational — the circuit is already within limit
+    expect(warning.severity).toBe('info');
+    const before = result.panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!;
+    expect(before.voltageDrop.withinLimit).toBe(true);
+    expect(before.cable.vdDriven).toBe(true);
+  });
 
-    // apply the suggested cable upsize
-    useProjectStore.getState().applyFix(panelId, circuitId, fix);
+  it('applyFix forces an explicit cable override end-to-end (undoable)', () => {
+    const found = findVoltageDropUpsize();
+    expect(found).toBeDefined();
+    const { panelId, circuitId, result } = found!;
+    const baseCsa = result.panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!.cable
+      .csaMm2;
 
-    // after: the voltage-drop warning is gone for that circuit
+    // force a larger conductor than the engine chose; the override rounds up to
+    // the next standard section and the cable grows.
+    useProjectStore.getState().applyFix(panelId, circuitId, {
+      description: 'force larger cable',
+      action: { type: 'set-cable', payload: { csaMm2: baseCsa + 1 } },
+    });
     const after = computeSystem(useProjectStore.getState().project)
-      .panels[panelId]!.warnings.filter((w: Warning) => w.circuitId === circuitId);
-    expect(after.some((w) => w.code === 'voltage-drop-exceeded')).toBe(false);
+      .panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!;
+    expect(after.cable.csaMm2).toBeGreaterThan(baseCsa);
+
+    // the override is undoable
+    useProjectStore.getState().undo();
+    const reverted = computeSystem(useProjectStore.getState().project)
+      .panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!;
+    expect(reverted.cable.csaMm2).toBe(baseCsa);
   });
 
   it('addCircuit and removeCircuit mutate the active panel', () => {

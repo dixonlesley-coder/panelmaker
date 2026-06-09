@@ -70,6 +70,12 @@ export interface CableResult {
   deratedIzA: number;
   deratingFactor: number;
   appliedRule: string;
+  /**
+   * True when the section was increased beyond the ampacity minimum to keep the
+   * run's voltage drop within its 3%/5% limit (informational — the cable is
+   * compliant by construction, the surcharge in copper is just made visible).
+   */
+  vdDriven?: boolean;
 }
 
 export interface VoltageDropResult {

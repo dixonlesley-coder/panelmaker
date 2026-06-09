@@ -36,12 +36,25 @@ export function circuitWarnings(result: CircuitResult, ctx: CircuitWarningContex
   }
 
   if (!vd.withinLimit) {
+    // Cables are auto-upsized for voltage drop, so this only fires when even the
+    // largest standard section can't hold the drop — no cable upsize can help.
     const fix = suggestCableForVoltageDrop(cable.csaMm2, vd.dropPercent, vd.limitPercent);
     out.push({
       code: 'voltage-drop-exceeded',
       severity: 'warning',
-      message: `${name}: voltage drop ${vd.dropPercent}% exceeds ${vd.limitPercent}% limit.`,
+      message: fix
+        ? `${name}: voltage drop ${vd.dropPercent}% exceeds ${vd.limitPercent}% limit.`
+        : `${name}: voltage drop ${vd.dropPercent}% exceeds ${vd.limitPercent}% limit even at the largest cable — shorten the run or parallel conductors.`,
       fixes: fix ? [fix] : undefined,
+      ...base,
+    });
+  } else if (cable.vdDriven) {
+    // The cable was enlarged beyond its ampacity minimum to keep the drop in
+    // limit — surface it so the engineer sees the upsize (and the extra copper).
+    out.push({
+      code: 'voltage-drop-upsized',
+      severity: 'info',
+      message: `${name}: cable upsized to ${cable.csaMm2} mm² to keep voltage drop within ${vd.limitPercent}% (now ${vd.dropPercent}%).`,
       ...base,
     });
   }
