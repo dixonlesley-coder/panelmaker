@@ -71,6 +71,25 @@ export interface PanelInput {
   circuits: CircuitInput[];
 }
 
+/**
+ * Commercial quotation settings — the labor rate and the cost mark-ups applied
+ * on top of the priced material BOM to build a sell price / proposal. Every
+ * field is optional; the quotation engine substitutes sane defaults when a value
+ * is absent, so existing projects (with no `quotation`) still quote sensibly.
+ */
+export interface QuotationSettings {
+  /** Shop assembly/wiring labor rate (currency per hour). */
+  laborRatePerHour?: number;
+  /** Overhead loading as a percentage of (material + labor). */
+  overheadPct?: number;
+  /** Profit margin as a percentage of the loaded cost base. */
+  marginPct?: number;
+  /** Contingency / risk allowance as a percentage of (material + labor). */
+  contingencyPct?: number;
+  /** Quote currency (defaults to IDR). */
+  currency?: string;
+}
+
 /** One entry in a drawing's revision history (title-block revision block). */
 export interface ProjectRevision {
   /** Revision label, e.g. "A", "B", "01". */
@@ -107,6 +126,8 @@ export interface ProjectMeta {
   logoDataUrl?: string;
   /** Revision history rendered as the title-block revision table. */
   revisions?: ProjectRevision[];
+  /** Commercial quotation settings (labor rate + mark-ups). */
+  quotation?: QuotationSettings;
 }
 
 export interface ProjectInput {

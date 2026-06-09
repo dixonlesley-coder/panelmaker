@@ -19,14 +19,22 @@ import type {
   TDocumentDefinitions,
 } from 'pdfmake/interfaces';
 import type { PanelInput, ProjectInput, ProjectMeta } from '@shared/types/project';
+import type { Part } from '@shared/types/parts';
 import type {
   BomLine,
   PanelResult,
+  QuotationResult,
   SystemResult,
   Warning,
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
 import { panelGaSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
+import {
+  buildSystemBom,
+  consolidateBom,
+  costBom,
+  computeQuotation,
+} from '@shared/engine';
 import { robotoFonts } from './pdfFonts';
 import { computeProject, computePanelResult } from './calc.service';
 
@@ -495,6 +503,118 @@ function labelsDocDefinition(
   };
 }
 
+/* ------------------------------- quotation -------------------------------- */
+
+/** Format a currency amount with thousands separators (no decimals). */
+function fmtMoney(amount: number, currency: string): string {
+  return `${currency} ${Math.round(amount).toLocaleString('en-US')}`;
+}
+
+/** The quotation cost-breakdown table (Material → … → grand total). */
+function quotationBreakdownTable(quote: QuotationResult): Content {
+  const body: TableCell[][] = [
+    [
+      { text: 'Cost element', bold: true },
+      { text: 'Basis', bold: true },
+      { text: `Amount (${quote.currency})`, bold: true, alignment: 'right' },
+    ],
+  ];
+  const s = quote.settings;
+  const bases: Record<string, string> = {
+    Material: 'priced bill of materials',
+    Labor: `${quote.laborHours} h × ${fmtMoney(s.laborRatePerHour, quote.currency)}/h`,
+    Overhead: `${s.overheadPct}% of material + labor`,
+    Contingency: `${s.contingencyPct}% of material + labor`,
+    Margin: `${s.marginPct}% of loaded cost`,
+  };
+  for (const section of quote.sections) {
+    body.push([
+      section.label,
+      bases[section.label] ?? '',
+      { text: fmtMoney(section.amount, quote.currency), alignment: 'right' },
+    ]);
+  }
+  body.push([
+    { text: 'Quoted total', bold: true },
+    '',
+    { text: fmtMoney(quote.grandTotal, quote.currency), bold: true, alignment: 'right' },
+  ]);
+  return {
+    table: { headerRows: 1, widths: ['auto', '*', 'auto'], body },
+    layout: 'lightHorizontalLines',
+  };
+}
+
+/** A priced BOM table for the quotation (item / SKU / qty / unit / line total). */
+function quotationBomTable(lines: BomLine[], currency: string): Content {
+  const header: TableCell[] = [
+    'Item',
+    'Order code',
+    'Qty',
+    `Unit (${currency})`,
+    `Total (${currency})`,
+  ].map((t) => ({ text: t, bold: true }));
+  const body: TableCell[][] = [header];
+  for (const l of lines) {
+    body.push([
+      l.description,
+      l.sku ?? '',
+      String(l.qty),
+      { text: l.matched && l.unitPrice !== undefined ? fmtMoney(l.unitPrice, '').trim() : '—', alignment: 'right' },
+      { text: l.matched && l.lineTotal !== undefined ? fmtMoney(l.lineTotal, '').trim() : '—', alignment: 'right' },
+    ]);
+  }
+  return {
+    table: { headerRows: 1, widths: ['*', 'auto', 'auto', 'auto', 'auto'], body },
+    layout: 'lightHorizontalLines',
+    fontSize: 8,
+  };
+}
+
+/** Build the document definition for the quotation / proposal. */
+function quotationDocDefinition(
+  system: SystemResult,
+  project: ProjectInput,
+  parts: Part[],
+  prices: Map<string, number>,
+): TDocumentDefinitions {
+  // Consolidate every panel's BOM into one orderable, priced project BOM.
+  const consolidated = consolidateBom(buildSystemBom(system, parts));
+  const cost = costBom(consolidated, prices);
+  const quote = computeQuotation({ lines: cost.lines, settings: project.meta?.quotation });
+
+  const content: Content[] = [...titleBlock(project, 'Quotation / Proposal')];
+
+  content.push(heading('Price summary'));
+  content.push(quotationBreakdownTable(quote));
+  if (cost.unmatchedCount > 0) {
+    content.push({
+      text: `Note: ${cost.unmatchedCount} bill-of-materials line(s) are unpriced and excluded from the material subtotal. Import a pricelist or match catalog parts to price them.`,
+      style: 'subtitle',
+      margin: [0, 6, 0, 0],
+      fontSize: 8,
+    });
+  }
+
+  content.push(heading('Bill of materials'));
+  content.push(quotationBomTable(quote.lines, quote.currency));
+
+  content.push(...revisionBlock(project));
+  content.push({
+    text: `Prices are engineering estimates — verify against current supplier quotations. Standards: ${quote.standardsVersion}.`,
+    style: 'subtitle',
+    margin: [0, 12, 0, 0],
+    fontSize: 8,
+  });
+
+  return {
+    defaultStyle: DEFAULT_STYLE,
+    styles: STYLES,
+    pageMargins: [36, 36, 36, 48],
+    content,
+  };
+}
+
 /* --------------------------------- API ------------------------------------ */
 
 /** Generate a single-panel PDF as a Buffer. */
@@ -519,6 +639,16 @@ export function exportLabelsPdfBuffer(
   project: ProjectInput,
 ): Promise<Buffer> {
   return renderToBuffer(labelsDocDefinition(system, project));
+}
+
+/** Generate the quotation / proposal PDF as a Buffer. */
+export function exportQuotationPdfBuffer(
+  system: SystemResult,
+  project: ProjectInput,
+  parts: Part[],
+  prices: Map<string, number>,
+): Promise<Buffer> {
+  return renderToBuffer(quotationDocDefinition(system, project, parts, prices));
 }
 
 /**
@@ -561,6 +691,25 @@ export async function exportLabelsPdf(
 ): Promise<ExportResult> {
   const system = computeProject(project);
   const buffer = await exportLabelsPdfBuffer(system, project);
+  await writeFile(filePath, buffer);
+  return { filePath, byteLength: buffer.byteLength };
+}
+
+/**
+ * Compute + render the commercial quotation / proposal (priced consolidated BOM
+ * + labor and mark-ups from the project's quotation settings) and write it to
+ * `filePath`. The renderer passes its parts catalog and the partId→unit-price
+ * map so the BOM is priced exactly as it appears on screen.
+ */
+export async function exportQuotationPdf(
+  project: ProjectInput,
+  parts: Part[],
+  prices: Record<string, number>,
+  filePath: string,
+): Promise<ExportResult> {
+  const system = computeProject(project);
+  const priceMap = new Map<string, number>(Object.entries(prices));
+  const buffer = await exportQuotationPdfBuffer(system, project, parts, priceMap);
   await writeFile(filePath, buffer);
   return { filePath, byteLength: buffer.byteLength };
 }

@@ -32,6 +32,12 @@ const api: Api = {
     ipcRenderer.invoke(IPC.exportSystemPdf, project, filePath),
   exportLabelsPdf: (project: ProjectInput, filePath: string) =>
     ipcRenderer.invoke(IPC.exportLabelsPdf, project, filePath),
+  exportQuotationPdf: (
+    project: ProjectInput,
+    parts: Part[],
+    prices: Record<string, number>,
+    filePath: string,
+  ) => ipcRenderer.invoke(IPC.exportQuotationPdf, project, parts, prices, filePath),
 
   saveSchematic: (schematic: ControlSchematic) => ipcRenderer.invoke(IPC.saveSchematic, schematic),
   loadSchematic: (circuitId: string) => ipcRenderer.invoke(IPC.loadSchematic, circuitId),

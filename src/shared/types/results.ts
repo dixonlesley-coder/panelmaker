@@ -210,6 +210,8 @@ export interface Warning {
 
 export interface BomLine {
   partId?: string;
+  /** Manufacturer order code / SKU of the matched part, when it carries one. */
+  sku?: string;
   description: string;
   category: string;
   qty: number;
@@ -223,6 +225,52 @@ export interface CostResult {
   grandTotal: number;
   currency: string;
   unmatchedCount: number;
+}
+
+/** One labelled line of a quotation breakdown (Material, Labor, …). */
+export interface QuotationSection {
+  /** Section label, e.g. "Material", "Labor", "Margin". */
+  label: string;
+  /** Section amount in the quote currency. */
+  amount: number;
+}
+
+/**
+ * Commercial quotation / proposal total for a project: the priced material BOM
+ * plus assembly labor, with overhead, contingency and margin mark-ups rolled up
+ * into a sell price. Produced by `computeQuotation` (pure engine).
+ */
+export interface QuotationResult {
+  /** Priced material BOM (the consolidated, costed lines that were quoted). */
+  lines: BomLine[];
+  /** Sum of the matched material line totals. */
+  materialSubtotal: number;
+  /** Total assembly man-hours derived from the BOM via the labor standard. */
+  laborHours: number;
+  /** Labor cost = laborHours × the labor rate. */
+  laborSubtotal: number;
+  /** Overhead loading on (material + labor). */
+  overhead: number;
+  /** Contingency / risk allowance on (material + labor). */
+  contingency: number;
+  /** The cost base the margin is applied to (material + labor + overhead + contingency). */
+  marginBase: number;
+  /** Profit margin on the cost base. */
+  margin: number;
+  /** Final sell price = marginBase + margin. */
+  grandTotal: number;
+  currency: string;
+  /** The settings actually used (after defaults were applied), for display. */
+  settings: {
+    laborRatePerHour: number;
+    overheadPct: number;
+    marginPct: number;
+    contingencyPct: number;
+  };
+  /** Ordered breakdown sections for tabular display. */
+  sections: QuotationSection[];
+  /** Standards version the labor figures were taken from. */
+  standardsVersion: string;
 }
 
 export interface PanelResult {

@@ -9,6 +9,7 @@ import {
   IconAdjustmentsBolt,
   IconBox,
   IconReceipt,
+  IconReceipt2,
   IconSolarPanel,
   IconSettings,
   IconBolt,
@@ -21,6 +22,7 @@ import { Dashboard } from '@renderer/screens/Dashboard';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
+import { Quotation } from '@renderer/screens/Quotation';
 import { Sources } from '@renderer/screens/Sources';
 import { Settings } from '@renderer/screens/Settings';
 import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
@@ -40,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { screen: 'panel', label: 'Panel Editor', icon: <IconAdjustmentsBolt size={18} /> },
   { screen: 'parts', label: 'Parts Catalog', icon: <IconBox size={18} /> },
   { screen: 'pricelist', label: 'Pricelist', icon: <IconReceipt size={18} /> },
+  { screen: 'quotation', label: 'Quotation', icon: <IconReceipt2 size={18} /> },
   { screen: 'sources', label: 'Energy Sources', icon: <IconSolarPanel size={18} /> },
   { screen: 'settings', label: 'Settings', icon: <IconSettings size={18} /> },
 ];
@@ -77,6 +80,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
       return <PartsCatalog />;
     case 'pricelist':
       return <Pricelist />;
+    case 'quotation':
+      return <Quotation />;
     case 'sources':
       return <Sources />;
     case 'settings':

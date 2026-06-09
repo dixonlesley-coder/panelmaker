@@ -71,6 +71,7 @@ export const IPC = {
   exportPanelPdf: 'export:panelPdf',
   exportSystemPdf: 'export:systemPdf',
   exportLabelsPdf: 'export:labelsPdf',
+  exportQuotationPdf: 'export:quotationPdf',
   saveSchematic: 'schematic:save',
   loadSchematic: 'schematic:load',
   chooseSavePath: 'dialog:saveAs',
@@ -131,6 +132,19 @@ export interface Api {
    * across every panel) and write the PDF to `filePath`.
    */
   exportLabelsPdf(project: ProjectInput, filePath: string): Promise<ExportResult>;
+
+  /**
+   * Render the commercial quotation / proposal (priced consolidated BOM + labor
+   * and mark-ups from `project.meta.quotation`) and write the PDF to `filePath`.
+   * The renderer supplies its parts catalog and the partId→unit-price map so the
+   * BOM prices match the on-screen costing.
+   */
+  exportQuotationPdf(
+    project: ProjectInput,
+    parts: Part[],
+    prices: Record<string, number>,
+    filePath: string,
+  ): Promise<ExportResult>;
 
   /** Persist a circuit's control/ladder schematic (manual edits included). */
   saveSchematic(schematic: ControlSchematic): Promise<{ id: string }>;

@@ -31,6 +31,7 @@ export type Screen =
   | 'panel'
   | 'parts'
   | 'pricelist'
+  | 'quotation'
   | 'sources'
   | 'settings';
 

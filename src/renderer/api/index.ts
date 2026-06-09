@@ -1,5 +1,5 @@
 import type { Api, UpdateStatus } from '@shared/ipc-contract';
-import type { ControlSchematic, ProjectInput } from '@shared/types';
+import type { ControlSchematic, Part, ProjectInput } from '@shared/types';
 
 type WindowWithApi = Window & typeof globalThis & { api?: Api };
 
@@ -56,6 +56,24 @@ export async function exportLabelsPdf(project: ProjectInput): Promise<ActionResu
     if (!path) return { ok: false, reason: 'cancelled', message: 'Export cancelled.' };
     const res = await api.exportLabelsPdf(project, path);
     return { ok: true, message: `Exported circuit labels to ${res.filePath}.` };
+  } catch (e) {
+    return { ok: false, reason: 'error', message: (e as Error).message };
+  }
+}
+
+/** Export the commercial quotation / proposal PDF via a native save dialog (desktop only). */
+export async function exportQuotationPdf(
+  project: ProjectInput,
+  parts: Part[],
+  prices: Record<string, number>,
+): Promise<ActionResult> {
+  const api = desktopApi();
+  if (!api) return { ok: false, reason: 'web', message: WEB_MESSAGE };
+  try {
+    const path = await api.chooseSavePath(`${project.name} - quotation.pdf`);
+    if (!path) return { ok: false, reason: 'cancelled', message: 'Export cancelled.' };
+    const res = await api.exportQuotationPdf(project, parts, prices, path);
+    return { ok: true, message: `Exported quotation to ${res.filePath}.` };
   } catch (e) {
     return { ok: false, reason: 'error', message: (e as Error).message };
   }

@@ -8,6 +8,8 @@ export * from './fault';
 export * from './busbar';
 export * from './enclosure';
 export * from './costing';
+export * from './bom';
+export * from './quotation';
 export * from './recommendations';
 export * from './warnings';
 export * from './phase';

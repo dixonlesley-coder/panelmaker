@@ -13,4 +13,5 @@ export * from './harmonics';
 export * from './arcFlash';
 export * from './occupancy';
 export * from './containment';
+export * from './labor';
 export * from './control';
