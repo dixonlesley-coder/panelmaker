@@ -7,7 +7,7 @@ export const SAMPLE_PARTS: Part[] = [
     category: 'breaker',
     manufacturer: 'Schneider',
     model: 'iC60N C16',
-    attributes: { ratingA: 16, poles: 1, curve: 'C', breakingKa: 6 },
+    attributes: { ratingA: 16, poles: 1, curve: 'C', breakingKa: 6, sku: 'A9F44116' },
     defaultUnit: 'pcs',
   },
   {
@@ -15,7 +15,7 @@ export const SAMPLE_PARTS: Part[] = [
     category: 'breaker',
     manufacturer: 'Schneider',
     model: 'iC60N C32',
-    attributes: { ratingA: 32, poles: 3, curve: 'C', breakingKa: 6 },
+    attributes: { ratingA: 32, poles: 3, curve: 'C', breakingKa: 6, sku: 'A9F44332' },
     defaultUnit: 'pcs',
   },
   {
@@ -23,7 +23,7 @@ export const SAMPLE_PARTS: Part[] = [
     category: 'breaker',
     manufacturer: 'ABB',
     model: 'XT3N 160',
-    attributes: { ratingA: 160, poles: 3, breakingKa: 36 },
+    attributes: { ratingA: 160, poles: 3, breakingKa: 36, sku: '1SDA068061R1' },
     defaultUnit: 'pcs',
   },
   {
@@ -47,7 +47,7 @@ export const SAMPLE_PARTS: Part[] = [
     category: 'contactor',
     manufacturer: 'Schneider',
     model: 'LC1D40A',
-    attributes: { utilizationCategory: 'AC-3', ac3AmpRating: 40, ratedKwAt400V: 18.5, coilVoltage: '230VAC', heatLossW: 4.5, widthMm: 45 },
+    attributes: { utilizationCategory: 'AC-3', ac3AmpRating: 40, ratedKwAt400V: 18.5, coilVoltage: '230VAC', heatLossW: 4.5, widthMm: 45, sku: 'LC1D40AP7' },
     defaultUnit: 'pcs',
   },
   {
@@ -71,7 +71,7 @@ export const SAMPLE_PARTS: Part[] = [
     category: 'vfd',
     manufacturer: 'Danfoss',
     model: 'FC280 11kW',
-    attributes: { ratedKw: 11, ratedA: 25, supplyV: 400, heatLossW: 330, widthMm: 90 },
+    attributes: { ratedKw: 11, ratedA: 25, supplyV: 400, heatLossW: 330, widthMm: 90, sku: '134U3068' },
     defaultUnit: 'pcs',
   },
   {
@@ -87,7 +87,7 @@ export const SAMPLE_PARTS: Part[] = [
     category: 'enclosure',
     manufacturer: 'Rittal',
     model: 'AE 800x600x250',
-    attributes: { widthMm: 800, heightMm: 600, depthMm: 250, ip: 'IP55', material: 'steel' },
+    attributes: { widthMm: 800, heightMm: 600, depthMm: 250, ip: 'IP55', material: 'steel', sku: 'AE1080.500' },
     defaultUnit: 'pcs',
   },
 ];

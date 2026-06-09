@@ -5,10 +5,21 @@ import type { Part } from '@shared/types';
 import { formatIdr } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
 
-/** Render a part's most relevant attributes as a compact summary string. */
+/** The order code / SKU of a part, when it carries one. */
+function skuOf(part: Part): string | undefined {
+  const sku = part.attributes.sku;
+  return typeof sku === 'string' && sku.length > 0 ? sku : undefined;
+}
+
+/**
+ * Render a part's most relevant attributes as a compact summary string. The SKU
+ * is shown in its own column, so it is excluded here to avoid duplication.
+ */
 function summarizeAttributes(part: Part): string {
   const a = part.attributes;
-  const keys = Object.keys(a).slice(0, 4);
+  const keys = Object.keys(a)
+    .filter((k) => k !== 'sku')
+    .slice(0, 4);
   return keys
     .map((k) => `${k}: ${String(a[k])}`)
     .join(' · ');
@@ -34,7 +45,7 @@ export function PartsCatalog() {
     const q = query.trim().toLowerCase();
     if (!q) return parts;
     return parts.filter((p) => {
-      const haystack = [p.manufacturer, p.model, p.category, p.id, summarizeAttributes(p)]
+      const haystack = [p.manufacturer, p.model, p.category, p.id, skuOf(p) ?? '', summarizeAttributes(p)]
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
@@ -77,12 +88,13 @@ export function PartsCatalog() {
               {items.length} item{items.length === 1 ? '' : 's'}
             </Text>
           </Group>
-          <Table.ScrollContainer minWidth={620}>
+          <Table.ScrollContainer minWidth={760}>
             <Table verticalSpacing="xs" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={140}>Manufacturer</Table.Th>
                   <Table.Th w={170}>Model</Table.Th>
+                  <Table.Th w={150}>Order code</Table.Th>
                   <Table.Th>Attributes</Table.Th>
                   <Table.Th w={150} ta="right">
                     Price
@@ -92,6 +104,7 @@ export function PartsCatalog() {
               <Table.Tbody>
                 {items.map((part) => {
                   const price = prices[part.id];
+                  const sku = skuOf(part);
                   return (
                     <Table.Tr key={part.id}>
                       <Table.Td>{part.manufacturer}</Table.Td>
@@ -99,6 +112,17 @@ export function PartsCatalog() {
                         <Text size="sm" fw={500}>
                           {part.model}
                         </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        {sku ? (
+                          <Text size="xs" ff="monospace">
+                            {sku}
+                          </Text>
+                        ) : (
+                          <Text size="xs" c="dimmed">
+                            —
+                          </Text>
+                        )}
                       </Table.Td>
                       <Table.Td>
                         <Text size="xs" c="dimmed">
