@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   Box,
@@ -244,6 +245,7 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
 
 /** Per-circuit results plus busbar, enclosure and a BOM cost summary. */
 export function ResultsPanel({ result }: { result: PanelResult }) {
+  const { t } = useTranslation();
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const project = useProjectStore((s) => s.project);
@@ -269,36 +271,40 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
   return (
     <Stack gap="md">
       <Group justify="space-between">
-        <Text fw={600}>Results</Text>
+        <Text fw={600}>{t('results.title')}</Text>
         <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={onExportPdf}>
-          Export panel PDF
+          {t('results.exportPanelPdf')}
         </Button>
       </Group>
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="sm">
         <Stat
-          label="Connected load"
+          label={t('results.connectedLoad')}
           value={formatKw(result.totalConnectedLoadW)}
           icon={<IconBolt size={18} />}
         />
         <Stat
-          label="Demand current"
+          label={t('results.demandCurrent')}
           value={formatAmps(result.totalDemandCurrentA)}
-          hint="Σ branch design currents"
+          hint={t('results.demandHint')}
           icon={<IconBolt size={18} />}
           color="grape"
         />
         <Stat
-          label="Enclosure heat"
+          label={t('results.enclosureHeat')}
           value={`${enc.totalHeatW.toFixed(0)} W`}
-          hint={`${enc.ventilation} cooling`}
+          hint={t('results.coolingHint', { ventilation: enc.ventilation })}
           icon={<IconTemperature size={18} />}
           color="orange"
         />
         <Stat
-          label="Estimated cost"
+          label={t('results.estimatedCost')}
           value={formatIdr(cost.grandTotal)}
-          hint={cost.unmatchedCount > 0 ? `${cost.unmatchedCount} unpriced` : 'all priced'}
+          hint={
+            cost.unmatchedCount > 0
+              ? t('results.unpricedHint', { count: cost.unmatchedCount })
+              : t('results.allPriced')
+          }
           icon={<IconCurrencyDollar size={18} />}
           color="teal"
         />
@@ -306,19 +312,19 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
 
       <Card withBorder radius="md" padding="sm">
         <Text fw={600} size="sm" mb="xs">
-          Branch circuits
+          {t('results.branchCircuits')}
         </Text>
         <Table.ScrollContainer minWidth={760}>
           <Table verticalSpacing="xs" highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Circuit</Table.Th>
-                <Table.Th w={64}>Phase</Table.Th>
-                <Table.Th w={100}>Design I</Table.Th>
-                <Table.Th w={150}>Breaker</Table.Th>
-                <Table.Th w={170}>Cable / wiring</Table.Th>
-                <Table.Th w={80}>Vdrop</Table.Th>
-                <Table.Th w={120}>Protection</Table.Th>
+                <Table.Th>{t('results.colCircuit')}</Table.Th>
+                <Table.Th w={64}>{t('results.colPhase')}</Table.Th>
+                <Table.Th w={100}>{t('results.colDesignI')}</Table.Th>
+                <Table.Th w={150}>{t('results.colBreaker')}</Table.Th>
+                <Table.Th w={170}>{t('results.colCable')}</Table.Th>
+                <Table.Th w={80}>{t('results.colVdrop')}</Table.Th>
+                <Table.Th w={120}>{t('results.colProtection')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -330,27 +336,118 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
         </Table.ScrollContainer>
       </Card>
 
+      {result.harmonics && (
+        <Card withBorder radius="md" padding="sm">
+          <Group justify="space-between" mb={4}>
+            <Text fw={600} size="sm">
+              {t('results.harmonics')}
+            </Text>
+            <Group gap={6}>
+              <Badge
+                size="sm"
+                variant="light"
+                color={
+                  result.harmonics.thdBand === 'high'
+                    ? 'red'
+                    : result.harmonics.thdBand === 'moderate'
+                      ? 'orange'
+                      : 'teal'
+                }
+              >
+                {result.harmonics.thdBand} THD
+              </Badge>
+              <Badge size="sm" variant="light" color="gray">
+                {t('results.nonLinear', {
+                  percent: formatPercent(result.harmonics.nonLinearFraction * 100),
+                })}
+              </Badge>
+              {result.harmonics.reactorRecommended && (
+                <Badge size="sm" variant="light" color="indigo">
+                  {t('results.lineReactor', { pct: result.harmonics.reactorPctZ })}
+                </Badge>
+              )}
+              {result.harmonics.filterRecommended && (
+                <Badge size="sm" variant="light" color="grape">
+                  {t('results.harmonicFilter')}
+                </Badge>
+              )}
+              {result.harmonics.neutralOversizeFactor > 1 && (
+                <Badge size="sm" variant="light" color="yellow">
+                  neutral {result.harmonics.recommendedNeutralCsaMm2} mm²
+                </Badge>
+              )}
+            </Group>
+          </Group>
+          <Text size="xs" c="dimmed">
+            {result.harmonics.note}
+          </Text>
+        </Card>
+      )}
+
+      {result.arcFlash && (
+        <Card withBorder radius="md" padding="sm">
+          <Group justify="space-between" mb={4}>
+            <Text fw={600} size="sm">
+              {t('results.arcFlash')}
+            </Text>
+            <Group gap={6}>
+              <Badge
+                size="sm"
+                variant="light"
+                color={
+                  result.arcFlash.incidentEnergyCalCm2 > 40
+                    ? 'red'
+                    : result.arcFlash.incidentEnergyCalCm2 > 8
+                      ? 'orange'
+                      : 'teal'
+                }
+              >
+                {result.arcFlash.incidentEnergyCalCm2} cal/cm²
+              </Badge>
+              <Badge size="sm" variant="light" color="gray">
+                {result.arcFlash.ppeCategory}
+              </Badge>
+              <Badge size="sm" variant="light" color="gray">
+                {t('results.boundary', { mm: result.arcFlash.arcFlashBoundaryMm })}
+              </Badge>
+            </Group>
+          </Group>
+          <Text size="xs" c="dimmed">
+            {result.arcFlash.note}
+          </Text>
+        </Card>
+      )}
+
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Busbar
+            {t('results.busbar')}
           </Text>
           <Stack gap={4}>
-            <KeyVal k="Section" v={`${bus.widthMm} × ${bus.thicknessMm} mm (${bus.csaMm2} mm²)`} />
-            <KeyVal k="Ampacity" v={formatAmps(bus.ampacityA)} />
-            <KeyVal k="Total current" v={formatAmps(bus.totalCurrentA)} />
+            <KeyVal
+              k={t('results.busbarSection')}
+              v={`${bus.widthMm} × ${bus.thicknessMm} mm (${bus.csaMm2} mm²)`}
+            />
+            <KeyVal k={t('results.busbarAmpacity')} v={formatAmps(bus.ampacityA)} />
+            <KeyVal k={t('results.busbarTotalCurrent')} v={formatAmps(bus.totalCurrentA)} />
           </Stack>
         </Card>
 
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Enclosure
+            {t('results.enclosure')}
           </Text>
           <Stack gap={4}>
-            <KeyVal k="Dimensions" v={`${enc.widthMm} × ${enc.heightMm} × ${enc.depthMm} mm`} />
-            <KeyVal k="Sheet" v={`${enc.sheetThicknessMm} mm`} />
-            <KeyVal k="Layout" v={`${enc.modules} modules · ${enc.rows} rows`} />
-            <KeyVal k="Cooling" v={`${enc.ventilation} · ${enc.totalHeatW.toFixed(0)} W`} />
+            <KeyVal
+              k={t('results.encDimensions')}
+              v={`${enc.widthMm} × ${enc.heightMm} × ${enc.depthMm} mm`}
+            />
+            <KeyVal k={t('results.encSheet')} v={`${enc.sheetThicknessMm} mm`} />
+            <KeyVal k={t('results.encLayout')} v={`${enc.modules} modules · ${enc.rows} rows`} />
+            <KeyVal
+              k={t('results.encCooling')}
+              v={`${enc.ventilation} · ${enc.totalHeatW.toFixed(0)} W`}
+            />
           </Stack>
         </Card>
       </SimpleGrid>
@@ -358,15 +455,15 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="xs">
           <Text fw={600} size="sm">
-            Phase balance
+            {t('results.phaseBalance')}
           </Text>
           {result.phaseBalance.L2 === 0 && result.phaseBalance.L3 === 0 ? (
             <Badge variant="light" color="gray">
-              single-phase
+              {t('results.singlePhase')}
             </Badge>
           ) : (
             <Badge variant="light" color={pb.imbalancePct > 15 ? 'red' : 'teal'}>
-              {formatPercent(pb.imbalancePct)} imbalance
+              {t('results.imbalance', { percent: formatPercent(pb.imbalancePct) })}
             </Badge>
           )}
         </Group>
@@ -387,16 +484,16 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
         </SimpleGrid>
       </Card>
 
-      <Divider label="Bill of materials" labelPosition="left" />
+      <Divider label={t('results.bom')} labelPosition="left" />
       <Card withBorder radius="md" padding="sm">
         <Table verticalSpacing={4} fz="sm">
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Item</Table.Th>
-              <Table.Th w={90}>Category</Table.Th>
-              <Table.Th w={60}>Qty</Table.Th>
+              <Table.Th>{t('results.bomItem')}</Table.Th>
+              <Table.Th w={90}>{t('results.bomCategory')}</Table.Th>
+              <Table.Th w={60}>{t('results.bomQty')}</Table.Th>
               <Table.Th w={140} ta="right">
-                Line total
+                {t('results.bomLineTotal')}
               </Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -415,7 +512,7 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
                     formatIdr(line.lineTotal)
                   ) : (
                     <Badge size="xs" variant="light" color="gray">
-                      unpriced
+                      {t('results.unpriced')}
                     </Badge>
                   )}
                 </Table.Td>
@@ -425,7 +522,7 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
           <Table.Tfoot>
             <Table.Tr>
               <Table.Td colSpan={3}>
-                <Text fw={700}>Grand total</Text>
+                <Text fw={700}>{t('results.grandTotal')}</Text>
               </Table.Td>
               <Table.Td ta="right">
                 <Text fw={700}>{formatIdr(cost.grandTotal)}</Text>
@@ -434,6 +531,10 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
           </Table.Tfoot>
         </Table>
       </Card>
+
+      <Text size="xs" c="dimmed">
+        {t('results.standardsRef')}: {t('results.standardsRefHint')}
+      </Text>
     </Stack>
   );
 }

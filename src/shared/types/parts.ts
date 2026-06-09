@@ -22,6 +22,9 @@ export type PartCategory =
   | 'vfd_accessory'
   | 'aux_contact_block'
   | 'terminal_block'
+  // metering
+  | 'panel_meter'
+  | 'current_transformer'
   // level / pump
   | 'level_relay'
   | 'float_switch'

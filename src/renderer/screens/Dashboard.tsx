@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   Card,
@@ -32,6 +33,7 @@ const hourLabel = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
 /** Peak-load & energy dashboard: when and where the building peaks. */
 export function Dashboard() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const profile = useMemo(() => computeLoadProfile(project), [project]);
   const system = useMemo(() => computeSystem(project), [project]);
@@ -57,31 +59,35 @@ export function Dashboard() {
     <Stack gap="md">
       <div>
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Energy & peak load
+          {t('dashboard.eyebrow')}
         </Text>
-        <Title order={3}>Dashboard</Title>
+        <Title order={3}>{t('dashboard.title')}</Title>
       </div>
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="sm">
-        <Stat label="Peak demand" value={formatKw(profile.peakKw * 1000)} icon={<IconBolt size={18} />} />
         <Stat
-          label="Peak time"
+          label={t('dashboard.peakDemand')}
+          value={formatKw(profile.peakKw * 1000)}
+          icon={<IconBolt size={18} />}
+        />
+        <Stat
+          label={t('dashboard.peakTime')}
           value={hourLabel(profile.peakHour)}
-          hint="busiest hour"
+          hint={t('dashboard.busiestHour')}
           icon={<IconClockHour4 size={18} />}
           color="grape"
         />
         <Stat
-          label="Daily energy"
+          label={t('dashboard.dailyEnergy')}
           value={`${profile.dailyKwh} kWh`}
-          hint={`load factor ${profile.loadFactor}`}
+          hint={t('dashboard.loadFactor', { factor: profile.loadFactor })}
           icon={<IconChartAreaLine size={18} />}
           color="orange"
         />
         <Stat
-          label="Solar offset"
+          label={t('dashboard.solarOffset')}
           value={`${Math.round(offsetPct)}%`}
-          hint={solarKwh > 0 ? `${solarKwh} kWh/day PV` : 'no PV configured'}
+          hint={solarKwh > 0 ? t('dashboard.pvPerDay', { kwh: solarKwh }) : t('dashboard.noPv')}
           icon={<IconSun size={18} />}
           color="teal"
         />
@@ -90,10 +96,10 @@ export function Dashboard() {
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="xs">
           <Text fw={600} size="sm">
-            24-hour load profile
+            {t('dashboard.dailyProfile')}
           </Text>
           <Badge variant="light" color="grape">
-            peak {profile.peakKw} kW at {hourLabel(profile.peakHour)}
+            {t('dashboard.peakBadge', { kw: profile.peakKw, time: hourLabel(profile.peakHour) })}
           </Badge>
         </Group>
         {series.length > 0 ? (
@@ -112,19 +118,18 @@ export function Dashboard() {
           />
         ) : (
           <Text c="dimmed" size="sm" ta="center" py="xl">
-            No loads to profile yet.
+            {t('dashboard.noLoadsProfile')}
           </Text>
         )}
         <Text size="xs" c="dimmed" mt="xs">
-          Stacked by panel — taller bands show where the building load concentrates over the day.
-          Continuous loads form the base; scheduled loads (daytime AC, overnight EV) shape the curve.
+          {t('dashboard.profileHint')}
         </Text>
       </Card>
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Peak contributors — {hourLabel(profile.peakHour)}
+            {t('dashboard.peakContributors', { time: hourLabel(profile.peakHour) })}
           </Text>
           {profile.peakContributors.length > 0 ? (
             <Table verticalSpacing={6} fz="sm">
@@ -158,7 +163,7 @@ export function Dashboard() {
             </Table>
           ) : (
             <Text c="dimmed" size="sm">
-              No loads at the peak hour.
+              {t('dashboard.noLoadsAtPeak')}
             </Text>
           )}
         </Card>
@@ -169,16 +174,19 @@ export function Dashboard() {
               <IconSun size={16} />
             </ThemeIcon>
             <Text fw={600} size="sm">
-              Energy & autonomy
+              {t('dashboard.energyAutonomy')}
             </Text>
           </Group>
           <Stack gap={8}>
-            <KeyVal k="Daily consumption" v={`${profile.dailyKwh} kWh`} />
-            <KeyVal k="Solar yield" v={solarKwh > 0 ? `${solarKwh} kWh/day` : '— (enable PV)'} />
+            <KeyVal k={t('dashboard.dailyConsumption')} v={`${profile.dailyKwh} kWh`} />
+            <KeyVal
+              k={t('dashboard.solarYield')}
+              v={solarKwh > 0 ? t('dashboard.perDay', { kwh: solarKwh }) : t('dashboard.enablePv')}
+            />
             <div>
               <Group justify="space-between" mb={2}>
                 <Text size="sm" c="dimmed">
-                  Solar offset
+                  {t('dashboard.solarOffset')}
                 </Text>
                 <Text size="sm" fw={600}>
                   {Math.round(offsetPct)}%
@@ -187,15 +195,21 @@ export function Dashboard() {
               <Progress value={offsetPct} color="teal" />
             </div>
             <KeyVal
-              k="Battery backup"
+              k={t('dashboard.batteryBackup')}
               v={
                 battery
-                  ? `${battery.installedKwh} kWh · ~${batteryHoursAtPeak?.toFixed(1)} h at peak`
-                  : '— (enable battery)'
+                  ? t('dashboard.batteryValue', {
+                      kwh: battery.installedKwh,
+                      hours: batteryHoursAtPeak?.toFixed(1),
+                    })
+                  : t('dashboard.enableBattery')
               }
             />
             {system.sources?.generator && (
-              <KeyVal k="Generator" v={`${system.sources.generator.ratingKva} kVA standby`} />
+              <KeyVal
+                k={t('dashboard.generator')}
+                v={t('dashboard.generatorStandby', { kva: system.sources.generator.ratingKva })}
+              />
             )}
           </Stack>
         </Card>
@@ -208,27 +222,29 @@ export function Dashboard() {
               <IconBolt size={16} />
             </ThemeIcon>
             <Text fw={600} size="sm">
-              Power factor &amp; capacitor bank
+              {t('dashboard.pfCard')}
             </Text>
           </Group>
           <Badge variant="light" color={system.powerFactor.needed ? 'orange' : 'teal'}>
-            {system.powerFactor.needed ? 'correction recommended' : 'PF adequate'}
+            {system.powerFactor.needed
+              ? t('dashboard.pfCorrectionRecommended')
+              : t('dashboard.pfAdequate')}
           </Badge>
         </Group>
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
-          <KeyValStat k="Existing PF" v={system.powerFactor.existingPf.toFixed(2)} />
-          <KeyValStat k="Target PF" v={system.powerFactor.targetPf.toFixed(2)} />
+          <KeyValStat k={t('dashboard.existingPf')} v={system.powerFactor.existingPf.toFixed(2)} />
+          <KeyValStat k={t('dashboard.targetPf')} v={system.powerFactor.targetPf.toFixed(2)} />
           <KeyValStat
-            k="Demand"
+            k={t('dashboard.demand')}
             v={`${system.powerFactor.totalKw} kW · ${system.powerFactor.totalKvar} kVAR`}
           />
           {system.powerFactor.bankKvar > 0 ? (
             <KeyValStat
-              k="Capacitor bank"
+              k={t('dashboard.capacitorBank')}
               v={`${system.powerFactor.bankKvar} kVAR (${system.powerFactor.steps}×${system.powerFactor.stepKvar})`}
             />
           ) : (
-            <KeyValStat k="Capacitor bank" v="not required" />
+            <KeyValStat k={t('dashboard.capacitorBank')} v={t('dashboard.notRequired')} />
           )}
         </SimpleGrid>
         <Text size="xs" c="dimmed">
@@ -238,39 +254,47 @@ export function Dashboard() {
 
       <div>
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Energy, losses & ROI
+          {t('dashboard.roiEyebrow')}
         </Text>
         <Title order={4} mt={2}>
-          Where energy goes — and what it costs
+          {t('dashboard.roiTitle')}
         </Title>
       </div>
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="sm">
         <Stat
-          label="System losses"
+          label={t('dashboard.systemLosses')}
           value={formatKw(energy.losses.totalLossW)}
-          hint={`${energy.losses.lossPercent}% of demand`}
+          hint={t('dashboard.ofDemand', { percent: energy.losses.lossPercent })}
           icon={<IconTrendingDown size={18} />}
           color="orange"
         />
         <Stat
-          label="Copper (I²R)"
+          label={t('dashboard.copperLoss')}
           value={formatKw(energy.losses.copperLossW)}
-          hint="conductor heating"
+          hint={t('dashboard.conductorHeating')}
           icon={<IconBolt size={18} />}
           color="grape"
         />
         <Stat
-          label="Monthly energy cost"
+          label={t('dashboard.monthlyEnergyCost')}
           value={formatIdr(energy.monthlyEnergyCost)}
           hint={`${energy.monthlyKwh.toLocaleString('id-ID')} kWh @ ${energy.tariffIdrPerKwh.toLocaleString('id-ID')}/kWh`}
           icon={<IconCoin size={18} />}
           color="teal"
         />
         <Stat
-          label="Solar payback"
-          value={energy.solar.paybackYears !== undefined ? `${energy.solar.paybackYears} yr` : '—'}
-          hint={energy.solar.paybackYears !== undefined ? 'simple, before escalation' : 'no PV configured'}
+          label={t('dashboard.solarPayback')}
+          value={
+            energy.solar.paybackYears !== undefined
+              ? t('dashboard.paybackYears', { years: energy.solar.paybackYears })
+              : '—'
+          }
+          hint={
+            energy.solar.paybackYears !== undefined
+              ? t('dashboard.beforeEscalation')
+              : t('dashboard.noPv')
+          }
           icon={<IconSun size={18} />}
           color="yellow"
         />
@@ -283,20 +307,20 @@ export function Dashboard() {
               <IconTrendingDown size={16} />
             </ThemeIcon>
             <Text fw={600} size="sm">
-              Loss & cost breakdown
+              {t('dashboard.lossCostBreakdown')}
             </Text>
           </Group>
           <Table verticalSpacing={6} fz="sm" withRowBorders={false}>
             <Table.Tbody>
-              <RoiRow k="Copper (I²R) loss" v={formatKw(energy.losses.copperLossW)} />
+              <RoiRow k={t('dashboard.copperLossRow')} v={formatKw(energy.losses.copperLossW)} />
               <RoiRow
-                k="Transformer loss"
-                v={energy.losses.transformerLossW > 0 ? formatKw(energy.losses.transformerLossW) : '— (LV supply)'}
+                k={t('dashboard.transformerLoss')}
+                v={energy.losses.transformerLossW > 0 ? formatKw(energy.losses.transformerLossW) : t('dashboard.lvSupply')}
               />
-              <RoiRow k="Total loss" v={`${formatKw(energy.losses.totalLossW)} · ${energy.losses.lossPercent}%`} strong />
-              <RoiRow k="Daily energy" v={`${energy.dailyKwh.toLocaleString('id-ID')} kWh (+${energy.dailyLossKwh} kWh loss)`} />
-              <RoiRow k="Monthly energy cost" v={formatIdr(energy.monthlyEnergyCost)} strong />
-              <RoiRow k="Annual cost of losses" v={formatIdr(energy.annualLossCost)} />
+              <RoiRow k={t('dashboard.totalLoss')} v={`${formatKw(energy.losses.totalLossW)} · ${energy.losses.lossPercent}%`} strong />
+              <RoiRow k={t('dashboard.dailyEnergyRow')} v={`${energy.dailyKwh.toLocaleString('id-ID')} kWh (+${energy.dailyLossKwh} kWh loss)`} />
+              <RoiRow k={t('dashboard.monthlyEnergyCost')} v={formatIdr(energy.monthlyEnergyCost)} strong />
+              <RoiRow k={t('dashboard.annualLossCost')} v={formatIdr(energy.annualLossCost)} />
             </Table.Tbody>
           </Table>
         </Card>
@@ -307,26 +331,26 @@ export function Dashboard() {
               <IconSun size={16} />
             </ThemeIcon>
             <Text fw={600} size="sm">
-              Solar & battery economics
+              {t('dashboard.solarBatteryEconomics')}
             </Text>
           </Group>
           {energy.solar.capex > 0 || energy.battery.capex > 0 ? (
             <Table verticalSpacing={6} fz="sm" withRowBorders={false}>
               <Table.Tbody>
-                <RoiRow k="Solar capex" v={energy.solar.capex > 0 ? formatIdr(energy.solar.capex) : '—'} />
-                <RoiRow k="Annual solar savings" v={energy.solar.annualSavings > 0 ? formatIdr(energy.solar.annualSavings) : '—'} />
+                <RoiRow k={t('dashboard.solarCapex')} v={energy.solar.capex > 0 ? formatIdr(energy.solar.capex) : '—'} />
+                <RoiRow k={t('dashboard.annualSolarSavings')} v={energy.solar.annualSavings > 0 ? formatIdr(energy.solar.annualSavings) : '—'} />
                 <RoiRow
-                  k="Simple payback"
-                  v={energy.solar.paybackYears !== undefined ? `${energy.solar.paybackYears} yr` : '—'}
+                  k={t('dashboard.simplePayback')}
+                  v={energy.solar.paybackYears !== undefined ? t('dashboard.paybackYears', { years: energy.solar.paybackYears }) : '—'}
                   strong
                 />
-                <RoiRow k="25-yr net value" v={energy.solar.capex > 0 ? formatIdr(energy.solar.lifetimeNet) : '—'} />
-                <RoiRow k="Battery capex" v={energy.battery.capex > 0 ? formatIdr(energy.battery.capex) : '—'} />
+                <RoiRow k={t('dashboard.lifetimeNet')} v={energy.solar.capex > 0 ? formatIdr(energy.solar.lifetimeNet) : '—'} />
+                <RoiRow k={t('dashboard.batteryCapex')} v={energy.battery.capex > 0 ? formatIdr(energy.battery.capex) : '—'} />
               </Table.Tbody>
             </Table>
           ) : (
             <Text c="dimmed" size="sm" py="sm">
-              Enable solar PV or battery storage in the project sources to see ROI.
+              {t('dashboard.enableRoi')}
             </Text>
           )}
         </Card>
@@ -335,7 +359,7 @@ export function Dashboard() {
       {energy.notes.length > 0 && (
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Assumptions
+            {t('dashboard.assumptions')}
           </Text>
           <Stack gap={4}>
             {energy.notes.map((note, i) => (

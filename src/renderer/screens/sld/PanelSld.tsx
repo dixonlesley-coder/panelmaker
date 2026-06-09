@@ -7,9 +7,12 @@ import {
   ReactFlow,
   ReactFlowProvider,
 } from '@xyflow/react';
-import { Box } from '@mantine/core';
+import { Box, Button, Group, Stack } from '@mantine/core';
+import { IconFileVector } from '@tabler/icons-react';
 import type { PanelInput, PanelResult } from '@shared/types';
+import { panelSldSvg, panelSldDxf } from '@shared/drawing';
 import { NODE_TYPES, type BranchNodeData } from '@renderer/screens/sld/nodes';
+import { downloadSvg, downloadDxf } from '@renderer/lib/drawingExport';
 import { formatAmps } from '@renderer/lib/format';
 
 const BRANCH_W = 160;
@@ -91,24 +94,44 @@ export function PanelSld({ panel, result }: { panel: PanelInput; result: PanelRe
   const { nodes, edges } = useMemo(() => buildGraph(panel, result), [panel, result]);
 
   return (
-    <Box h={440} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
-      <ReactFlowProvider>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={NODE_TYPES}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          proOptions={{ hideAttribution: true }}
-          minZoom={0.2}
-          nodesConnectable={false}
-          nodesDraggable={false}
-          elementsSelectable={false}
+    <Stack gap="sm">
+      <Group justify="flex-end" gap="xs">
+        <Button
+          size="xs"
+          variant="light"
+          leftSection={<IconFileVector size={14} />}
+          onClick={() => downloadSvg(panel.name, panelSldSvg(panel, result))}
         >
-          <Background gap={16} />
-          <Controls showInteractive={false} />
-        </ReactFlow>
-      </ReactFlowProvider>
-    </Box>
+          Export SVG
+        </Button>
+        <Button
+          size="xs"
+          variant="light"
+          leftSection={<IconFileVector size={14} />}
+          onClick={() => downloadDxf(panel.name, panelSldDxf(panel, result))}
+        >
+          Export DXF
+        </Button>
+      </Group>
+      <Box h={440} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}>
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={NODE_TYPES}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            proOptions={{ hideAttribution: true }}
+            minZoom={0.2}
+            nodesConnectable={false}
+            nodesDraggable={false}
+            elementsSelectable={false}
+          >
+            <Background gap={16} />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </Box>
+    </Stack>
   );
 }

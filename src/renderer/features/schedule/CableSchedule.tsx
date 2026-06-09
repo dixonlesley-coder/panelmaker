@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Button, Card, Group, Stack, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconFileSpreadsheet, IconFileText } from '@tabler/icons-react';
@@ -32,6 +33,7 @@ function cableMakeUp(circuit: CircuitResult): string {
  * panel BOM and downloads it as `.csv` or `.xlsx` straight from the renderer.
  */
 export function CableSchedule({ panel, result }: { panel: PanelInput; result: PanelResult }) {
+  const { t } = useTranslation();
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
 
@@ -50,12 +52,18 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
 
   function exportCsv() {
     downloadBomCsv(`${fileStem(result.name)}-bom.csv`, cost.lines, cost.currency);
-    notifications.show({ message: `Exported BOM CSV (${cost.lines.length} lines)`, color: 'teal' });
+    notifications.show({
+      message: t('schedule.exportedCsv', { count: cost.lines.length }),
+      color: 'teal',
+    });
   }
 
   function exportXlsx() {
     downloadBomXlsx(`${fileStem(result.name)}-bom.xlsx`, cost.lines, cost.currency);
-    notifications.show({ message: `Exported BOM workbook (${cost.lines.length} lines)`, color: 'teal' });
+    notifications.show({
+      message: t('schedule.exportedXlsx', { count: cost.lines.length }),
+      color: 'teal',
+    });
   }
 
   const bus = result.busbar;
@@ -63,7 +71,7 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
   return (
     <Stack gap="md">
       <Group justify="space-between" wrap="wrap">
-        <Text fw={600}>Cable schedule</Text>
+        <Text fw={600}>{t('schedule.title')}</Text>
         <Button.Group>
           <Button
             size="xs"
@@ -71,7 +79,7 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
             leftSection={<IconFileText size={14} />}
             onClick={exportCsv}
           >
-            Export CSV
+            {t('schedule.exportCsv')}
           </Button>
           <Button
             size="xs"
@@ -79,28 +87,30 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
             leftSection={<IconFileSpreadsheet size={14} />}
             onClick={exportXlsx}
           >
-            Export Excel (.xlsx)
+            {t('schedule.exportXlsx')}
           </Button>
         </Button.Group>
       </Group>
 
       <Card withBorder radius="md" padding="sm">
-        <Table.ScrollContainer minWidth={920}>
+        <Table.ScrollContainer minWidth={1120}>
           <Table verticalSpacing="xs" fz="sm" highlightOnHover withColumnBorders>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th w={48}>No.</Table.Th>
-                <Table.Th>Description</Table.Th>
-                <Table.Th w={56}>Ph</Table.Th>
-                <Table.Th w={84}>Design I</Table.Th>
-                <Table.Th w={150}>Breaker</Table.Th>
-                <Table.Th w={180}>Cable</Table.Th>
-                <Table.Th w={88}>Iz derated</Table.Th>
-                <Table.Th w={72}>Length</Table.Th>
-                <Table.Th w={72}>Vdrop</Table.Th>
-                <Table.Th w={64}>PE</Table.Th>
-                <Table.Th w={64}>N</Table.Th>
-                <Table.Th w={72}>RCD</Table.Th>
+                <Table.Th w={48}>{t('schedule.colNo')}</Table.Th>
+                <Table.Th w={120}>{t('schedule.colFrom')}</Table.Th>
+                <Table.Th>{t('schedule.colTo')}</Table.Th>
+                <Table.Th w={56}>{t('schedule.colPhase')}</Table.Th>
+                <Table.Th w={84}>{t('schedule.colDesignI')}</Table.Th>
+                <Table.Th w={150}>{t('schedule.colBreaker')}</Table.Th>
+                <Table.Th w={180}>{t('schedule.colCable')}</Table.Th>
+                <Table.Th w={110}>{t('schedule.colConduit')}</Table.Th>
+                <Table.Th w={88}>{t('schedule.colIzDerated')}</Table.Th>
+                <Table.Th w={72}>{t('schedule.colLength')}</Table.Th>
+                <Table.Th w={72}>{t('schedule.colVdrop')}</Table.Th>
+                <Table.Th w={64}>{t('schedule.colPe')}</Table.Th>
+                <Table.Th w={64}>{t('schedule.colNeutral')}</Table.Th>
+                <Table.Th w={72}>{t('schedule.colRcd')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -110,6 +120,11 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
                 return (
                   <Table.Tr key={c.circuitId}>
                     <Table.Td>{i + 1}</Table.Td>
+                    <Table.Td>
+                      <Text size="xs" c="dimmed">
+                        {panel.name}
+                      </Text>
+                    </Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={500}>
                         {c.name}
@@ -121,6 +136,11 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
                       {c.breaker.deviceClass} {c.breaker.ratingA}A · {c.breaker.curve}
                     </Table.Td>
                     <Table.Td>{cableMakeUp(c)}</Table.Td>
+                    <Table.Td>
+                      {c.containment
+                        ? `${c.containment.conduitSizeMm} mm (${c.containment.fillPct}%)`
+                        : '—'}
+                    </Table.Td>
                     <Table.Td>{formatAmps(c.cable.deratedIzA)}</Table.Td>
                     <Table.Td>{len !== undefined ? `${len} m` : '—'}</Table.Td>
                     <Table.Td>
@@ -147,11 +167,25 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
 
       <Box>
         <Text size="xs" c="dimmed">
-          Busbar: {bus.widthMm} × {bus.thicknessMm} mm ({bus.csaMm2} mm²) — rated {formatAmps(bus.ampacityA)},
-          carrying {formatAmps(bus.totalCurrentA)}.
+          {t('schedule.busbarNote', {
+            width: bus.widthMm,
+            thickness: bus.thicknessMm,
+            csa: bus.csaMm2,
+            rated: formatAmps(bus.ampacityA),
+            current: formatAmps(bus.totalCurrentA),
+          })}
         </Text>
+        {result.cableTray && (
+          <Text size="xs" c="dimmed">
+            {t('schedule.trayNote', {
+              width: result.cableTray.widthMm,
+              count: result.cableTray.cableCount,
+              fill: result.cableTray.fillPct,
+            })}
+          </Text>
+        )}
         <Text size="xs" c="dimmed">
-          Engineering estimate — verify against PUIL 2011 / IEC 60364 before construction.
+          {t('schedule.estimateNote')}
         </Text>
       </Box>
     </Stack>

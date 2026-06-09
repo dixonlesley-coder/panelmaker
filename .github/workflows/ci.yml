@@ -1,0 +1,43 @@
+name: CI
+
+# Lightweight gate on every push and pull request: the three TypeScript scopes
+# plus the Vitest suite. Packaging/Electron are NOT exercised here (that's the
+# Release workflow) — this stays fast.
+
+on:
+  push:
+  pull_request:
+
+# Cancel an in-progress run when new commits land on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # No Electron binary is needed to typecheck/test — skip the heavy download.
+      # (better-sqlite3 still builds natively for the integration test.)
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (all three scopes)
+        run: |
+          npx tsc --noEmit -p tsconfig.json
+          npx tsc --noEmit -p tsconfig.web.json
+          npx tsc --noEmit -p tsconfig.node.json
+
+      - name: Test
+        run: npx vitest run

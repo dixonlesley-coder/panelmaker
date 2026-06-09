@@ -149,6 +149,39 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   **scheduled/continuous loads + a 24-hour peak-load dashboard** (charts), **per-panel +
   per-system PDF export**, and **GitHub-releases auto-update** (electron-updater).
 
+### Added this iteration (branch `claude/trusting-lovelace-fflrn3`)
+
+- **Protection & fault analysis:** prospective short-circuit current (Isc) propagated down
+  the feeder tree, **breaker kA adequacy** check, **earth-fault loop (Zs) + ADS disconnection**
+  for TN systems, and **selectivity/discrimination** reporting (`engine/fault.ts`).
+- **Power quality:** **harmonics** estimate for VFD-heavy panels (triplen-neutral oversizing,
+  line-reactor/filter recommendation, THD band) and a simplified **arc-flash / incident-energy**
+  (IEEE-1584-style) estimate mapped to an NFPA 70E PPE category (`engine/harmonics`, `engine/arcFlash`).
+- **Occupancy demand library:** residential/office/commercial/industrial/hospitality/mixed
+  presets supply diversity + per-load demand factors (`standards/occupancy`); explicit values win.
+- **Containment:** per-circuit **conduit fill** sizing + per-panel **cable-tray** sizing, with
+  **from-to** columns on the cable schedule (`engine/containment`).
+- **Drawings & CAD:** pure DOM-free **SVG builders** for the GA front-view (to-scale device
+  placement) and single-line (`src/shared/drawing`), **vector diagrams embedded in the PDF**,
+  and **SVG + DXF file export** from the GA/SLD views.
+- **Branding & deliverables:** project **title block** (logo, drawing/project number, revision
+  block) on PDFs/drawings, persisted via a `meta_json` column on `projects`; **circuit-label /
+  nameplate** PDF printing.
+- **Commercial:** **labor + mark-up quotation/proposal** engine + screen + PDF (`engine/quotation`,
+  settings on `ProjectMeta`), **consolidated project-wide BOM** with CSV/Excel export, and optional
+  catalog **SKU / order codes**.
+- **Workflow:** visible **undo/redo** toolbar + tests, **duplicate / copy-paste** circuits,
+  **multi-select bulk edit**, reusable **panel templates**, and a guided **circuit wizard**.
+- **i18n:** offline **Bahasa Indonesia** localization (statically bundled `react-i18next`
+  resources, no runtime fetch; `src/renderer/i18n`), a language switcher (Settings + header), and
+  **PUIL 2011 / IEC 60364** clause references on the PDF reports (`standards/references`).
+- **Licensing / access control (`src/main/license/**`):** optional **Google Workspace (OIDC)**
+  gate for the *desktop* build only — system-browser OAuth (RFC 8252) + PKCE, `id_token` verified
+  with `jose`/JWKS, `hd`-claim employee check, a **7-day offline grace window**, and `safeStorage`-
+  encrypted session. **Fail-open until configured** (off when unconfigured / `PANELMAKER_DEV_BYPASS=1`
+  / unpackaged), so dev, CI, and the web preview are unaffected. The gate lives entirely in the main
+  process; the renderer only reads status via `license:*` IPC. Setup in `LICENSING.md`.
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are

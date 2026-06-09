@@ -4,7 +4,7 @@
  * these shapes; the engine never imports DB or DOM code.
  */
 
-import type { SystemType, LoadKind, InstallMethod, EarthingSystem } from './electrical';
+import type { SystemType, LoadKind, InstallMethod, EarthingSystem, OccupancyType } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { SourcesConfig } from './sources';
 
@@ -59,10 +59,75 @@ export interface PanelInput {
   groupingCount: number;
   /** Diversity factor applied to the aggregated load when feeding upstream. */
   diversityFactor: number;
+  /**
+   * Building occupancy class. When set, the engine applies the occupancy's
+   * recommended diversity / per-load demand factors wherever the panel/circuit
+   * has been left at the neutral default (1). Explicit values always win.
+   */
+  occupancy?: OccupancyType;
   /** Fed by the utility, or by a parent panel's feeder circuit. */
   sourceType: 'utility' | 'feeder';
   fedByCircuitId?: string;
   circuits: CircuitInput[];
+}
+
+/**
+ * Commercial quotation settings — the labor rate and the cost mark-ups applied
+ * on top of the priced material BOM to build a sell price / proposal. Every
+ * field is optional; the quotation engine substitutes sane defaults when a value
+ * is absent, so existing projects (with no `quotation`) still quote sensibly.
+ */
+export interface QuotationSettings {
+  /** Shop assembly/wiring labor rate (currency per hour). */
+  laborRatePerHour?: number;
+  /** Overhead loading as a percentage of (material + labor). */
+  overheadPct?: number;
+  /** Profit margin as a percentage of the loaded cost base. */
+  marginPct?: number;
+  /** Contingency / risk allowance as a percentage of (material + labor). */
+  contingencyPct?: number;
+  /** Quote currency (defaults to IDR). */
+  currency?: string;
+}
+
+/** One entry in a drawing's revision history (title-block revision block). */
+export interface ProjectRevision {
+  /** Revision label, e.g. "A", "B", "01". */
+  rev: string;
+  /** Issue date (free-text or ISO; rendered verbatim). */
+  date: string;
+  /** Description of what changed at this revision. */
+  note: string;
+  /** Who issued the revision (initials/name). */
+  by?: string;
+}
+
+/**
+ * Optional project-level branding / title-block metadata. Drives the PDF title
+ * block, the revision block, and the small drawing title-strip. Every field is
+ * optional so existing projects (which have no `meta`) keep working unchanged.
+ */
+export interface ProjectMeta {
+  /** End client / owner the design is prepared for. */
+  client?: string;
+  /** Site / installation location. */
+  location?: string;
+  /** Responsible engineer (name / initials). */
+  engineer?: string;
+  /** Designing company / consultancy name. */
+  companyName?: string;
+  /** Drawing number stamped in the title block. */
+  drawingNumber?: string;
+  /** Project / job number. */
+  projectNumber?: string;
+  /** Current revision label, e.g. "A". */
+  revision?: string;
+  /** Company logo as a base64 data URL (offline-friendly, embedded in PDFs). */
+  logoDataUrl?: string;
+  /** Revision history rendered as the title-block revision table. */
+  revisions?: ProjectRevision[];
+  /** Commercial quotation settings (labor rate + mark-ups). */
+  quotation?: QuotationSettings;
 }
 
 export interface ProjectInput {
@@ -73,4 +138,6 @@ export interface ProjectInput {
   earthingSystem?: EarthingSystem;
   /** Optional distributed energy sources (generator / solar / battery). */
   sources?: SourcesConfig;
+  /** Optional project branding / title-block metadata. */
+  meta?: ProjectMeta;
 }

@@ -1,14 +1,10 @@
-import { Alert, Box, Card, Group, SimpleGrid, Stack, Text } from '@mantine/core';
-import { IconRuler2 } from '@tabler/icons-react';
+import { Alert, Box, Button, Card, Group, SimpleGrid, Stack, Text } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import { IconFileVector, IconRuler2 } from '@tabler/icons-react';
 import type { PanelInput } from '@shared/types/project';
 import type { PanelResult } from '@shared/types/results';
-
-/** A single DIN module is 18 mm wide (one "pole" pitch). */
-const MODULE_MM = 18;
-/** Inner door gutter / mounting margin around the chassis (mm). */
-const GUTTER_MM = 40;
-/** Height reserved for the busbar chamber at the bottom (mm). */
-const BUSBAR_CHAMBER_MM = 90;
+import { panelGaSvg, panelGaDxf } from '@shared/drawing';
+import { downloadSvg, downloadDxf } from '@renderer/lib/drawingExport';
 
 /** Small labelled key/value used in the dimension legend. */
 function KeyVal({ k, v }: { k: string; v: string }) {
@@ -25,12 +21,15 @@ function KeyVal({ k, v }: { k: string; v: string }) {
 }
 
 /**
- * A to-scale (schematic) SVG front elevation of the panel enclosure, derived
- * from the computed enclosure result: the outer cabinet, a door gutter, the DIN
- * rails (one per `rows`) with 18 mm module ticks, and a busbar chamber. It is a
- * representative general-arrangement sketch, not a CAD drawing.
+ * A to-scale general-arrangement front elevation of the panel. The drawing itself
+ * comes from the shared, DOM-free builder `panelGaSvg` (the single source of truth
+ * shared with the PDF embed and the SVG/DXF exports), so the on-screen view shows
+ * the same to-scale device placement: the outer cabinet, the door gutter, the DIN
+ * rails with each branch breaker laid on as a to-scale footprint, and the busbar
+ * chamber. The surrounding legend cards summarise the enclosure and thermal spec.
  */
 export function PanelLayout({ panel, result }: { panel: PanelInput; result: PanelResult }) {
+  const { t } = useTranslation();
   const enc = result.enclosure;
   const { widthMm, heightMm, depthMm, sheetThicknessMm, modules, rows, ventilation, totalHeatW } = enc;
 
@@ -38,185 +37,88 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
   if (widthMm <= 0 || heightMm <= 0 || rows <= 0 || modules <= 0) {
     return (
       <Stack gap="md">
-        <Alert color="gray" icon={<IconRuler2 size={18} />} title="No layout yet">
-          Add branch circuits to size the enclosure — the general-arrangement elevation appears once the
-          engine computes modules and DIN rows.
+        <Alert color="gray" icon={<IconRuler2 size={18} />} title={t('layout.noLayoutTitle')}>
+          {t('layout.noLayoutBody')}
         </Alert>
       </Stack>
     );
   }
 
-  // --- Geometry in millimetres (SVG user units = mm; scaling is done by viewBox). ---
-  const innerW = Math.max(widthMm - 2 * GUTTER_MM, MODULE_MM);
-  const railTopY = GUTTER_MM;
-  const railBottomY = heightMm - BUSBAR_CHAMBER_MM - GUTTER_MM;
-  const railSpan = Math.max(railBottomY - railTopY, MODULE_MM);
-  const railPitch = rows > 1 ? railSpan / (rows - 1) : 0;
-
-  // Modules spread across the available rows; ticks per rail = ceil(modules/rows),
-  // capped to what physically fits on the rail width.
-  const fitPerRail = Math.max(Math.floor(innerW / MODULE_MM), 1);
-  const perRail = Math.min(Math.ceil(modules / rows), fitPerRail);
-
-  // Busbar chamber band.
-  const chamberY = heightMm - BUSBAR_CHAMBER_MM - GUTTER_MM / 2;
-  const chamberH = BUSBAR_CHAMBER_MM;
-
-  const stroke = 'var(--mantine-color-default-border)';
-  const accent = 'var(--mantine-color-blue-filled)';
-  const dim = 'var(--mantine-color-dimmed)';
-
-  const railIndices = Array.from({ length: rows }, (_, i) => i);
-  const moduleIndices = Array.from({ length: perRail }, (_, i) => i);
+  // The shared builder renders the to-scale GA (device placement included). We
+  // inject its SVG string directly so the screen and the exports never diverge.
+  const gaSvg = panelGaSvg(panel, result);
+  // The builder emits explicit pixel width/height (needed by pdfmake); for the
+  // responsive on-screen embed we let the viewBox drive scaling instead, so the
+  // drawing fills the card width. The export buttons use the unmodified `gaSvg`.
+  const gaSvgResponsive = gaSvg.replace(
+    /^<svg /,
+    '<svg style="width:100%;height:auto;max-height:480px;display:block" ',
+  );
 
   return (
     <Stack gap="md">
       <Group justify="space-between">
-        <Text fw={600}>General arrangement</Text>
-        <Text size="xs" c="dimmed">
-          {panel.system} · front elevation
-        </Text>
+        <Text fw={600}>{t('layout.generalArrangement')}</Text>
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            {t('layout.frontElevation', { system: panel.system })}
+          </Text>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconFileVector size={14} />}
+            onClick={() => downloadSvg(panel.name, gaSvg)}
+          >
+            {t('layout.exportSvg')}
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconFileVector size={14} />}
+            onClick={() => downloadDxf(panel.name, panelGaDxf(panel, result))}
+          >
+            {t('layout.exportDxf')}
+          </Button>
+        </Group>
       </Group>
 
       <Card withBorder radius="md" padding="md">
-        <Box style={{ width: '100%' }}>
-          <svg
-            viewBox={`-20 -20 ${widthMm + 40} ${heightMm + 40}`}
-            width="100%"
-            style={{ maxHeight: 480, display: 'block', color: 'var(--mantine-color-text)' }}
-            preserveAspectRatio="xMidYMid meet"
-            role="img"
-            aria-label={`Panel front elevation, ${widthMm} by ${heightMm} millimetres`}
-          >
-            {/* Cabinet body. */}
-            <rect
-              x={0}
-              y={0}
-              width={widthMm}
-              height={heightMm}
-              fill="none"
-              stroke={stroke}
-              strokeWidth={Math.max(sheetThicknessMm, 1.5)}
-              rx={6}
-            />
-            {/* Door gutter / mounting plate margin. */}
-            <rect
-              x={GUTTER_MM / 2}
-              y={GUTTER_MM / 2}
-              width={widthMm - GUTTER_MM}
-              height={heightMm - GUTTER_MM}
-              fill="none"
-              stroke={stroke}
-              strokeWidth={0.75}
-              strokeDasharray="6 4"
-              rx={4}
-            />
-
-            {/* DIN rails with module ticks. */}
-            {railIndices.map((r) => {
-              const y = railTopY + r * railPitch;
-              return (
-                <g key={r}>
-                  <line
-                    x1={GUTTER_MM}
-                    y1={y}
-                    x2={GUTTER_MM + innerW}
-                    y2={y}
-                    stroke={stroke}
-                    strokeWidth={2}
-                  />
-                  {moduleIndices.map((m) => {
-                    const x = GUTTER_MM + m * MODULE_MM;
-                    return (
-                      <rect
-                        key={m}
-                        x={x + 1}
-                        y={y - 9}
-                        width={MODULE_MM - 2}
-                        height={18}
-                        fill="none"
-                        stroke={accent}
-                        strokeWidth={1}
-                        rx={1.5}
-                      />
-                    );
-                  })}
-                </g>
-              );
-            })}
-
-            {/* Busbar chamber. */}
-            <rect
-              x={GUTTER_MM / 2}
-              y={chamberY}
-              width={widthMm - GUTTER_MM}
-              height={chamberH}
-              fill="none"
-              stroke={accent}
-              strokeWidth={1}
-              strokeDasharray="3 3"
-              rx={3}
-            />
-            <text
-              x={widthMm / 2}
-              y={chamberY + chamberH / 2}
-              fill={dim}
-              fontSize={Math.max(widthMm / 28, 12)}
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              busbar chamber
-            </text>
-
-            {/* Overall width dimension line (top). */}
-            <text
-              x={widthMm / 2}
-              y={-6}
-              fill={dim}
-              fontSize={Math.max(widthMm / 26, 12)}
-              textAnchor="middle"
-            >
-              {widthMm} mm
-            </text>
-            {/* Overall height dimension (rotated, left). */}
-            <text
-              x={-6}
-              y={heightMm / 2}
-              fill={dim}
-              fontSize={Math.max(widthMm / 26, 12)}
-              textAnchor="middle"
-              transform={`rotate(-90 ${-6} ${heightMm / 2})`}
-            >
-              {heightMm} mm
-            </text>
-          </svg>
-        </Box>
+        {/*
+          The builder emits a self-contained <svg> with width/height + viewBox; the
+          wrapper constrains it to the card width and a sensible max height while the
+          viewBox preserves the to-scale aspect ratio.
+        */}
+        <Box
+          style={{ width: '100%' }}
+          aria-label={t('layout.frontElevationAria', { width: widthMm, height: heightMm })}
+          dangerouslySetInnerHTML={{ __html: gaSvgResponsive }}
+        />
 
         <Text size="xs" c="dimmed" mt="xs" ta="center">
-          Schematic general arrangement — estimate, verify against PUIL 2011.
+          {t('layout.schematicEstimate')}
         </Text>
       </Card>
 
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Enclosure
+            {t('layout.enclosure')}
           </Text>
           <Stack gap={4}>
-            <KeyVal k="Overall (W×H×D)" v={`${widthMm} × ${heightMm} × ${depthMm} mm`} />
-            <KeyVal k="Sheet thickness" v={`${sheetThicknessMm} mm`} />
-            <KeyVal k="DIN rows" v={`${rows}`} />
-            <KeyVal k="Modules (18 mm)" v={`${modules}`} />
+            <KeyVal k={t('layout.overall')} v={`${widthMm} × ${heightMm} × ${depthMm} mm`} />
+            <KeyVal k={t('layout.sheetThickness')} v={`${sheetThicknessMm} mm`} />
+            <KeyVal k={t('layout.dinRows')} v={`${rows}`} />
+            <KeyVal k={t('layout.modules18')} v={`${modules}`} />
           </Stack>
         </Card>
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Thermal / cooling
+            {t('layout.thermalCooling')}
           </Text>
           <Stack gap={4}>
-            <KeyVal k="Internal heat" v={`${totalHeatW.toFixed(0)} W`} />
-            <KeyVal k="Ventilation class" v={ventilation} />
-            <KeyVal k="Modules per rail (drawn)" v={`${perRail}`} />
+            <KeyVal k={t('layout.internalHeat')} v={`${totalHeatW.toFixed(0)} W`} />
+            <KeyVal k={t('layout.ventilationClass')} v={ventilation} />
+            <KeyVal k={t('layout.devicesDrawn')} v={`${result.circuits.length}`} />
           </Stack>
         </Card>
       </SimpleGrid>

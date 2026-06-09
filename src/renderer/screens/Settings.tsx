@@ -1,41 +1,82 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
   Card,
   Group,
+  Image,
   NumberInput,
   Select,
   SimpleGrid,
   Stack,
   Text,
+  TextInput,
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconInfoCircle, IconRefresh, IconShieldBolt } from '@tabler/icons-react';
+import {
+  IconBuildingFactory2,
+  IconInfoCircle,
+  IconLock,
+  IconPhoto,
+  IconRefresh,
+  IconShieldBolt,
+  IconX,
+} from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { computeSystem } from '@shared/engine';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
-import { appVersion, checkForUpdates } from '@renderer/api';
+import {
+  appVersion,
+  checkForUpdates,
+  isDesktop,
+  licenseSignOut,
+  licenseStatus,
+} from '@renderer/api';
+import type { LicenseStatusResult } from '@shared/ipc-contract';
+import { getLanguage, setLanguage, type Language } from '@renderer/i18n';
 
-/** Install-method options for the panel default Select. */
-const INSTALL_METHODS: { value: InstallMethod; label: string }[] = [
-  { value: 'conduit', label: 'In conduit' },
-  { value: 'trunking', label: 'In trunking' },
-  { value: 'wall', label: 'Clipped to wall' },
-  { value: 'air', label: 'Free air' },
-  { value: 'tray', label: 'On cable tray' },
-  { value: 'buried', label: 'Buried' },
+/** Install-method values for the panel default Select (labels are translated). */
+const INSTALL_METHOD_VALUES: InstallMethod[] = [
+  'conduit',
+  'trunking',
+  'wall',
+  'air',
+  'tray',
+  'buried',
+];
+
+/** Language options for the UI-language Select. */
+const LANGUAGES: { value: Language; label: string }[] = [
+  { value: 'en', label: 'English' },
+  { value: 'id', label: 'Bahasa Indonesia' },
 ];
 
 export function Settings() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const setEarthingSystem = useProjectStore((s) => s.setEarthingSystem);
+  const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
+  const meta = project.meta ?? {};
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  /** Read a chosen image file as a base64 data URL and store it on the project. */
+  function onLogoFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setProjectMeta({ logoDataUrl: reader.result });
+    };
+    reader.onerror = () =>
+      notifications.show({ message: t('settings.logoReadError'), color: 'red' });
+    reader.readAsDataURL(file);
+  }
 
   const system = useMemo(() => computeSystem(project), [project]);
   const standardsVersion = Object.values(system.panels)[0]?.standardsVersion ?? 'unknown';
@@ -43,9 +84,17 @@ export function Settings() {
 
   const [version, setVersion] = useState('…');
   const [checking, setChecking] = useState(false);
+  const [license, setLicense] = useState<LicenseStatusResult | null>(null);
   useEffect(() => {
     void appVersion().then(setVersion);
+    if (isDesktop()) void licenseStatus().then(setLicense);
   }, []);
+
+  async function onSignOut() {
+    await licenseSignOut();
+    setLicense(await licenseStatus());
+    notifications.show({ message: t('settings.licenseSignedOut'), color: 'gray' });
+  }
 
   async function onCheckUpdates() {
     setChecking(true);
@@ -53,21 +102,21 @@ export function Settings() {
     setChecking(false);
     const message =
       status.state === 'available'
-        ? `Update ${status.version} available — downloading.`
+        ? t('settings.updateAvailable', { version: status.version })
         : status.state === 'not-available'
-          ? "You're on the latest version."
+          ? t('settings.updateLatest')
           : status.state === 'disabled'
             ? status.reason
             : status.state === 'error'
-              ? `Update check failed: ${status.message}`
-              : 'Checking…';
+              ? t('settings.updateCheckFailed', { message: status.message })
+              : t('settings.updateChecking');
     notifications.show({ message, color: status.state === 'available' ? 'indigo' : 'gray' });
   }
 
   if (!panel) {
     return (
-      <Alert color="yellow" title="No panel selected">
-        Select a panel first to edit its defaults.
+      <Alert color="yellow" title={t('settings.noPanelTitle')}>
+        {t('settings.noPanelBody')}
       </Alert>
     );
   }
@@ -76,19 +125,124 @@ export function Settings() {
     <Stack gap="md">
       <div>
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Settings
+          {t('settings.eyebrow')}
         </Text>
-        <Title order={3}>Panel defaults — {panel.name}</Title>
+        <Title order={3}>{t('settings.panelDefaults', { name: panel.name })}</Title>
       </div>
 
       <Card withBorder radius="md" padding="md">
+        <Group gap="xs" mb="md">
+          <IconBuildingFactory2 size={18} color="var(--mantine-color-indigo-6)" />
+          <Text fw={600}>{t('settings.projectDetails')}</Text>
+        </Group>
+        <Text size="xs" c="dimmed" mb="md">
+          {t('settings.projectDetailsHint')}
+        </Text>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <TextInput
+            label={t('settings.companyName')}
+            placeholder={t('settings.companyNamePlaceholder')}
+            value={meta.companyName ?? ''}
+            onChange={(e) => setProjectMeta({ companyName: e.currentTarget.value })}
+          />
+          <TextInput
+            label={t('settings.client')}
+            placeholder={t('settings.clientPlaceholder')}
+            value={meta.client ?? ''}
+            onChange={(e) => setProjectMeta({ client: e.currentTarget.value })}
+          />
+          <TextInput
+            label={t('settings.location')}
+            placeholder={t('settings.locationPlaceholder')}
+            value={meta.location ?? ''}
+            onChange={(e) => setProjectMeta({ location: e.currentTarget.value })}
+          />
+          <TextInput
+            label={t('settings.engineer')}
+            placeholder={t('settings.engineerPlaceholder')}
+            value={meta.engineer ?? ''}
+            onChange={(e) => setProjectMeta({ engineer: e.currentTarget.value })}
+          />
+          <TextInput
+            label={t('settings.drawingNumber')}
+            placeholder={t('settings.drawingNumberPlaceholder')}
+            value={meta.drawingNumber ?? ''}
+            onChange={(e) => setProjectMeta({ drawingNumber: e.currentTarget.value })}
+          />
+          <TextInput
+            label={t('settings.projectNumber')}
+            placeholder={t('settings.projectNumberPlaceholder')}
+            value={meta.projectNumber ?? ''}
+            onChange={(e) => setProjectMeta({ projectNumber: e.currentTarget.value })}
+          />
+          <TextInput
+            label={t('settings.revision')}
+            placeholder={t('settings.revisionPlaceholder')}
+            value={meta.revision ?? ''}
+            onChange={(e) => setProjectMeta({ revision: e.currentTarget.value })}
+            maw={160}
+          />
+        </SimpleGrid>
+
+        <Group align="flex-end" mt="md" gap="md">
+          <div>
+            <Text size="sm" fw={500} mb={4}>
+              {t('settings.companyLogo')}
+            </Text>
+            {meta.logoDataUrl ? (
+              <Group gap="sm" align="center">
+                <Image
+                  src={meta.logoDataUrl}
+                  alt={t('settings.companyLogoAlt')}
+                  h={48}
+                  w="auto"
+                  fit="contain"
+                  style={{ maxWidth: 160, border: '1px solid var(--mantine-color-gray-3)' }}
+                />
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="red"
+                  leftSection={<IconX size={14} />}
+                  onClick={() => setProjectMeta({ logoDataUrl: undefined })}
+                >
+                  {t('common.clear')}
+                </Button>
+              </Group>
+            ) : (
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<IconPhoto size={14} />}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {t('settings.uploadLogo')}
+              </Button>
+            )}
+            {/* Hidden native file picker; reads the chosen image as a data URL. */}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                onLogoFile(e.currentTarget.files?.[0] ?? null);
+                // Reset so re-selecting the same file fires change again.
+                e.currentTarget.value = '';
+              }}
+            />
+          </div>
+        </Group>
+      </Card>
+
+      <Card withBorder radius="md" padding="md">
         <Text fw={600} mb="md">
-          Environment &amp; derating
+          {t('settings.environment')}
         </Text>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <NumberInput
-            label="Ambient temperature"
-            description="Used for cable derating"
+            label={t('settings.ambientTemp')}
+            description={t('settings.ambientTempHint')}
             suffix=" °C"
             min={10}
             max={70}
@@ -98,8 +252,8 @@ export function Settings() {
             }
           />
           <NumberInput
-            label="Grouping count"
-            description="Circuits bundled together"
+            label={t('settings.groupingCount')}
+            description={t('settings.groupingCountHint')}
             min={1}
             max={20}
             value={panel.groupingCount}
@@ -108,15 +262,18 @@ export function Settings() {
             }
           />
           <Select
-            label="Install method"
-            data={INSTALL_METHODS}
+            label={t('settings.installMethod')}
+            data={INSTALL_METHOD_VALUES.map((value) => ({
+              value,
+              label: t(`installMethod.${value}`),
+            }))}
             value={panel.installMethod}
             allowDeselect={false}
             onChange={(v) => v && updatePanel(panel.id, { installMethod: v as InstallMethod })}
           />
           <NumberInput
-            label="Diversity factor"
-            description="Applied to aggregated downstream load"
+            label={t('settings.diversityFactor')}
+            description={t('settings.diversityFactorHint')}
             min={0.1}
             max={1}
             step={0.05}
@@ -132,11 +289,11 @@ export function Settings() {
       <Card withBorder radius="md" padding="md">
         <Group gap="xs" mb="md">
           <IconShieldBolt size={18} color="var(--mantine-color-teal-6)" />
-          <Text fw={600}>Earthing &amp; grounding</Text>
+          <Text fw={600}>{t('settings.earthing')}</Text>
         </Group>
         <Select
-          label="Earthing system"
-          description="Project-wide; drives RCD requirements and bonding"
+          label={t('settings.earthingSystem')}
+          description={t('settings.earthingSystemHint')}
           data={EARTHING_SYSTEMS.map((e) => ({ value: e.value, label: e.label }))}
           value={project.earthingSystem ?? 'TN-C-S'}
           allowDeselect={false}
@@ -145,19 +302,75 @@ export function Settings() {
           maw={360}
         />
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
-          <KeyStat k="RCD policy" v={earthing.requiresRcd ? 'All final circuits' : 'Sockets / EV only'} />
-          <KeyStat k="Main earthing" v={`${earthing.mainEarthingConductorMm2} mm²`} />
-          <KeyStat k="Main bonding" v={`${earthing.mainBondingConductorMm2} mm²`} />
-          <KeyStat k="Electrode target" v={`≤ ${earthing.electrodeResistanceTargetOhm} Ω`} />
+          <KeyStat
+            k={t('settings.rcdPolicy')}
+            v={earthing.requiresRcd ? t('settings.rcdAll') : t('settings.rcdSockets')}
+          />
+          <KeyStat k={t('settings.mainEarthing')} v={`${earthing.mainEarthingConductorMm2} mm²`} />
+          <KeyStat k={t('settings.mainBonding')} v={`${earthing.mainBondingConductorMm2} mm²`} />
+          <KeyStat
+            k={t('settings.electrodeTarget')}
+            v={`≤ ${earthing.electrodeResistanceTargetOhm} Ω`}
+          />
         </SimpleGrid>
         <Text size="xs" c="dimmed">
           {earthing.note}
         </Text>
       </Card>
 
+      {isDesktop() && license && (
+        <Card withBorder radius="md" padding="md">
+          <Group gap="xs" mb="md">
+            <IconLock size={18} color="var(--mantine-color-indigo-6)" />
+            <Text fw={600}>{t('settings.licensing')}</Text>
+          </Group>
+          {license.enforced ? (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('settings.licenseStatus')}
+                </Text>
+                <Text size="sm" fw={500} c={license.licensed ? 'teal' : 'red'}>
+                  {license.licensed ? t('settings.licenseLicensed') : t('settings.licenseLocked')}
+                </Text>
+              </Group>
+              {license.email && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {t('settings.licenseSignedInAs')}
+                  </Text>
+                  <Text size="sm" fw={500}>
+                    {license.email}
+                  </Text>
+                </Group>
+              )}
+              {license.lastVerifiedAtMs && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {t('settings.licenseLastVerified')}
+                  </Text>
+                  <Text size="sm" fw={500}>
+                    {new Date(license.lastVerifiedAtMs).toLocaleString()}
+                  </Text>
+                </Group>
+              )}
+              <Group justify="flex-end">
+                <Button size="xs" variant="light" color="red" onClick={onSignOut}>
+                  {t('settings.licenseSignOut')}
+                </Button>
+              </Group>
+            </SimpleGrid>
+          ) : (
+            <Text size="sm" c="dimmed">
+              {t('settings.licenseNotEnforced')}
+            </Text>
+          )}
+        </Card>
+      )}
+
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="md">
-          <Text fw={600}>Application</Text>
+          <Text fw={600}>{t('settings.application')}</Text>
           <Button
             size="xs"
             variant="light"
@@ -165,13 +378,23 @@ export function Settings() {
             loading={checking}
             onClick={onCheckUpdates}
           >
-            Check for updates
+            {t('settings.checkUpdates')}
           </Button>
         </Group>
+        <Select
+          label={t('settings.language')}
+          description={t('settings.languageHint')}
+          data={LANGUAGES}
+          value={getLanguage()}
+          allowDeselect={false}
+          onChange={(v) => v && setLanguage(v as Language)}
+          mb="md"
+          maw={360}
+        />
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Version
+              {t('settings.version')}
             </Text>
             <Text size="sm" fw={500} ff="monospace">
               {version}
@@ -179,7 +402,7 @@ export function Settings() {
           </Group>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Currency
+              {t('settings.currency')}
             </Text>
             <Text size="sm" fw={500}>
               IDR
@@ -187,7 +410,7 @@ export function Settings() {
           </Group>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Standards
+              {t('settings.standards')}
             </Text>
             <Text size="sm" fw={500} ff="monospace">
               {standardsVersion}
@@ -195,14 +418,12 @@ export function Settings() {
           </Group>
         </SimpleGrid>
         <Text size="xs" c="dimmed" mt="xs">
-          PanelMaker auto-updates from GitHub releases in the installed desktop app; downloads apply
-          on restart.
+          {t('settings.autoUpdateNote')}
         </Text>
       </Card>
 
       <Alert variant="light" color="blue" icon={<IconInfoCircle size={18} />}>
-        Changes recompute the panel live. The active panel is set from the System view or the Panel
-        editor's dropdown.
+        {t('settings.recomputeNote')}
       </Alert>
     </Stack>
   );

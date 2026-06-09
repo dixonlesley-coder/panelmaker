@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bomToCsv, bomToAoa } from '@renderer/lib/bomExport';
+import { consolidateBom } from '@shared/engine';
 import type { BomLine } from '@shared/types/results';
 
 const LINES: BomLine[] = [
@@ -89,5 +90,88 @@ describe('bomToAoa', () => {
     const totals = aoa.at(-1);
     expect(totals?.[1]).toBe('Grand total');
     expect(totals?.[4]).toBe(380000);
+  });
+});
+
+describe('consolidateBom', () => {
+  it('sums quantities and line totals for the same part across panels', () => {
+    // Two panels each contributing one MCB on a different circuit (so the
+    // per-circuit description suffix differs) plus a shared cable.
+    const lines: BomLine[] = [
+      {
+        partId: 'mcb-c16',
+        description: 'MCB 16A — Lights P1',
+        category: 'breaker',
+        qty: 2,
+        unitPrice: 190000,
+        lineTotal: 380000,
+        matched: true,
+      },
+      {
+        partId: 'mcb-c16',
+        description: 'MCB 16A — Sockets P2',
+        category: 'breaker',
+        qty: 3,
+        unitPrice: 190000,
+        lineTotal: 570000,
+        matched: true,
+      },
+      {
+        partId: 'cable-16',
+        description: 'Cable 16 mm² — Feeder P2',
+        category: 'cable',
+        qty: 1,
+        unitPrice: 165000,
+        lineTotal: 165000,
+        matched: true,
+      },
+    ];
+
+    const merged = consolidateBom(lines);
+    // The two MCB lines collapse into one; the cable stays separate.
+    expect(merged).toHaveLength(2);
+    const mcb = merged.find((l) => l.partId === 'mcb-c16');
+    expect(mcb?.qty).toBe(5);
+    expect(mcb?.lineTotal).toBe(950000); // 190000 × 5
+    // The circuit-specific suffix is dropped from the consolidated description.
+    expect(mcb?.description).toBe('MCB 16A');
+  });
+
+  it('groups unmatched lines by description+category and marks the merge unpriced', () => {
+    const lines: BomLine[] = [
+      { description: 'Busbar set — MDP', category: 'busbar', qty: 1, matched: false },
+      { description: 'Busbar set — SDP', category: 'busbar', qty: 2, matched: false },
+    ];
+    const merged = consolidateBom(lines);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.qty).toBe(3);
+    expect(merged[0]?.matched).toBe(false);
+    expect(merged[0]?.lineTotal).toBeUndefined();
+  });
+
+  it('produces a consolidated total that the export totals row reflects', () => {
+    const lines: BomLine[] = [
+      {
+        partId: 'p',
+        description: 'Widget — A',
+        category: 'accessory',
+        qty: 1,
+        unitPrice: 1000,
+        lineTotal: 1000,
+        matched: true,
+      },
+      {
+        partId: 'p',
+        description: 'Widget — B',
+        category: 'accessory',
+        qty: 4,
+        unitPrice: 1000,
+        lineTotal: 4000,
+        matched: true,
+      },
+    ];
+    const merged = consolidateBom(lines);
+    const totals = bomToAoa(merged, 'IDR').at(-1);
+    expect(totals?.[4]).toBe(5000);
   });
 });

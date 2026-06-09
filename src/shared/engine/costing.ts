@@ -27,3 +27,43 @@ export function costBom(
 
   return { lines: out, grandTotal: round(grandTotal, 2), currency, unmatchedCount };
 }
+
+/**
+ * Consolidate a flat list of BOM lines (e.g. every panel's lines concatenated)
+ * into one project-level BOM, summing quantities and line totals for identical
+ * items. Lines are grouped by part id when present (so the same catalog part
+ * used across panels collapses), otherwise by description+category. The kept
+ * description drops the per-circuit suffix (everything after the last " — ") so
+ * the same device on different circuits merges into a single orderable line.
+ */
+export function consolidateBom(lines: BomLine[]): BomLine[] {
+  const byKey = new Map<string, BomLine>();
+  // Preserve first-seen order so the consolidated BOM reads predictably.
+  const order: string[] = [];
+
+  for (const line of lines) {
+    // Strip the trailing " — <circuit>" so the merged item is circuit-agnostic.
+    const desc = line.description.replace(/\s+—\s+[^—]*$/, '').trimEnd();
+    const key = line.partId ?? `${line.category}::${desc}`;
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...line, description: desc });
+      order.push(key);
+      continue;
+    }
+
+    existing.qty += line.qty;
+    // Re-derive the line total from the (consistent) unit price when both
+    // contributing lines were priced; otherwise the line stays unpriced.
+    if (existing.matched && line.matched && existing.unitPrice !== undefined) {
+      existing.lineTotal = round(existing.unitPrice * existing.qty, 2);
+    } else {
+      existing.matched = false;
+      existing.unitPrice = undefined;
+      existing.lineTotal = undefined;
+    }
+  }
+
+  return order.map((k) => byKey.get(k)!);
+}

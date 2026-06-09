@@ -23,8 +23,14 @@ import { listParts, upsertPart } from '../repositories/parts.repo';
 import { importPricelist } from '../repositories/pricelists.repo';
 import { saveSchematic, loadSchematic } from '../repositories/schematic.repo';
 import { computeProject } from '../services/calc.service';
-import { exportPanelPdf, exportSystemPdf } from '../services/export.service';
+import {
+  exportLabelsPdf,
+  exportPanelPdf,
+  exportQuotationPdf,
+  exportSystemPdf,
+} from '../services/export.service';
 import { checkForUpdates, installUpdate } from '../updater';
+import { getStatus, runSignIn, signOut } from '../license/session';
 
 /* ------------------------------- validators ------------------------------- */
 
@@ -91,12 +97,21 @@ function asProject(value: unknown): ProjectInput {
   return projectSchema.parse(value) as unknown as ProjectInput;
 }
 
+/** Hooks the main process can supply to the licensing handlers. */
+export interface IpcHandlerHooks {
+  /**
+   * Called after a successful interactive sign-in so the main process can swap
+   * the sign-in window for the real app window.
+   */
+  onSignedIn?: () => void;
+}
+
 /**
  * Register every IPC handler. Call once during app startup (after the DB is
  * ready). Idempotent guard prevents duplicate registration on hot reload.
  */
 let registered = false;
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(hooks: IpcHandlerHooks = {}): void {
   if (registered) return;
   registered = true;
 
@@ -138,6 +153,21 @@ export function registerIpcHandlers(): void {
     exportSystemPdf(asProject(project), z.string().min(1).parse(filePath)),
   );
 
+  ipcMain.handle(IPC.exportLabelsPdf, (_e, project: unknown, filePath: unknown) =>
+    exportLabelsPdf(asProject(project), z.string().min(1).parse(filePath)),
+  );
+
+  ipcMain.handle(
+    IPC.exportQuotationPdf,
+    (_e, project: unknown, parts: unknown, prices: unknown, filePath: unknown) =>
+      exportQuotationPdf(
+        asProject(project),
+        z.array(partSchema).parse(parts) as unknown as Part[],
+        z.record(z.number()).parse(prices),
+        z.string().min(1).parse(filePath),
+      ),
+  );
+
   ipcMain.handle(IPC.saveSchematic, (_e, schematic: unknown) =>
     saveSchematic(schematic as ControlSchematic),
   );
@@ -162,5 +192,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.updateCheck, () => checkForUpdates());
   ipcMain.handle(IPC.updateInstall, () => {
     installUpdate();
+  });
+
+  ipcMain.handle(IPC.licenseStatus, () => getStatus());
+  ipcMain.handle(IPC.licenseSignIn, async () => {
+    const decision = await runSignIn();
+    if (decision.licensed) hooks.onSignedIn?.();
+    return decision;
+  });
+  ipcMain.handle(IPC.licenseSignOut, () => {
+    signOut();
   });
 }

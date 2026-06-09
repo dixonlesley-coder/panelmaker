@@ -1,5 +1,10 @@
-import type { Api, UpdateStatus } from '@shared/ipc-contract';
-import type { ControlSchematic, ProjectInput } from '@shared/types';
+import type {
+  Api,
+  LicenseDecisionResult,
+  LicenseStatusResult,
+  UpdateStatus,
+} from '@shared/ipc-contract';
+import type { ControlSchematic, Part, ProjectInput } from '@shared/types';
 
 type WindowWithApi = Window & typeof globalThis & { api?: Api };
 
@@ -42,6 +47,38 @@ export async function exportSystemPdf(project: ProjectInput): Promise<ActionResu
     if (!path) return { ok: false, reason: 'cancelled', message: 'Export cancelled.' };
     const res = await api.exportSystemPdf(project, path);
     return { ok: true, message: `Exported system report to ${res.filePath}.` };
+  } catch (e) {
+    return { ok: false, reason: 'error', message: (e as Error).message };
+  }
+}
+
+/** Export the circuit-label / nameplate sheet PDF via a native save dialog (desktop only). */
+export async function exportLabelsPdf(project: ProjectInput): Promise<ActionResult> {
+  const api = desktopApi();
+  if (!api) return { ok: false, reason: 'web', message: WEB_MESSAGE };
+  try {
+    const path = await api.chooseSavePath(`${project.name} - labels.pdf`);
+    if (!path) return { ok: false, reason: 'cancelled', message: 'Export cancelled.' };
+    const res = await api.exportLabelsPdf(project, path);
+    return { ok: true, message: `Exported circuit labels to ${res.filePath}.` };
+  } catch (e) {
+    return { ok: false, reason: 'error', message: (e as Error).message };
+  }
+}
+
+/** Export the commercial quotation / proposal PDF via a native save dialog (desktop only). */
+export async function exportQuotationPdf(
+  project: ProjectInput,
+  parts: Part[],
+  prices: Record<string, number>,
+): Promise<ActionResult> {
+  const api = desktopApi();
+  if (!api) return { ok: false, reason: 'web', message: WEB_MESSAGE };
+  try {
+    const path = await api.chooseSavePath(`${project.name} - quotation.pdf`);
+    if (!path) return { ok: false, reason: 'cancelled', message: 'Export cancelled.' };
+    const res = await api.exportQuotationPdf(project, parts, prices, path);
+    return { ok: true, message: `Exported quotation to ${res.filePath}.` };
   } catch (e) {
     return { ok: false, reason: 'error', message: (e as Error).message };
   }
@@ -101,4 +138,29 @@ export function onUpdateStatus(cb: (status: UpdateStatus) => void): () => void {
   const api = desktopApi();
   if (!api) return () => undefined;
   return api.onUpdateStatus(cb);
+}
+
+/* -------------------------------- licensing ------------------------------- */
+
+/**
+ * Current licensing status. On the web build (no main process) licensing does
+ * not apply, so this reports an unenforced, licensed status and the preview is
+ * unaffected.
+ */
+export async function licenseStatus(): Promise<LicenseStatusResult> {
+  const api = desktopApi();
+  if (!api) return { enforced: false, licensed: true, reason: 'web' };
+  return api.licenseStatus();
+}
+
+/** Run the interactive Google Workspace sign-in (desktop only; no-op on web). */
+export async function licenseSignIn(): Promise<LicenseDecisionResult> {
+  const api = desktopApi();
+  if (!api) return { licensed: true, reason: 'web' };
+  return api.licenseSignIn();
+}
+
+/** Sign out of the licensing session (desktop only; no-op on web). */
+export async function licenseSignOut(): Promise<void> {
+  await desktopApi()?.licenseSignOut();
 }

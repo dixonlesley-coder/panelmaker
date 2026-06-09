@@ -7,6 +7,8 @@ import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC } from './control/motorFLC';
+import { circuitDemandFactor } from './occupancy';
+import { sizeCableTray, sizeCircuitConduit } from './containment';
 import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
@@ -14,6 +16,8 @@ import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
+import { computeHarmonics, harmonicsWarnings } from './harmonics';
+import { computeArcFlash, arcFlashWarnings } from './arcFlash';
 import { checkBreakerKa, checkZs, type Impedance } from './fault';
 import { circuitRcd, sizeGrounding } from './grounding';
 import { round } from './util';
@@ -31,17 +35,22 @@ export interface ComputePanelOptions {
   sourceZ?: Impedance;
 }
 
-/** A leaf circuit's connected demand (W): motor kW for motors, else connected W, x demand factor. */
-export function circuitConnectedW(c: CircuitInput): number {
+/**
+ * A leaf circuit's connected demand (W): motor kW for motors, else connected W,
+ * times the demand factor. `demandFactor` lets the caller pass an occupancy-
+ * resolved factor; absent, the circuit's own value (default 1) is used.
+ */
+export function circuitConnectedW(c: CircuitInput, demandFactor?: number): number {
   const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
-  return (isMotor ? c.motorKw! * 1000 : c.loadW) * (c.demandFactor ?? 1);
+  const df = demandFactor ?? c.demandFactor ?? 1;
+  return (isMotor ? c.motorKw! * 1000 : c.loadW) * df;
 }
 
-function effectiveLoadW(c: CircuitInput, opts: ComputePanelOptions): number {
+function effectiveLoadW(c: CircuitInput, panel: PanelInput, opts: ComputePanelOptions): number {
   if (c.feedsPanelId && opts.feederLoadW && opts.feederLoadW[c.feedsPanelId] !== undefined) {
     return opts.feederLoadW[c.feedsPanelId]!;
   }
-  return circuitConnectedW(c);
+  return circuitConnectedW(c, circuitDemandFactor(c, panel));
 }
 
 interface CircuitComputation {
@@ -60,7 +69,7 @@ function computeCircuit(
   df: number,
   opts: ComputePanelOptions,
 ): CircuitComputation {
-  const loadW = effectiveLoadW(c, opts);
+  const loadW = effectiveLoadW(c, panel, opts);
   const def = LOAD_DEFAULTS[c.loadKind];
   const isFeeder = c.loadKind === 'feeder' || c.feedsPanelId !== undefined;
 
@@ -148,6 +157,8 @@ function computeCircuit(
     warnings.push(...validateInterlocks(control, panel.id));
   }
 
+  const containment = sizeCircuitConduit(cable.csaMm2, grounding.cores);
+
   const result: CircuitResult = {
     circuitId: c.id,
     name: c.name,
@@ -159,6 +170,7 @@ function computeCircuit(
     grounding,
     rcd,
     control,
+    containment,
   };
 
   // Protection / fault analysis (only when the panel's prospective fault is known).
@@ -263,6 +275,42 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   const busbar = sizeBusbar(totalDemandCurrentA);
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
 
+  // Cable tray for all outgoing cables, laid side-by-side in a single layer.
+  const cableTray = sizeCableTray(circuits.map((c) => c.containment?.cableOdMm ?? 0));
+
+  // Harmonics / power-quality estimate from the non-linear (VFD/soft-starter/
+  // UPS/rectifier) load share. branches and comps are aligned by construction.
+  const largestNeutralCsaMm2 = comps.reduce(
+    (m, cm) => Math.max(m, cm.result.grounding.neutralCsaMm2),
+    0,
+  );
+  const harmonics = computeHarmonics({
+    loads: branches.map((b, idx) => ({
+      loadW: comps[idx]!.effectiveLoadW,
+      loadKind: b.loadKind,
+      starterType: b.starterType,
+      threePhase: comps[idx]!.threePhase,
+    })),
+    largestNeutralCsaMm2,
+  });
+  if (harmonics) warnings.push(...harmonicsWarnings(harmonics, panel.id));
+
+  // Arc-flash incident-energy estimate at the bus (needs the prospective fault).
+  // The clearing device is approximated by the panel's heaviest breaker class —
+  // an MCCB-fed bus is assumed to clear more slowly than an MCB-only board.
+  let arcFlash;
+  if (opts.faultLevelA !== undefined) {
+    const incomerClass = comps.some((cm) => cm.result.breaker.deviceClass === 'MCCB')
+      ? 'MCCB'
+      : 'MCB';
+    arcFlash = computeArcFlash({
+      boltedFaultA: opts.faultLevelA,
+      voltageV: panel.voltageV,
+      incomerClass,
+    });
+    if (arcFlash) warnings.push(...arcFlashWarnings(arcFlash, panel.id));
+  }
+
   return {
     panelId: panel.id,
     name: panel.name,
@@ -279,6 +327,9 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     },
     warnings,
     standardsVersion: STANDARDS_VERSION,
+    cableTray,
     ...(opts.faultLevelA !== undefined ? { faultLevelKa: round(opts.faultLevelA / 1000, 1) } : {}),
+    ...(harmonics ? { harmonics } : {}),
+    ...(arcFlash ? { arcFlash } : {}),
   };
 }

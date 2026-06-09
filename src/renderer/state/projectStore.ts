@@ -4,9 +4,11 @@ import type {
   ControlAssembly,
   ControlSchematic,
   EarthingSystem,
+  OccupancyType,
   PanelInput,
   Part,
   ProjectInput,
+  ProjectMeta,
   SchematicRung,
   SchematicSymbol,
   SchematicSymbolType,
@@ -15,6 +17,7 @@ import type {
 } from '@shared/types';
 import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { createSampleProject } from '@renderer/data/sampleProject';
+import { findPanelTemplate } from '@renderer/data/panelTemplates';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 import {
   deleteProject as registryDeleteProject,
@@ -29,6 +32,7 @@ export type Screen =
   | 'panel'
   | 'parts'
   | 'pricelist'
+  | 'quotation'
   | 'sources'
   | 'settings';
 
@@ -63,6 +67,11 @@ export interface ProjectState {
   past: ProjectInput[];
   /** Redo stack: states undone away from, newest first. */
   future: ProjectInput[];
+  /**
+   * A copied circuit held outside project history, ready to paste into any
+   * panel. Stored as a deep clone so later edits never mutate the clipboard.
+   */
+  circuitClipboard: CircuitInput | null;
 
   // navigation
   setScreen: (screen: Screen) => void;
@@ -72,10 +81,26 @@ export interface ProjectState {
   updateCircuit: (panelId: string, circuitId: string, patch: Partial<CircuitInput>) => void;
   addCircuit: (panelId: string) => void;
   removeCircuit: (panelId: string, circuitId: string) => void;
+  /** Clone a circuit in place: fresh id, "(copy)" name, inserted after the source. */
+  duplicateCircuit: (panelId: string, circuitId: string) => void;
+  /** Copy a circuit to the clipboard (deep clone, outside project history). */
+  copyCircuit: (panelId: string, circuitId: string) => void;
+  /** Paste the clipboard circuit (fresh id) onto a panel, enabling cross-panel copy. */
+  pasteCircuit: (panelId: string) => void;
+  /** Apply the same partial patch to several circuits in a panel (one undo step). */
+  bulkUpdateCircuits: (panelId: string, ids: string[], patch: Partial<CircuitInput>) => void;
+  /** Remove several circuits from a panel in a single undoable step. */
+  removeCircuits: (panelId: string, ids: string[]) => void;
+  /** Append a fully-configured circuit (fresh id) to a panel — used by the wizard. */
+  addCircuitConfigured: (panelId: string, circuit: Omit<CircuitInput, 'id'>) => void;
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
   addPanel: () => void;
+  /** Set (or clear) a panel's building occupancy class. */
+  setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
+  /** Append a new panel built from a template (fresh ids) and select it. */
+  addPanelFromTemplate: (templateId: string) => void;
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
@@ -91,6 +116,10 @@ export interface ProjectState {
   // earthing
   /** Set the installation earthing system. */
   setEarthingSystem: (system: EarthingSystem) => void;
+
+  // branding / title-block metadata
+  /** Merge a partial branding/title-block metadata patch into the project. */
+  setProjectMeta: (patch: Partial<ProjectMeta>) => void;
 
   // undo / redo (project edits only)
   /** Restore the previous project state (no-op when the past stack is empty). */
@@ -139,6 +168,16 @@ function mapPanel(
     ...project,
     panels: project.panels.map((p) => (p.id === panelId ? fn(p) : p)),
   };
+}
+
+/** A structural deep clone (circuits are plain JSON-safe data). */
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/** Deep-clone a circuit, assigning it a fresh runtime id. */
+function cloneCircuit(circuit: CircuitInput): CircuitInput {
+  return { ...deepClone(circuit), id: nextId('c') };
 }
 
 /** Immutably map over a panel's circuits, replacing the one matching `circuitId`. */
@@ -201,6 +240,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   schematics: {},
   past: [],
   future: [],
+  circuitClipboard: null,
 
   setScreen: (screen) => set({ activeScreen: screen }),
   setActivePanel: (panelId) => set({ activePanelId: panelId }),
@@ -244,6 +284,76 @@ export const useProjectStore = create<ProjectState>((set) => ({
       ),
     ),
 
+  duplicateCircuit: (panelId, circuitId) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          const index = panel.circuits.findIndex((c) => c.id === circuitId);
+          if (index === -1) return panel;
+          const source = panel.circuits[index]!;
+          const copy: CircuitInput = { ...cloneCircuit(source), name: `${source.name} (copy)` };
+          const circuits = [...panel.circuits];
+          circuits.splice(index + 1, 0, copy);
+          return { ...panel, circuits };
+        }),
+      ),
+    ),
+
+  copyCircuit: (panelId, circuitId) =>
+    set((s) => {
+      const panel = s.project.panels.find((p) => p.id === panelId);
+      const circuit = panel?.circuits.find((c) => c.id === circuitId);
+      if (!circuit) return s;
+      // Deep clone so subsequent edits never reach back into the clipboard.
+      return { circuitClipboard: deepClone(circuit) };
+    }),
+
+  pasteCircuit: (panelId) =>
+    set((s) => {
+      const clip = s.circuitClipboard;
+      if (!clip) return s;
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: [...panel.circuits, cloneCircuit(clip)],
+        })),
+      );
+    }),
+
+  bulkUpdateCircuits: (panelId, ids, patch) =>
+    set((s) => {
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: panel.circuits.map((c) => (idSet.has(c.id) ? { ...c, ...patch } : c)),
+        })),
+      );
+    }),
+
+  removeCircuits: (panelId, ids) =>
+    set((s) => {
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: panel.circuits.filter((c) => !idSet.has(c.id)),
+        })),
+      );
+    }),
+
+  addCircuitConfigured: (panelId, circuit) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: [...panel.circuits, { ...circuit, id: nextId('c') }],
+        })),
+      ),
+    ),
+
   updatePanel: (panelId, patch) =>
     set((s) =>
       withHistory(s, (project) =>
@@ -272,6 +382,34 @@ export const useProjectStore = create<ProjectState>((set) => ({
       };
     }),
 
+  addPanelFromTemplate: (templateId) =>
+    set((s) => {
+      const template = findPanelTemplate(templateId);
+      if (!template) return s;
+      const newPanel = template.build();
+      // Disambiguate the name if a panel with this template name already exists.
+      const sameName = s.project.panels.filter((p) => p.name.startsWith(newPanel.name)).length;
+      if (sameName > 0) newPanel.name = `${newPanel.name} ${sameName + 1}`;
+      return {
+        ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
+        activePanelId: newPanel.id,
+        activeScreen: 'panel',
+      };
+    }),
+
+  setPanelOccupancy: (panelId, occupancy) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          if (occupancy === undefined) {
+            const { occupancy: _drop, ...rest } = panel;
+            return rest;
+          }
+          return { ...panel, occupancy };
+        }),
+      ),
+    ),
+
   applyFix: (panelId, circuitId, fix) =>
     set((s) => {
       const action = fix.action;
@@ -297,6 +435,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setEarthingSystem: (system) =>
     set((s) => withHistory(s, (project) => ({ ...project, earthingSystem: system }))),
+
+  setProjectMeta: (patch) =>
+    set((s) =>
+      withHistory(s, (project) => ({
+        ...project,
+        meta: { ...project.meta, ...patch },
+      })),
+    ),
 
   undo: () =>
     set((s) => {
@@ -474,3 +620,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }),
     })),
 }));
+
+/** Selector: whether an undo is currently available (the past stack is non-empty). */
+export const selectCanUndo = (s: ProjectState): boolean => s.past.length > 0;
+
+/** Selector: whether a redo is currently available (the future stack is non-empty). */
+export const selectCanRedo = (s: ProjectState): boolean => s.future.length > 0;
+
+/** Selector: whether a copied circuit is available to paste. */
+export const selectHasClipboard = (s: ProjectState): boolean => s.circuitClipboard !== null;

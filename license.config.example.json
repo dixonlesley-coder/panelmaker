@@ -1,0 +1,6 @@
+{
+  "_comment": "Template for the Google Workspace licensing gate. Copy to 'license.config.json' (gitignored) in the app's userData dir, OR prefer build-time env injection (see LICENSING.md). Do NOT commit real values.",
+  "GOOGLE_CLIENT_ID": "REPLACE_WITH_YOUR_DESKTOP_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+  "GOOGLE_CLIENT_SECRET": "REPLACE_WITH_YOUR_CLIENT_SECRET",
+  "ALLOWED_HD": "company.example"
+}

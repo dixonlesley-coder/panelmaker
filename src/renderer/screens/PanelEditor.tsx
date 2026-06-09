@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, Title } from '@mantine/core';
 import {
   IconAlertTriangle,
@@ -10,6 +11,8 @@ import {
   IconTable,
 } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
+import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
+import type { OccupancyType } from '@shared/types';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
@@ -21,9 +24,11 @@ import { useProjectStore } from '@renderer/state/projectStore';
 
 /** The single-panel editor: structured builder on the left, views on the right. */
 export function PanelEditor() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
+  const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
 
   // Compute the whole system so feeder loads aggregate correctly, then pick this panel.
   const system = useMemo(() => computeSystem(project), [project]);
@@ -32,11 +37,19 @@ export function PanelEditor() {
   const result = panel ? system.panels[panel.id] : undefined;
 
   const panelOptions = project.panels.map((p) => ({ value: p.id, label: p.name }));
+  const occupancyOptions = OCCUPANCY_TYPES.map((o) => ({
+    value: o,
+    label: OCCUPANCY_PRESETS[o].label,
+  }));
 
   if (!panel || !result) {
     return (
-      <Alert color="yellow" icon={<IconAlertTriangle size={18} />} title="No panel selected">
-        Select a panel from the System view or the dropdown above.
+      <Alert
+        color="yellow"
+        icon={<IconAlertTriangle size={18} />}
+        title={t('panel.noPanelTitle')}
+      >
+        {t('panel.noPanelBody')}
       </Alert>
     );
   }
@@ -48,25 +61,37 @@ export function PanelEditor() {
       <Group justify="space-between" align="flex-end">
         <div>
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Panel editor
+            {t('panel.eyebrow')}
           </Text>
           <Title order={3}>{panel.name}</Title>
         </div>
-        <Select
-          label="Active panel"
-          data={panelOptions}
-          value={activePanelId}
-          allowDeselect={false}
-          onChange={(v) => v && setActivePanel(v)}
-          w={280}
-        />
+        <Group gap="sm" align="flex-end">
+          <Select
+            label={t('panel.occupancy')}
+            placeholder={t('panel.occupancyPlaceholder')}
+            description={t('panel.occupancyHint')}
+            data={occupancyOptions}
+            value={panel.occupancy ?? null}
+            clearable
+            onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
+            w={210}
+          />
+          <Select
+            label={t('panel.activePanel')}
+            data={panelOptions}
+            value={activePanelId}
+            allowDeselect={false}
+            onChange={(v) => v && setActivePanel(v)}
+            w={240}
+          />
+        </Group>
       </Group>
 
       <Grid gutter="md" align="stretch">
         <Grid.Col span={{ base: 12, lg: 5 }}>
           <Card withBorder radius="md" padding="md" h="100%">
             <Group justify="space-between" mb="xs">
-              <Text fw={600}>Circuit builder</Text>
+              <Text fw={600}>{t('panel.circuitBuilder')}</Text>
               <Text size="xs" c="dimmed">
                 {panel.system} · {panel.voltageV} V
               </Text>
@@ -80,19 +105,19 @@ export function PanelEditor() {
             <Tabs defaultValue="sld" keepMounted={false}>
               <Tabs.List mb="md">
                 <Tabs.Tab value="sld" leftSection={<IconSitemap size={16} />}>
-                  Single-line
+                  {t('panel.tabSingleLine')}
                 </Tabs.Tab>
                 <Tabs.Tab value="schematic" leftSection={<IconCpu size={16} />}>
-                  Control schematic
+                  {t('panel.tabSchematic')}
                 </Tabs.Tab>
                 <Tabs.Tab value="layout" leftSection={<IconLayoutGrid size={16} />}>
-                  Layout
+                  {t('panel.tabLayout')}
                 </Tabs.Tab>
                 <Tabs.Tab value="schedule" leftSection={<IconColumns size={16} />}>
-                  Cable schedule
+                  {t('panel.tabSchedule')}
                 </Tabs.Tab>
                 <Tabs.Tab value="results" leftSection={<IconTable size={16} />}>
-                  Results
+                  {t('panel.tabResults')}
                 </Tabs.Tab>
                 <Tabs.Tab
                   value="issues"
@@ -105,7 +130,7 @@ export function PanelEditor() {
                     ) : null
                   }
                 >
-                  Issues
+                  {t('panel.tabIssues')}
                 </Tabs.Tab>
               </Tabs.List>
 

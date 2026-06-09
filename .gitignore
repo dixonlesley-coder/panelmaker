@@ -12,3 +12,8 @@ coverage/
 *.sqlite-journal
 panelmaker.db*
 .panelmaker/
+
+# Licensing (Google Workspace gate) — never commit secrets or session state.
+license.config.json
+license.json
+machine.id

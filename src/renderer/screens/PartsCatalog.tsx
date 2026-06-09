@@ -1,14 +1,26 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge, Card, Group, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import type { Part } from '@shared/types';
 import { formatIdr } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
 
-/** Render a part's most relevant attributes as a compact summary string. */
+/** The order code / SKU of a part, when it carries one. */
+function skuOf(part: Part): string | undefined {
+  const sku = part.attributes.sku;
+  return typeof sku === 'string' && sku.length > 0 ? sku : undefined;
+}
+
+/**
+ * Render a part's most relevant attributes as a compact summary string. The SKU
+ * is shown in its own column, so it is excluded here to avoid duplication.
+ */
 function summarizeAttributes(part: Part): string {
   const a = part.attributes;
-  const keys = Object.keys(a).slice(0, 4);
+  const keys = Object.keys(a)
+    .filter((k) => k !== 'sku')
+    .slice(0, 4);
   return keys
     .map((k) => `${k}: ${String(a[k])}`)
     .join(' · ');
@@ -26,6 +38,7 @@ function groupByCategory(parts: Part[]): Map<string, Part[]> {
 }
 
 export function PartsCatalog() {
+  const { t } = useTranslation();
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const [query, setQuery] = useState('');
@@ -34,7 +47,7 @@ export function PartsCatalog() {
     const q = query.trim().toLowerCase();
     if (!q) return parts;
     return parts.filter((p) => {
-      const haystack = [p.manufacturer, p.model, p.category, p.id, summarizeAttributes(p)]
+      const haystack = [p.manufacturer, p.model, p.category, p.id, skuOf(p) ?? '', summarizeAttributes(p)]
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
@@ -48,12 +61,12 @@ export function PartsCatalog() {
       <Group justify="space-between" align="flex-end">
         <div>
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Catalog
+            {t('parts.eyebrow')}
           </Text>
-          <Title order={3}>Parts</Title>
+          <Title order={3}>{t('parts.title')}</Title>
         </div>
         <TextInput
-          placeholder="Search manufacturer, model, attribute…"
+          placeholder={t('parts.searchPlaceholder')}
           leftSection={<IconSearch size={16} />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
@@ -63,7 +76,7 @@ export function PartsCatalog() {
 
       {grouped.size === 0 && (
         <Text c="dimmed" ta="center" py="xl">
-          No parts match “{query}”.
+          {t('parts.noMatch', { query })}
         </Text>
       )}
 
@@ -74,24 +87,26 @@ export function PartsCatalog() {
               {category}
             </Badge>
             <Text size="xs" c="dimmed">
-              {items.length} item{items.length === 1 ? '' : 's'}
+              {t('parts.items', { count: items.length })}
             </Text>
           </Group>
-          <Table.ScrollContainer minWidth={620}>
+          <Table.ScrollContainer minWidth={760}>
             <Table verticalSpacing="xs" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th w={140}>Manufacturer</Table.Th>
-                  <Table.Th w={170}>Model</Table.Th>
-                  <Table.Th>Attributes</Table.Th>
+                  <Table.Th w={140}>{t('parts.manufacturer')}</Table.Th>
+                  <Table.Th w={170}>{t('parts.model')}</Table.Th>
+                  <Table.Th w={150}>{t('parts.orderCode')}</Table.Th>
+                  <Table.Th>{t('parts.attributes')}</Table.Th>
                   <Table.Th w={150} ta="right">
-                    Price
+                    {t('parts.price')}
                   </Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {items.map((part) => {
                   const price = prices[part.id];
+                  const sku = skuOf(part);
                   return (
                     <Table.Tr key={part.id}>
                       <Table.Td>{part.manufacturer}</Table.Td>
@@ -99,6 +114,17 @@ export function PartsCatalog() {
                         <Text size="sm" fw={500}>
                           {part.model}
                         </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        {sku ? (
+                          <Text size="xs" ff="monospace">
+                            {sku}
+                          </Text>
+                        ) : (
+                          <Text size="xs" c="dimmed">
+                            —
+                          </Text>
+                        )}
                       </Table.Td>
                       <Table.Td>
                         <Text size="xs" c="dimmed">
@@ -112,7 +138,7 @@ export function PartsCatalog() {
                           </Text>
                         ) : (
                           <Badge size="xs" variant="light" color="gray">
-                            no price
+                            {t('parts.noPrice')}
                           </Badge>
                         )}
                       </Table.Td>

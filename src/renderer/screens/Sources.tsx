@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Card,
   Group,
@@ -70,6 +71,7 @@ function SourceHeader({
 
 /** Configure distributed energy sources and see them sized against the demand. */
 export function Sources() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const updateSources = useProjectStore((s) => s.updateSources);
   const system = useMemo(() => computeSystem(project), [project]);
@@ -87,12 +89,11 @@ export function Sources() {
     <Stack gap="md">
       <div>
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Power sources
+          {t('sources.eyebrow')}
         </Text>
-        <Title order={3}>Energy sources</Title>
+        <Title order={3}>{t('sources.title')}</Title>
         <Text size="sm" c="dimmed">
-          Building demand: <b>{system.supply.demandKva} kVA</b>. Enable backup and renewable sources
-          to size them against it.
+          {t('sources.demandIntro', { kva: system.supply.demandKva })}
         </Text>
       </div>
 
@@ -100,7 +101,7 @@ export function Sources() {
       <Card withBorder radius="md" padding="md">
         <SourceHeader
           icon={<IconBolt size={16} />}
-          title="Generator (genset)"
+          title={t('sources.generator')}
           enabled={gen.enabled}
           onToggle={(v) => setGen({ enabled: v })}
         />
@@ -108,7 +109,7 @@ export function Sources() {
           <>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm">
               <NumberInput
-                label="Backup of demand (%)"
+                label={t('sources.backupOfDemand')}
                 value={Math.round(gen.backupFraction * 100)}
                 min={10}
                 max={100}
@@ -117,13 +118,13 @@ export function Sources() {
               />
               <div>
                 <Text size="sm" fw={500} mb={4}>
-                  Duty
+                  {t('sources.duty')}
                 </Text>
                 <SegmentedControl
                   fullWidth
                   data={[
-                    { value: 'standby', label: 'Standby' },
-                    { value: 'prime', label: 'Prime' },
+                    { value: 'standby', label: t('sources.dutyStandby') },
+                    { value: 'prime', label: t('sources.dutyPrime') },
                   ]}
                   value={gen.mode}
                   onChange={(v) => setGen({ mode: v as GeneratorMode })}
@@ -134,9 +135,9 @@ export function Sources() {
               <ResultBlock
                 note={res.generator.note}
                 stats={[
-                  ['Genset rating', `${res.generator.ratingKva} kVA`],
-                  ['Backup load', `${res.generator.backupKva} kVA`],
-                  ['Duty', res.generator.mode],
+                  [t('sources.gensetRating'), `${res.generator.ratingKva} kVA`],
+                  [t('sources.backupLoad'), `${res.generator.backupKva} kVA`],
+                  [t('sources.duty'), res.generator.mode],
                 ]}
               />
             )}
@@ -148,7 +149,7 @@ export function Sources() {
       <Card withBorder radius="md" padding="md">
         <SourceHeader
           icon={<IconSun size={16} />}
-          title="Solar PV + inverter"
+          title={t('sources.solarPv')}
           enabled={solar.enabled}
           onToggle={(v) => setSolar({ enabled: v })}
         />
@@ -156,21 +157,21 @@ export function Sources() {
           <>
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="sm">
               <NumberInput
-                label="Target array (kWp)"
+                label={t('sources.targetArray')}
                 value={solar.targetKwp}
                 min={1}
                 step={5}
                 onChange={(v) => setSolar({ targetKwp: typeof v === 'number' ? v : solar.targetKwp })}
               />
               <NumberInput
-                label="Panel power (Wp)"
+                label={t('sources.panelPower')}
                 value={solar.panelWp}
                 min={100}
                 step={10}
                 onChange={(v) => setSolar({ panelWp: typeof v === 'number' ? v : solar.panelWp })}
               />
               <NumberInput
-                label="DC/AC ratio"
+                label={t('sources.dcAcRatio')}
                 value={solar.dcAcRatio}
                 min={1}
                 max={1.5}
@@ -183,11 +184,11 @@ export function Sources() {
               <ResultBlock
                 note={res.solar.note}
                 stats={[
-                  ['Panels', `${res.solar.panelCount} × ${res.solar.panelWp} Wp`],
-                  ['Array', `${res.solar.arrayKwp} kWp`],
-                  ['Inverter', `${res.solar.inverterKw} kW`],
-                  ['Strings', `${res.solar.strings} × ${res.solar.stringSize}`],
-                  ['Daily yield', `${res.solar.dailyKwh} kWh`],
+                  [t('sources.panels'), `${res.solar.panelCount} × ${res.solar.panelWp} Wp`],
+                  [t('sources.array'), `${res.solar.arrayKwp} kWp`],
+                  [t('sources.inverter'), `${res.solar.inverterKw} kW`],
+                  [t('sources.strings'), `${res.solar.strings} × ${res.solar.stringSize}`],
+                  [t('sources.dailyYield'), `${res.solar.dailyKwh} kWh`],
                 ]}
               />
             )}
@@ -199,7 +200,7 @@ export function Sources() {
       <Card withBorder radius="md" padding="md">
         <SourceHeader
           icon={<IconBattery size={16} />}
-          title="Backup battery + inverter"
+          title={t('sources.battery')}
           enabled={batt.enabled}
           onToggle={(v) => setBatt({ enabled: v })}
         />
@@ -207,14 +208,14 @@ export function Sources() {
           <>
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="sm">
               <NumberInput
-                label="Backup load (kW)"
+                label={t('sources.backupLoadKw')}
                 value={batt.backupKw}
                 min={1}
                 step={1}
                 onChange={(v) => setBatt({ backupKw: typeof v === 'number' ? v : batt.backupKw })}
               />
               <NumberInput
-                label="Autonomy (hours)"
+                label={t('sources.autonomyHours')}
                 value={batt.autonomyHours}
                 min={0.5}
                 step={0.5}
@@ -224,7 +225,7 @@ export function Sources() {
                 }
               />
               <Select
-                label="Chemistry"
+                label={t('sources.chemistry')}
                 data={[
                   { value: 'lifepo4', label: 'LiFePO4' },
                   { value: 'lead_acid', label: 'Lead-acid' },
@@ -238,10 +239,10 @@ export function Sources() {
               <ResultBlock
                 note={res.battery.note}
                 stats={[
-                  ['Required', `${res.battery.requiredKwh} kWh`],
-                  ['Installed', `${res.battery.installedKwh} kWh`],
-                  ['Modules', `${res.battery.moduleCount} × ${res.battery.moduleKwh} kWh`],
-                  ['Inverter', `${res.battery.inverterKw} kW`],
+                  [t('sources.required'), `${res.battery.requiredKwh} kWh`],
+                  [t('sources.installed'), `${res.battery.installedKwh} kWh`],
+                  [t('sources.modules'), `${res.battery.moduleCount} × ${res.battery.moduleKwh} kWh`],
+                  [t('sources.inverter'), `${res.battery.inverterKw} kW`],
                 ]}
               />
             )}

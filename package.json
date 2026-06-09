@@ -5,6 +5,7 @@
   "description": "Offline electrical panel & system designer (PUIL 2011 / IEC 60364 / IEC 60947)",
   "license": "MIT",
   "type": "module",
+  "main": "out/main/index.js",
   "engines": {
     "node": ">=20"
   },
@@ -18,6 +19,7 @@
     "lint": "eslint . --ext .ts,.tsx"
   },
   "devDependencies": {
+    "@electron/fuses": "^2.1.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "@types/pdfmake": "^0.2.11",
@@ -44,9 +46,12 @@
     "drizzle-orm": "^0.38.3",
     "electron-updater": "^6.3.9",
     "elkjs": "^0.9.3",
+    "i18next": "^26.3.1",
+    "jose": "^6.2.3",
     "pdfmake": "^0.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.8",
     "recharts": "^2.13.0",
     "xlsx": "^0.18.5",
     "zod": "^3.24.1",

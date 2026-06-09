@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   ActionIcon,
   Alert,
@@ -50,13 +51,17 @@ function formatWhen(iso: string): string {
 function ok(message: string) {
   notifications.show({ message, color: 'teal' });
 }
-function fail(message: string) {
-  notifications.show({ message, color: 'red', title: 'Project error' });
-}
 
 /** Multi-project management: create / open / duplicate / rename / delete + import / export. */
 export function Projects() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
+  /** Show a red error toast with the localized "Project error" title. */
+  const fail = useCallback(
+    (message: string) =>
+      notifications.show({ message, color: 'red', title: t('projects.errorTitle') }),
+    [t],
+  );
   const replaceProject = useProjectStore((s) => s.replaceProject);
   const setScreen = useProjectStore((s) => s.setScreen);
   const newProject = useProjectStore((s) => s.newProject);
@@ -80,7 +85,7 @@ export function Projects() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fail]);
 
   useEffect(() => {
     void refresh();
@@ -90,7 +95,7 @@ export function Projects() {
     setBusy(true);
     try {
       await newProject();
-      ok('Created a new project.');
+      ok(t('projects.createdToast'));
       await refresh();
       setScreen('system');
     } catch (e) {
@@ -105,10 +110,10 @@ export function Projects() {
     try {
       const opened = await openProject(id);
       if (opened) {
-        ok('Project opened.');
+        ok(t('projects.openedToast'));
         setScreen('system');
       } else {
-        fail('That project could not be loaded.');
+        fail(t('projects.openFailedToast'));
       }
     } catch (e) {
       fail((e as Error).message);
@@ -121,7 +126,7 @@ export function Projects() {
     setBusy(true);
     try {
       await duplicateActiveProject();
-      ok(`Duplicated "${project.name}".`);
+      ok(t('projects.duplicatedToast', { name: project.name }));
       await refresh();
     } catch (e) {
       fail((e as Error).message);
@@ -140,7 +145,7 @@ export function Projects() {
     if (!id) return;
     const name = renameValue.trim();
     if (name.length === 0) {
-      fail('Project name cannot be empty.');
+      fail(t('projects.nameEmpty'));
       return;
     }
     setBusy(true);
@@ -150,10 +155,10 @@ export function Projects() {
       } else {
         // Rename a non-active stored project: load it, patch the name, save back.
         const stored = await registryLoadProject(id);
-        if (!stored) throw new Error('Project not found.');
+        if (!stored) throw new Error(t('projects.notFound'));
         await registrySaveProject({ ...stored, name });
       }
-      ok('Project renamed.');
+      ok(t('projects.renamedToast'));
       setRenaming(null);
       await refresh();
     } catch (e) {
@@ -169,7 +174,7 @@ export function Projects() {
       const imported = await pickAndReadProjectFile();
       replaceProject(imported);
       await registrySaveProject(imported);
-      ok(`Imported "${imported.name}".`);
+      ok(t('projects.importedToast', { name: imported.name }));
       await refresh();
       setScreen('system');
     } catch (e) {
@@ -184,7 +189,7 @@ export function Projects() {
   function onExport() {
     try {
       downloadProjectFile(project);
-      ok(`Exported "${project.name}".`);
+      ok(t('projects.exportedToast', { name: project.name }));
     } catch (e) {
       fail((e as Error).message);
     }
@@ -200,7 +205,7 @@ export function Projects() {
         // The active project was deleted — start fresh so the app stays usable.
         await newProject();
       }
-      ok(removed ? `Deleted "${target.name}".` : 'Nothing to delete.');
+      ok(removed ? t('projects.deletedToast', { name: target.name }) : t('projects.nothingToDelete'));
       setDeleting(null);
       await refresh();
     } catch (e) {
@@ -214,19 +219,17 @@ export function Projects() {
     <Stack gap="md">
       <div>
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Workspace
+          {t('projects.eyebrow')}
         </Text>
-        <Title order={3}>Projects</Title>
+        <Title order={3}>{t('projects.title')}</Title>
         <Text size="sm" c="dimmed">
-          Create, open, duplicate, rename or delete projects, and import/export portable
-          project files.
+          {t('projects.subtitle')}
         </Text>
       </div>
 
       {!isDesktop() && (
         <Alert color="blue" icon={<IconInfoCircle size={16} />} variant="light">
-          Running in the browser — projects are stored locally in this browser. Export to a
-          file to move a project between machines or into the desktop app.
+          {t('projects.webNote')}
         </Alert>
       )}
 
@@ -234,12 +237,11 @@ export function Projects() {
         <Group justify="space-between" align="flex-start">
           <div>
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-              Active project
+              {t('projects.activeProject')}
             </Text>
             <Title order={4}>{project.name}</Title>
             <Text size="sm" c="dimmed">
-              {project.panels.length} panel{project.panels.length === 1 ? '' : 's'} · id{' '}
-              {project.id}
+              {t('projects.panelCount', { count: project.panels.length, id: project.id })}
             </Text>
           </div>
           <Group gap="xs">
@@ -249,14 +251,14 @@ export function Projects() {
               onClick={onDuplicate}
               loading={busy}
             >
-              Duplicate
+              {t('common.duplicate')}
             </Button>
             <Button
               variant="light"
               leftSection={<IconDownload size={16} />}
               onClick={onExport}
             >
-              Export
+              {t('common.export')}
             </Button>
             <Button
               variant="light"
@@ -264,10 +266,10 @@ export function Projects() {
               onClick={onImport}
               loading={busy}
             >
-              Import
+              {t('common.import')}
             </Button>
             <Button leftSection={<IconPlus size={16} />} onClick={onNew} loading={busy}>
-              New
+              {t('projects.newProject')}
             </Button>
           </Group>
         </Group>
@@ -276,13 +278,17 @@ export function Projects() {
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="sm">
           <Group gap="xs">
-            <Title order={5}>Stored projects</Title>
+            <Title order={5}>{t('projects.storedProjects')}</Title>
             <Badge variant="light" color="gray">
               {projects.length}
             </Badge>
           </Group>
-          <Tooltip label="Refresh list">
-            <ActionIcon variant="default" onClick={() => void refresh()} aria-label="Refresh">
+          <Tooltip label={t('projects.refreshList')}>
+            <ActionIcon
+              variant="default"
+              onClick={() => void refresh()}
+              aria-label={t('projects.refresh')}
+            >
               <IconRefresh size={16} />
             </ActionIcon>
           </Tooltip>
@@ -294,17 +300,17 @@ export function Projects() {
           </Group>
         ) : projects.length === 0 ? (
           <Text size="sm" c="dimmed">
-            No saved projects yet. The active project is saved automatically as you edit.
+            {t('projects.noProjects')}
           </Text>
         ) : (
           <ScrollArea.Autosize mah={420}>
             <Table stickyHeader highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th ta="center">Panels</Table.Th>
-                  <Table.Th>Updated</Table.Th>
-                  <Table.Th ta="right">Actions</Table.Th>
+                  <Table.Th>{t('projects.colName')}</Table.Th>
+                  <Table.Th ta="center">{t('projects.colPanels')}</Table.Th>
+                  <Table.Th>{t('projects.colUpdated')}</Table.Th>
+                  <Table.Th ta="right">{t('projects.colActions')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -317,7 +323,7 @@ export function Projects() {
                           <Text fw={active ? 600 : 400}>{p.name}</Text>
                           {active && (
                             <Badge size="xs" color="indigo" variant="light">
-                              active
+                              {t('projects.active')}
                             </Badge>
                           )}
                         </Group>
@@ -330,33 +336,33 @@ export function Projects() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4} justify="flex-end">
-                          <Tooltip label="Open">
+                          <Tooltip label={t('projects.openTip')}>
                             <ActionIcon
                               variant="subtle"
                               onClick={() => void onOpen(p.id)}
                               disabled={busy}
-                              aria-label={`Open ${p.name}`}
+                              aria-label={t('projects.openAria', { name: p.name })}
                             >
                               <IconFolderOpen size={16} />
                             </ActionIcon>
                           </Tooltip>
-                          <Tooltip label="Rename">
+                          <Tooltip label={t('projects.renameTip')}>
                             <ActionIcon
                               variant="subtle"
                               onClick={() => startRename(p)}
                               disabled={busy}
-                              aria-label={`Rename ${p.name}`}
+                              aria-label={t('projects.renameAria', { name: p.name })}
                             >
                               <IconPencil size={16} />
                             </ActionIcon>
                           </Tooltip>
-                          <Tooltip label="Delete">
+                          <Tooltip label={t('projects.deleteTip')}>
                             <ActionIcon
                               variant="subtle"
                               color="red"
                               onClick={() => setDeleting(p)}
                               disabled={busy}
-                              aria-label={`Delete ${p.name}`}
+                              aria-label={t('projects.deleteAria', { name: p.name })}
                             >
                               <IconTrash size={16} />
                             </ActionIcon>
@@ -375,12 +381,12 @@ export function Projects() {
       <Modal
         opened={renaming !== null}
         onClose={() => setRenaming(null)}
-        title="Rename project"
+        title={t('projects.renameTitle')}
         centered
       >
         <Stack>
           <TextInput
-            label="Project name"
+            label={t('projects.projectName')}
             value={renameValue}
             onChange={(e) => setRenameValue(e.currentTarget.value)}
             data-autofocus
@@ -390,10 +396,10 @@ export function Projects() {
           />
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setRenaming(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => void confirmRename()} loading={busy}>
-              Save
+              {t('common.save')}
             </Button>
           </Group>
         </Stack>
@@ -402,21 +408,22 @@ export function Projects() {
       <Modal
         opened={deleting !== null}
         onClose={() => setDeleting(null)}
-        title="Delete project"
+        title={t('projects.deleteTitle')}
         centered
       >
         <Stack>
           <Text size="sm">
-            Delete <b>{deleting?.name}</b>? This cannot be undone.
-            {deleting?.id === project.id &&
-              ' This is the active project — a new blank project will open in its place.'}
+            <Trans i18nKey="projects.deleteBody" values={{ name: deleting?.name ?? '' }}>
+              Delete <b>{deleting?.name}</b>? This cannot be undone.
+            </Trans>
+            {deleting?.id === project.id && t('projects.deleteActiveSuffix')}
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setDeleting(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button color="red" onClick={() => void confirmDelete()} loading={busy}>
-              Delete
+              {t('common.delete')}
             </Button>
           </Group>
         </Stack>

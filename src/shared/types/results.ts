@@ -101,6 +101,28 @@ export interface CircuitResult {
   zsMaxOhm?: number;
   /** True when Zs <= Zs_max (automatic disconnection within the limit). */
   disconnectsInTime?: boolean;
+  /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
+  containment?: ContainmentResult;
+}
+
+/** Conduit sizing + fill for a single circuit cable. */
+export interface ContainmentResult {
+  /** Estimated cable outer diameter (mm). */
+  cableOdMm: number;
+  /** Smallest standard conduit nominal size that satisfies the fill rule (mm). */
+  conduitSizeMm: number;
+  /** Conduit fill (%) — cable area over the conduit's usable bore area. */
+  fillPct: number;
+}
+
+/** Cable-tray sizing for all of a panel's outgoing cables (single-layer). */
+export interface CableTrayResult {
+  /** Smallest standard tray width that holds the cables side-by-side (mm). */
+  widthMm: number;
+  /** Tray width utilisation (%). */
+  fillPct: number;
+  /** Number of cables carried. */
+  cableCount: number;
 }
 
 export interface BusbarResult {
@@ -120,6 +142,51 @@ export interface EnclosureResult {
   ventilation: Ventilation;
   modules: number;
   rows: number;
+}
+
+/**
+ * Harmonics / power-quality estimate for a panel carrying non-linear
+ * (electronically switched) loads — VFDs, soft-starters, UPS and 6-pulse
+ * rectifier loads. See `engine/harmonics`.
+ */
+export interface HarmonicsResult {
+  /** Non-linear demand over total panel demand (0-1). */
+  nonLinearFraction: number;
+  /** Recommended neutral-current multiplier of phase current (1.0 = standard). */
+  neutralOversizeFactor: number;
+  /**
+   * Recommended neutral CSA (mm^2) for the panel's largest neutral, oversized
+   * for triplen-harmonic content. Equals the phase CSA when no oversize needed.
+   */
+  recommendedNeutralCsaMm2: number;
+  /** True when a 6-pulse input line reactor is recommended. */
+  reactorRecommended: boolean;
+  /** Recommended input line-reactor impedance (% Z) when reactorRecommended. */
+  reactorPctZ: number;
+  /** True when a harmonic filter (passive/active) is recommended. */
+  filterRecommended: boolean;
+  /** Qualitative voltage/current THD band. */
+  thdBand: 'low' | 'moderate' | 'high';
+  note: string;
+}
+
+/**
+ * Simplified arc-flash / incident-energy estimate for a panel bus — a Ralph Lee
+ * approximation mapped to an NFPA 70E PPE category. A design risk-screen, NOT a
+ * full IEEE 1584 study. See `engine/arcFlash`.
+ */
+export interface ArcFlashResult {
+  /** Estimated incident energy at the working distance (cal/cm²). */
+  incidentEnergyCalCm2: number;
+  /** Working distance the estimate is referenced to (mm). */
+  workingDistanceMm: number;
+  /** Assumed arcing (clearing) time (s). */
+  arcingTimeS: number;
+  /** NFPA 70E PPE category label. */
+  ppeCategory: string;
+  /** Arc-flash boundary distance where incident energy falls to 1.2 cal/cm² (mm). */
+  arcFlashBoundaryMm: number;
+  note: string;
 }
 
 export type WarningSeverity = 'info' | 'warning' | 'error';
@@ -143,6 +210,8 @@ export interface Warning {
 
 export interface BomLine {
   partId?: string;
+  /** Manufacturer order code / SKU of the matched part, when it carries one. */
+  sku?: string;
   description: string;
   category: string;
   qty: number;
@@ -158,6 +227,52 @@ export interface CostResult {
   unmatchedCount: number;
 }
 
+/** One labelled line of a quotation breakdown (Material, Labor, …). */
+export interface QuotationSection {
+  /** Section label, e.g. "Material", "Labor", "Margin". */
+  label: string;
+  /** Section amount in the quote currency. */
+  amount: number;
+}
+
+/**
+ * Commercial quotation / proposal total for a project: the priced material BOM
+ * plus assembly labor, with overhead, contingency and margin mark-ups rolled up
+ * into a sell price. Produced by `computeQuotation` (pure engine).
+ */
+export interface QuotationResult {
+  /** Priced material BOM (the consolidated, costed lines that were quoted). */
+  lines: BomLine[];
+  /** Sum of the matched material line totals. */
+  materialSubtotal: number;
+  /** Total assembly man-hours derived from the BOM via the labor standard. */
+  laborHours: number;
+  /** Labor cost = laborHours × the labor rate. */
+  laborSubtotal: number;
+  /** Overhead loading on (material + labor). */
+  overhead: number;
+  /** Contingency / risk allowance on (material + labor). */
+  contingency: number;
+  /** The cost base the margin is applied to (material + labor + overhead + contingency). */
+  marginBase: number;
+  /** Profit margin on the cost base. */
+  margin: number;
+  /** Final sell price = marginBase + margin. */
+  grandTotal: number;
+  currency: string;
+  /** The settings actually used (after defaults were applied), for display. */
+  settings: {
+    laborRatePerHour: number;
+    overheadPct: number;
+    marginPct: number;
+    contingencyPct: number;
+  };
+  /** Ordered breakdown sections for tabular display. */
+  sections: QuotationSection[];
+  /** Standards version the labor figures were taken from. */
+  standardsVersion: string;
+}
+
 export interface PanelResult {
   panelId: string;
   name: string;
@@ -171,6 +286,12 @@ export interface PanelResult {
   standardsVersion: string;
   /** Prospective 3-phase symmetrical fault current at this panel's bus (kA). */
   faultLevelKa?: number;
+  /** Harmonics / power-quality estimate, when non-linear loads are present. */
+  harmonics?: HarmonicsResult;
+  /** Simplified arc-flash incident-energy estimate at the bus, when fault known. */
+  arcFlash?: ArcFlashResult;
+  /** Cable-tray sizing for the panel's outgoing cables. */
+  cableTray?: CableTrayResult;
 }
 
 /** A 24-hour building demand profile and peak analysis. */
@@ -205,6 +326,27 @@ export interface CapacitorBankResult {
   note: string;
 }
 
+/**
+ * Current-based discrimination report for one upstream→downstream device pair
+ * (feeder breaker vs the sub-panel's largest branch breaker). `selective` is a
+ * first-pass screen on the rating ratio; full coordination needs manufacturer
+ * time-current / let-through curves.
+ */
+export interface SelectivityEntry {
+  upstreamPanelId: string;
+  upstreamCircuitId: string;
+  upstreamName: string;
+  upstreamRatingA: number;
+  downstreamPanelId: string;
+  downstreamName: string;
+  downstreamRatingA: number;
+  /** Upstream rating / downstream rating. */
+  ratio: number;
+  /** True when ratio meets the discrimination rule of thumb. */
+  selective: boolean;
+  marginNote: string;
+}
+
 export interface SystemResult {
   projectId: string;
   panels: Record<string, PanelResult>;
@@ -217,6 +359,8 @@ export interface SystemResult {
   powerFactor: CapacitorBankResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
+  /** Current-based discrimination report per cascaded device pair. */
+  selectivity?: SelectivityEntry[];
   totals: {
     connectedLoadW: number;
     panelCount: number;

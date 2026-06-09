@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { AppShell, Center, Group, Loader, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import { AppShell, Center, Group, Loader, Menu, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import {
   IconSun,
   IconMoon,
@@ -9,18 +10,31 @@ import {
   IconAdjustmentsBolt,
   IconBox,
   IconReceipt,
+  IconReceipt2,
   IconSolarPanel,
   IconSettings,
   IconBolt,
+  IconArrowBackUp,
+  IconArrowForwardUp,
+  IconLanguage,
+  IconCheck,
 } from '@tabler/icons-react';
 
-import { useProjectStore, type Screen } from '@renderer/state/projectStore';
+import { setLanguage, SUPPORTED_LANGUAGES, type Language } from '@renderer/i18n';
+
+import {
+  useProjectStore,
+  selectCanUndo,
+  selectCanRedo,
+  type Screen,
+} from '@renderer/state/projectStore';
 import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
 import { Dashboard } from '@renderer/screens/Dashboard';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
+import { Quotation } from '@renderer/screens/Quotation';
 import { Sources } from '@renderer/screens/Sources';
 import { Settings } from '@renderer/screens/Settings';
 import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
@@ -29,37 +43,116 @@ import { AutosaveIndicator } from '@renderer/features/autosave/AutosaveIndicator
 
 interface NavItem {
   screen: Screen;
-  label: string;
+  /** Translation key under the `nav.*` namespace. */
+  labelKey: string;
   icon: React.ReactNode;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { screen: 'projects', label: 'Projects', icon: <IconFolder size={18} /> },
-  { screen: 'system', label: 'System', icon: <IconSitemap size={18} /> },
-  { screen: 'dashboard', label: 'Dashboard', icon: <IconGauge size={18} /> },
-  { screen: 'panel', label: 'Panel Editor', icon: <IconAdjustmentsBolt size={18} /> },
-  { screen: 'parts', label: 'Parts Catalog', icon: <IconBox size={18} /> },
-  { screen: 'pricelist', label: 'Pricelist', icon: <IconReceipt size={18} /> },
-  { screen: 'sources', label: 'Energy Sources', icon: <IconSolarPanel size={18} /> },
-  { screen: 'settings', label: 'Settings', icon: <IconSettings size={18} /> },
+  { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
+  { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
+  { screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> },
+  { screen: 'panel', labelKey: 'nav.panel', icon: <IconAdjustmentsBolt size={18} /> },
+  { screen: 'parts', labelKey: 'nav.parts', icon: <IconBox size={18} /> },
+  { screen: 'pricelist', labelKey: 'nav.pricelist', icon: <IconReceipt size={18} /> },
+  { screen: 'quotation', labelKey: 'nav.quotation', icon: <IconReceipt2 size={18} /> },
+  { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
+  { screen: 'settings', labelKey: 'nav.settings', icon: <IconSettings size={18} /> },
 ];
 
 /** Toggle between light and dark color schemes. */
 function ColorSchemeToggle() {
+  const { t } = useTranslation();
   const { setColorScheme } = useMantineColorScheme();
   const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computed === 'dark';
   return (
-    <Tooltip label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+    <Tooltip label={isDark ? t('colorScheme.toLight') : t('colorScheme.toDark')}>
       <ActionIcon
         variant="default"
         size="lg"
-        aria-label="Toggle color scheme"
+        aria-label={t('colorScheme.toggle')}
         onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
       >
         {isDark ? <IconSun size={18} /> : <IconMoon size={18} />}
       </ActionIcon>
     </Tooltip>
+  );
+}
+
+/** Endonyms for the shipped languages (shown in their own language by convention). */
+const LANGUAGE_LABELS: Record<Language, string> = {
+  en: 'English',
+  id: 'Bahasa Indonesia',
+};
+
+/** Compact UI-language picker for the header (mirrors the Settings switcher). */
+function LanguageMenu() {
+  const { t, i18n } = useTranslation();
+  const current = (i18n.resolvedLanguage as Language | undefined) ?? 'en';
+  return (
+    <Menu shadow="md" width={200} position="bottom-end" withinPortal>
+      <Menu.Target>
+        <Tooltip label={t('settings.language')}>
+          <ActionIcon variant="default" size="lg" aria-label={t('settings.language')}>
+            <IconLanguage size={18} />
+          </ActionIcon>
+        </Tooltip>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {SUPPORTED_LANGUAGES.map((lng) => (
+          <Menu.Item
+            key={lng}
+            onClick={() => setLanguage(lng)}
+            leftSection={
+              lng === current ? <IconCheck size={14} /> : <span style={{ display: 'inline-block', width: 14 }} />
+            }
+          >
+            {LANGUAGE_LABELS[lng]}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
+/** Platform-aware modifier label for the undo/redo shortcut tooltips. */
+const MOD_KEY =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+
+/** Undo / redo buttons, disabled when the matching history stack is empty. */
+function HistoryControls() {
+  const { t } = useTranslation();
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
+  const canUndo = useProjectStore(selectCanUndo);
+  const canRedo = useProjectStore(selectCanRedo);
+
+  return (
+    <Group gap={4}>
+      <Tooltip label={`${t('history.undo')} (${MOD_KEY}+Z)`}>
+        <ActionIcon
+          variant="default"
+          size="lg"
+          aria-label={t('history.undo')}
+          disabled={!canUndo}
+          onClick={() => undo()}
+        >
+          <IconArrowBackUp size={18} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label={`${t('history.redo')} (${MOD_KEY}+Shift+Z)`}>
+        <ActionIcon
+          variant="default"
+          size="lg"
+          aria-label={t('history.redo')}
+          disabled={!canRedo}
+          onClick={() => redo()}
+        >
+          <IconArrowForwardUp size={18} />
+        </ActionIcon>
+      </Tooltip>
+    </Group>
   );
 }
 
@@ -77,6 +170,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
       return <PartsCatalog />;
     case 'pricelist':
       return <Pricelist />;
+    case 'quotation':
+      return <Quotation />;
     case 'sources':
       return <Sources />;
     case 'settings':
@@ -97,6 +192,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function App() {
+  const { t } = useTranslation();
   const activeScreen = useProjectStore((s) => s.activeScreen);
   const setScreen = useProjectStore((s) => s.setScreen);
   const projectName = useProjectStore((s) => s.project.name);
@@ -147,7 +243,9 @@ export function App() {
             </Text>
           </Group>
           <Group gap="md">
+            <HistoryControls />
             <AutosaveIndicator saveState={saveState} target={target} />
+            <LanguageMenu />
             <ColorSchemeToggle />
           </Group>
         </Group>
@@ -157,7 +255,7 @@ export function App() {
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.screen}
-            label={item.label}
+            label={t(item.labelKey)}
             leftSection={item.icon}
             active={activeScreen === item.screen}
             onClick={() => setScreen(item.screen)}

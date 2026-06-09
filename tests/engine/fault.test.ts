@@ -264,3 +264,68 @@ describe('selectivity / discrimination', () => {
     expect(sys.warnings.some((w) => w.code === 'selectivity-risk')).toBe(false);
   });
 });
+
+describe('selectivity report (margins)', () => {
+  it('reports the rating ratio and margin for a non-selective feeder pair', () => {
+    const project: ProjectInput = {
+      id: 'PRJ',
+      name: 'B',
+      panels: [
+        panel({
+          id: 'MAIN',
+          name: 'Main',
+          circuits: [branch({ id: 'f', name: 'Feeder to SDB', loadKind: 'feeder', feedsPanelId: 'SDB' })],
+        }),
+        panel({
+          id: 'SDB',
+          name: 'Sub DB',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f',
+          circuits: [branch({ id: 'b1', name: 'Big branch', loadW: 60_000 })],
+        }),
+      ],
+    };
+    const sys = computeSystem(project);
+    expect(sys.selectivity).toBeDefined();
+    const entry = sys.selectivity!.find(
+      (e) => e.upstreamCircuitId === 'f' && e.downstreamPanelId === 'SDB',
+    )!;
+    expect(entry).toBeDefined();
+    expect(entry.upstreamRatingA).toBeGreaterThan(0);
+    expect(entry.downstreamRatingA).toBeGreaterThan(0);
+    // A near-equal feeder/branch is below the 1.6x screen.
+    expect(entry.ratio).toBeLessThan(1.6);
+    expect(entry.selective).toBe(false);
+    expect(entry.marginNote).toContain('1.6');
+    // Reported entry matches the emitted warning.
+    expect(sys.warnings.some((w) => w.code === 'selectivity-risk')).toBe(true);
+  });
+
+  it('reports a selective pair with ratio >= 1.6 and no warning', () => {
+    const project: ProjectInput = {
+      id: 'PRJ',
+      name: 'B',
+      panels: [
+        panel({
+          id: 'MAIN',
+          name: 'Main',
+          circuits: [branch({ id: 'f', name: 'Feeder to SDB', loadKind: 'feeder', feedsPanelId: 'SDB' })],
+        }),
+        panel({
+          id: 'SDB',
+          name: 'Sub DB',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f',
+          circuits: Array.from({ length: 8 }, (_, i) =>
+            branch({ id: `b${i}`, name: `Load ${i}`, loadW: 2000 }),
+          ),
+        }),
+      ],
+    };
+    const sys = computeSystem(project);
+    const entry = sys.selectivity!.find((e) => e.downstreamPanelId === 'SDB')!;
+    expect(entry.selective).toBe(true);
+    expect(entry.ratio).toBeGreaterThanOrEqual(1.6);
+    expect(sys.warnings.some((w) => w.code === 'selectivity-risk')).toBe(false);
+  });
+});
