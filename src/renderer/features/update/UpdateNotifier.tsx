@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, CloseButton, Group, Paper, Progress, Text, ThemeIcon } from '@mantine/core';
 import { IconAlertTriangle, IconArrowUp } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import type { UpdateStatus } from '@shared/ipc-contract';
 import { installUpdate, isDesktop, onUpdateStatus } from '@renderer/api';
 
@@ -9,6 +10,7 @@ import { installUpdate, isDesktop, onUpdateStatus } from '@renderer/api';
  * update" once a release is downloaded. Renders nothing in the web build.
  */
 export function UpdateNotifier() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
@@ -30,10 +32,10 @@ export function UpdateNotifier() {
 
   const title =
     status.state === 'downloaded'
-      ? 'Update ready'
+      ? t('update.ready')
       : status.state === 'error'
-        ? 'Update error'
-        : 'Updating PanelMaker';
+        ? t('update.error')
+        : t('update.updating');
 
   return (
     <Paper
@@ -57,13 +59,13 @@ export function UpdateNotifier() {
 
       {status.state === 'available' && (
         <Text size="xs" c="dimmed">
-          Version {status.version} found — downloading in the background…
+          {t('update.found', { version: status.version })}
         </Text>
       )}
       {status.state === 'downloading' && (
         <>
           <Text size="xs" c="dimmed" mb={4}>
-            Downloading… {status.percent}%
+            {t('update.downloadingPct', { percent: status.percent })}
           </Text>
           <Progress value={status.percent} size="sm" />
         </>
@@ -71,10 +73,10 @@ export function UpdateNotifier() {
       {status.state === 'downloaded' && (
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="xs" c="dimmed">
-            Version {status.version} ready to install.
+            {t('update.readyToInstall', { version: status.version })}
           </Text>
           <Button size="xs" onClick={() => void installUpdate()}>
-            Restart &amp; update
+            {t('update.restartAndUpdate')}
           </Button>
         </Group>
       )}
