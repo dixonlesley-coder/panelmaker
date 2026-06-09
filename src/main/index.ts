@@ -16,7 +16,7 @@ import { registerIpcHandlers } from './ipc/handlers';
 import { createMainWindow } from './window';
 import { initAutoUpdater } from './updater';
 import { ensureLicensed } from './license/session';
-import { getLicensingConfig } from './license/config';
+import { getLicensingConfig, isDemoEnabled } from './license/config';
 import { createSigninWindow } from './license/signinWindow';
 
 /**
@@ -102,7 +102,7 @@ function bootstrap(): void {
       launchApp();
     } else {
       const { allowedHd } = getLicensingConfig();
-      signinWindow = createSigninWindow(allowedHd);
+      signinWindow = createSigninWindow(allowedHd, isDemoEnabled());
     }
 
     app.on('activate', () => {
@@ -113,7 +113,7 @@ function bootstrap(): void {
           if (d.licensed) launchApp();
           else {
             const { allowedHd } = getLicensingConfig();
-            signinWindow = createSigninWindow(allowedHd);
+            signinWindow = createSigninWindow(allowedHd, isDemoEnabled());
           }
         });
       }

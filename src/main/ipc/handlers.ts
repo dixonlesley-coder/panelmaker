@@ -30,7 +30,7 @@ import {
   exportSystemPdf,
 } from '../services/export.service';
 import { checkForUpdates, installUpdate } from '../updater';
-import { getStatus, runSignIn, signOut } from '../license/session';
+import { getStatus, runDemoSignIn, runSignIn, signOut } from '../license/session';
 
 /* ------------------------------- validators ------------------------------- */
 
@@ -197,6 +197,11 @@ export function registerIpcHandlers(hooks: IpcHandlerHooks = {}): void {
   ipcMain.handle(IPC.licenseStatus, () => getStatus());
   ipcMain.handle(IPC.licenseSignIn, async () => {
     const decision = await runSignIn();
+    if (decision.licensed) hooks.onSignedIn?.();
+    return decision;
+  });
+  ipcMain.handle(IPC.licenseDemoSignIn, (_e, password: unknown) => {
+    const decision = runDemoSignIn(typeof password === 'string' ? password : '');
     if (decision.licensed) hooks.onSignedIn?.();
     return decision;
   });

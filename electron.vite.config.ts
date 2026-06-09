@@ -35,6 +35,12 @@ export default defineConfig({
       'process.env.GOOGLE_CLIENT_ID': JSON.stringify(process.env.GOOGLE_CLIENT_ID ?? ''),
       'process.env.GOOGLE_CLIENT_SECRET': JSON.stringify(process.env.GOOGLE_CLIENT_SECRET ?? ''),
       'process.env.ALLOWED_HD': JSON.stringify(process.env.ALLOWED_HD ?? ''),
+      // Demo/test account: enabled by default with a built-in password. Bake the
+      // DISABLE flag (set PANELMAKER_DISABLE_DEMO=1 at build to strip it from a
+      // production release), and the email/password only when explicitly provided.
+      'process.env.PANELMAKER_DISABLE_DEMO': JSON.stringify(process.env.PANELMAKER_DISABLE_DEMO ?? ''),
+      ...(process.env.DEMO_EMAIL ? { 'process.env.DEMO_EMAIL': JSON.stringify(process.env.DEMO_EMAIL) } : {}),
+      ...(process.env.DEMO_PASSWORD ? { 'process.env.DEMO_PASSWORD': JSON.stringify(process.env.DEMO_PASSWORD) } : {}),
     },
     build: {
       rollupOptions: {

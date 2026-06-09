@@ -12,9 +12,12 @@
  */
 
 import {
+  getDemoConfig,
   getLicensingConfig,
+  isDemoEnabled,
   isLicensingConfigured,
   licensingEnforced,
+  verifyDemoPassword,
 } from './config';
 import { withinOfflineGrace } from './validate';
 import { clearSession, loadSession, saveSession, type LicenseSession } from './store';
@@ -85,6 +88,15 @@ export async function ensureLicensed(nowMs: number = Date.now()): Promise<Licens
     return { licensed: false, reason: 'no-session' };
   }
 
+  // A demo/test session bypasses Google entirely; it stays valid while the demo
+  // account is enabled (disabling it locks demo sessions out on next launch).
+  if (session.demo) {
+    if (!isDemoEnabled()) {
+      return { licensed: false, reason: 'demo-disabled', email: session.email };
+    }
+    return { licensed: true, reason: 'demo', email: session.email };
+  }
+
   const online = await reverifyOnline(session);
   if (online) {
     saveSession({ ...session, lastVerifiedAtMs: nowMs });
@@ -135,6 +147,32 @@ export async function runSignIn(nowMs: number = Date.now()): Promise<LicenseDeci
   return { licensed: true, reason: 'verified-online', email: result.email };
 }
 
+/**
+ * Sign in with the demo/test account: validate the password against the
+ * configured demo password (no Google round-trip) and persist a demo session.
+ * Intended for testing the enforced gate without a Workspace account; the demo
+ * account can be disabled for production (see `config.getDemoConfig`).
+ */
+export function runDemoSignIn(password: string, nowMs: number = Date.now()): LicenseDecision {
+  if (!isDemoEnabled()) {
+    return { licensed: false, reason: 'demo-disabled' };
+  }
+  if (!verifyDemoPassword(password)) {
+    return { licensed: false, reason: 'demo-bad-password' };
+  }
+  const demo = getDemoConfig();
+  const session: LicenseSession = {
+    email: demo.email,
+    hd: 'demo',
+    machineId: getMachineId(),
+    refreshToken: '',
+    lastVerifiedAtMs: nowMs,
+    demo: true,
+  };
+  saveSession(session);
+  return { licensed: true, reason: 'demo', email: demo.email };
+}
+
 /** Clear the stored session (sign-out). Locks the app on next launch. */
 export function signOut(): void {
   clearSession();
@@ -155,6 +193,16 @@ export function getStatus(): LicenseStatus {
   }
   if (!session) {
     return { enforced: true, licensed: false, reason: 'no-session' };
+  }
+  if (session.demo) {
+    const ok = isDemoEnabled();
+    return {
+      enforced: true,
+      licensed: ok,
+      reason: ok ? 'demo' : 'demo-disabled',
+      email: session.email,
+      lastVerifiedAtMs: session.lastVerifiedAtMs,
+    };
   }
   const licensed = withinOfflineGrace(session.lastVerifiedAtMs, Date.now());
   return {
