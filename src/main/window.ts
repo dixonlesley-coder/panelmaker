@@ -7,8 +7,8 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
 
-/** Path to the compiled preload script (electron-vite emits to out/preload). */
-const PRELOAD_PATH = join(__dirname, '../preload/index.js');
+/** Path to the compiled preload script (electron-vite emits CJS to out/preload). */
+const PRELOAD_PATH = join(__dirname, '../preload/index.cjs');
 
 /** Create the main application window with hardened web preferences. */
 export function createMainWindow(): BrowserWindow {
