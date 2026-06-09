@@ -14,6 +14,7 @@ import { migrate } from './db/migrate';
 import { seed } from './db/seed';
 import { registerIpcHandlers } from './ipc/handlers';
 import { createMainWindow } from './window';
+import { initAutoUpdater } from './updater';
 
 /**
  * Strict CSP: only same-origin resources, inline styles allowed for the UI
@@ -72,7 +73,8 @@ function bootstrap(): void {
     applyContentSecurityPolicy();
     initDatabase();
     registerIpcHandlers();
-    createMainWindow();
+    const win = createMainWindow();
+    initAutoUpdater(win);
 
     app.on('activate', () => {
       // macOS: re-create a window when the dock icon is clicked and none exist.

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Button,
   Card,
   Group,
   NumberInput,
@@ -10,11 +11,13 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconInfoCircle, IconShieldBolt } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { IconInfoCircle, IconRefresh, IconShieldBolt } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { appVersion, checkForUpdates } from '@renderer/api';
 
 /** Install-method options for the panel default Select. */
 const INSTALL_METHODS: { value: InstallMethod; label: string }[] = [
@@ -37,6 +40,29 @@ export function Settings() {
   const system = useMemo(() => computeSystem(project), [project]);
   const standardsVersion = Object.values(system.panels)[0]?.standardsVersion ?? 'unknown';
   const earthing = system.earthing;
+
+  const [version, setVersion] = useState('…');
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    void appVersion().then(setVersion);
+  }, []);
+
+  async function onCheckUpdates() {
+    setChecking(true);
+    const status = await checkForUpdates();
+    setChecking(false);
+    const message =
+      status.state === 'available'
+        ? `Update ${status.version} available — downloading.`
+        : status.state === 'not-available'
+          ? "You're on the latest version."
+          : status.state === 'disabled'
+            ? status.reason
+            : status.state === 'error'
+              ? `Update check failed: ${status.message}`
+              : 'Checking…';
+    notifications.show({ message, color: status.state === 'available' ? 'indigo' : 'gray' });
+  }
 
   if (!panel) {
     return (
@@ -130,27 +156,48 @@ export function Settings() {
       </Card>
 
       <Card withBorder radius="md" padding="md">
-        <Text fw={600} mb="md">
-          Project
-        </Text>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+        <Group justify="space-between" mb="md">
+          <Text fw={600}>Application</Text>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconRefresh size={14} />}
+            loading={checking}
+            onClick={onCheckUpdates}
+          >
+            Check for updates
+          </Button>
+        </Group>
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              Version
+            </Text>
+            <Text size="sm" fw={500} ff="monospace">
+              {version}
+            </Text>
+          </Group>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
               Currency
             </Text>
             <Text size="sm" fw={500}>
-              IDR (Indonesian Rupiah)
+              IDR
             </Text>
           </Group>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Standards version
+              Standards
             </Text>
             <Text size="sm" fw={500} ff="monospace">
               {standardsVersion}
             </Text>
           </Group>
         </SimpleGrid>
+        <Text size="xs" c="dimmed" mt="xs">
+          PanelMaker auto-updates from GitHub releases in the installed desktop app; downloads apply
+          on restart.
+        </Text>
       </Card>
 
       <Alert variant="light" color="blue" icon={<IconInfoCircle size={18} />}>

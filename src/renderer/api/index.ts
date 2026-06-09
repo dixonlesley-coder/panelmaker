@@ -1,4 +1,4 @@
-import type { Api } from '@shared/ipc-contract';
+import type { Api, UpdateStatus } from '@shared/ipc-contract';
 import type { ControlSchematic, ProjectInput } from '@shared/types';
 
 type WindowWithApi = Window & typeof globalThis & { api?: Api };
@@ -74,4 +74,31 @@ export async function persistSchematic(schematic: ControlSchematic): Promise<voi
   } catch {
     /* best-effort; ignore in non-critical autosave */
   }
+}
+
+/* -------------------------------- updates --------------------------------- */
+
+/** Installed app version ("web" in the browser build). */
+export async function appVersion(): Promise<string> {
+  const api = desktopApi();
+  return api ? api.appVersion() : 'web';
+}
+
+/** Manually check GitHub for a newer release. */
+export async function checkForUpdates(): Promise<UpdateStatus> {
+  const api = desktopApi();
+  if (!api) return { state: 'disabled', reason: 'Auto-update runs in the installed desktop app.' };
+  return api.checkForUpdates();
+}
+
+/** Quit and install a downloaded update. */
+export async function installUpdate(): Promise<void> {
+  await desktopApi()?.installUpdate();
+}
+
+/** Subscribe to auto-update status; no-op (returns a noop unsubscribe) on web. */
+export function onUpdateStatus(cb: (status: UpdateStatus) => void): () => void {
+  const api = desktopApi();
+  if (!api) return () => undefined;
+  return api.onUpdateStatus(cb);
 }

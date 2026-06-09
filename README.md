@@ -13,7 +13,10 @@ overcapacity / mismatched / wrong components and suggesting replacements), links
 panels into a **whole-building single-line diagram**, and exports **PDF per panel
 and per system**.
 
-100% offline — no internet, CDNs, or external services required at runtime.
+The design work is 100% offline — no CDNs or external services for any
+calculation, diagram or export. The only network use is the **optional
+auto-update** check (electron-updater) against the project's GitHub releases,
+which the installed desktop app performs in the background.
 
 ## Architecture
 

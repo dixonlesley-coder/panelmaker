@@ -5,6 +5,13 @@ copyright: Copyright © 2026 PanelMaker
 # Rebuild native modules (better-sqlite3) against the bundled Electron ABI.
 npmRebuild: true
 
+# Auto-update feed: GitHub Releases. `electron-builder --publish always` uploads
+# the installers + latest.yml; electron-updater reads them to detect new versions.
+publish:
+  provider: github
+  owner: dixonlesley-coder
+  repo: panelmaker
+
 directories:
   output: release
   buildResources: build

@@ -45,6 +45,16 @@ export interface ExportResult {
   byteLength: number;
 }
 
+/** Auto-update lifecycle status pushed from the main process. */
+export type UpdateStatus =
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available'; version: string }
+  | { state: 'downloading'; percent: number }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string }
+  | { state: 'disabled'; reason: string };
+
 /**
  * Channel name constants. Centralised so main and preload cannot drift; the
  * keys mirror the `Api` method names.
@@ -63,6 +73,10 @@ export const IPC = {
   saveSchematic: 'schematic:save',
   loadSchematic: 'schematic:load',
   chooseSavePath: 'dialog:saveAs',
+  updateCheck: 'update:check',
+  updateInstall: 'update:install',
+  updateStatus: 'update:status',
+  appVersion: 'app:version',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -118,6 +132,15 @@ export interface Api {
 
   /** Show a native "save as" dialog; returns the chosen path or `null` if cancelled. */
   chooseSavePath(defaultName: string): Promise<string | null>;
+
+  /** Installed application version. */
+  appVersion(): Promise<string>;
+  /** Manually check GitHub for a newer release; returns the resulting status. */
+  checkForUpdates(): Promise<UpdateStatus>;
+  /** Quit and install a downloaded update. */
+  installUpdate(): Promise<void>;
+  /** Subscribe to auto-update status events; returns an unsubscribe function. */
+  onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
 }
 
 /** Re-export of the priced item type for renderer convenience. */

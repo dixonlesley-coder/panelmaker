@@ -20,6 +20,7 @@ import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
 import { Sources } from '@renderer/screens/Sources';
 import { Settings } from '@renderer/screens/Settings';
+import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
 
 interface NavItem {
   screen: Screen;
@@ -114,6 +115,8 @@ export function App() {
       <AppShell.Main>
         <ActiveScreen screen={activeScreen} />
       </AppShell.Main>
+
+      <UpdateNotifier />
     </AppShell>
   );
 }

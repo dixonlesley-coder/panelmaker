@@ -7,7 +7,7 @@
  * surfaces as a rejected promise on the renderer side).
  */
 
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { z } from 'zod';
 import type { Part } from '@shared/types/parts';
 import type { ProjectInput } from '@shared/types/project';
@@ -24,6 +24,7 @@ import { importPricelist } from '../repositories/pricelists.repo';
 import { saveSchematic, loadSchematic } from '../repositories/schematic.repo';
 import { computeProject } from '../services/calc.service';
 import { exportPanelPdf, exportSystemPdf } from '../services/export.service';
+import { checkForUpdates, installUpdate } from '../updater';
 
 /* ------------------------------- validators ------------------------------- */
 
@@ -155,5 +156,11 @@ export function registerIpcHandlers(): void {
       ? await dialog.showSaveDialog(win, opts)
       : await dialog.showSaveDialog(opts);
     return res.canceled || !res.filePath ? null : res.filePath;
+  });
+
+  ipcMain.handle(IPC.appVersion, () => app.getVersion());
+  ipcMain.handle(IPC.updateCheck, () => checkForUpdates());
+  ipcMain.handle(IPC.updateInstall, () => {
+    installUpdate();
   });
 }

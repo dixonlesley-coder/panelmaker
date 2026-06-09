@@ -42,6 +42,7 @@
     "@xyflow/react": "^12.3.6",
     "better-sqlite3": "^11.7.0",
     "drizzle-orm": "^0.38.3",
+    "electron-updater": "^6.3.9",
     "elkjs": "^0.9.3",
     "pdfmake": "^0.2.15",
     "react": "^18.3.1",

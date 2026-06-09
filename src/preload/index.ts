@@ -5,8 +5,8 @@
  * the renderer — only the methods declared in the shared `Api` contract.
  */
 
-import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, type Api } from '@shared/ipc-contract';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { IPC, type Api, type UpdateStatus } from '@shared/ipc-contract';
 import type { ProjectInput } from '@shared/types/project';
 import type { Part } from '@shared/types/parts';
 import type { ControlSchematic } from '@shared/types/schematic';
@@ -34,6 +34,15 @@ const api: Api = {
   saveSchematic: (schematic: ControlSchematic) => ipcRenderer.invoke(IPC.saveSchematic, schematic),
   loadSchematic: (circuitId: string) => ipcRenderer.invoke(IPC.loadSchematic, circuitId),
   chooseSavePath: (defaultName: string) => ipcRenderer.invoke(IPC.chooseSavePath, defaultName),
+
+  appVersion: () => ipcRenderer.invoke(IPC.appVersion),
+  checkForUpdates: () => ipcRenderer.invoke(IPC.updateCheck),
+  installUpdate: () => ipcRenderer.invoke(IPC.updateInstall),
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => {
+    const listener = (_event: IpcRendererEvent, status: UpdateStatus) => callback(status);
+    ipcRenderer.on(IPC.updateStatus, listener);
+    return () => ipcRenderer.removeListener(IPC.updateStatus, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);
