@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActionIcon,
   Button,
@@ -49,6 +50,7 @@ interface RowProps {
 
 /** A single editable circuit row. Edits dispatch immutable store updates. */
 function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
+  const { t } = useTranslation();
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -64,7 +66,7 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
         <Checkbox
           checked={selected}
           size="xs"
-          aria-label={`Select ${circuit.name}`}
+          aria-label={t('builder.selectCircuit', { name: circuit.name })}
           onChange={(e) => onToggle(e.currentTarget.checked)}
         />
       </Table.Td>
@@ -180,31 +182,31 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
 
       <Table.Td>
         <Group gap={2} wrap="nowrap" justify="flex-end">
-          <Tooltip label="Duplicate circuit">
+          <Tooltip label={t('builder.duplicateCircuit')}>
             <ActionIcon
               variant="subtle"
               color="gray"
-              aria-label="Duplicate circuit"
+              aria-label={t('builder.duplicateCircuit')}
               onClick={() => duplicateCircuit(panelId, circuit.id)}
             >
               <IconCopyPlus size={16} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Copy circuit">
+          <Tooltip label={t('builder.copyCircuit')}>
             <ActionIcon
               variant="subtle"
               color="gray"
-              aria-label="Copy circuit"
+              aria-label={t('builder.copyCircuit')}
               onClick={() => copyCircuit(panelId, circuit.id)}
             >
               <IconCopy size={16} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Delete circuit">
+          <Tooltip label={t('builder.deleteCircuit')}>
             <ActionIcon
               variant="subtle"
               color="red"
-              aria-label="Delete circuit"
+              aria-label={t('builder.deleteCircuit')}
               onClick={() => removeCircuit(panelId, circuit.id)}
             >
               <IconTrash size={16} />
@@ -230,6 +232,7 @@ function BulkActionBar({
   ids: string[];
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   const bulkUpdateCircuits = useProjectStore((s) => s.bulkUpdateCircuits);
   const removeCircuits = useProjectStore((s) => s.removeCircuits);
 
@@ -242,39 +245,39 @@ function BulkActionBar({
     <Paper withBorder radius="md" p="xs" mt="sm" bg="var(--mantine-color-blue-light)">
       <Group gap="sm" wrap="wrap" align="flex-end">
         <Text size="sm" fw={600}>
-          {ids.length} selected
+          {t('builder.selected', { count: ids.length })}
         </Text>
         <NumberInput
-          label="Cable length"
+          label={t('builder.cableLength')}
           size="xs"
           w={120}
           min={0}
           step={5}
           suffix=" m"
-          placeholder="set m"
+          placeholder={t('builder.cableLengthPlaceholder')}
           onChange={(v) => {
             if (typeof v === 'number') apply({ lengthM: v });
           }}
         />
         <NumberInput
-          label="Demand factor"
+          label={t('builder.demandFactor')}
           size="xs"
           w={120}
           min={0}
           max={1}
           step={0.05}
           decimalScale={2}
-          placeholder="set"
+          placeholder={t('builder.demandFactorPlaceholder')}
           onChange={(v) => {
             if (typeof v === 'number') apply({ demandFactor: v });
           }}
         />
         <Select
-          label="Load kind"
+          label={t('builder.loadKind')}
           data={LOAD_KIND_OPTIONS}
           size="xs"
           w={150}
-          placeholder="set kind"
+          placeholder={t('builder.loadKindPlaceholder')}
           comboboxProps={{ withinPortal: true }}
           onChange={(value) => {
             if (!value) return;
@@ -292,7 +295,7 @@ function BulkActionBar({
             onDone();
           }}
         >
-          Delete selected
+          {t('builder.bulkDelete')}
         </Button>
       </Group>
     </Paper>
@@ -301,6 +304,7 @@ function BulkActionBar({
 
 /** Structured editor for a panel's branch circuits; recomputes the panel live. */
 export function CircuitTable({ panelId }: { panelId: string }) {
+  const { t } = useTranslation();
   const circuits = useProjectStore(
     (s) => s.project.panels.find((p) => p.id === panelId)?.circuits ?? [],
   );
@@ -346,20 +350,20 @@ export function CircuitTable({ panelId }: { panelId: string }) {
                   checked={allSelected}
                   indeterminate={someSelected}
                   size="xs"
-                  aria-label="Select all circuits"
+                  aria-label={t('builder.selectAllCircuits')}
                   disabled={branchIds.length === 0}
                   onChange={(e) =>
                     setSelected(e.currentTarget.checked ? new Set(branchIds) : new Set())
                   }
                 />
               </Table.Th>
-              <Table.Th>Name</Table.Th>
-              <Table.Th w={130}>Kind</Table.Th>
-              <Table.Th w={120}>Load</Table.Th>
-              <Table.Th w={100}>Length</Table.Th>
-              <Table.Th w={80}>pf</Table.Th>
-              <Table.Th w={170}>Usage</Table.Th>
-              <Table.Th w={160}>Starter</Table.Th>
+              <Table.Th>{t('builder.colName')}</Table.Th>
+              <Table.Th w={130}>{t('builder.colKind')}</Table.Th>
+              <Table.Th w={120}>{t('builder.colLoad')}</Table.Th>
+              <Table.Th w={100}>{t('builder.colLength')}</Table.Th>
+              <Table.Th w={80}>{t('builder.colPf')}</Table.Th>
+              <Table.Th w={170}>{t('builder.colUsage')}</Table.Th>
+              <Table.Th w={160}>{t('builder.colStarter')}</Table.Th>
               <Table.Th w={108} />
             </Table.Tr>
           </Table.Thead>
@@ -379,7 +383,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
 
       {branches.length === 0 && (
         <Text c="dimmed" size="sm" ta="center" py="md">
-          No branch circuits yet. Add one to start sizing.
+          {t('builder.noBranches')}
         </Text>
       )}
 
@@ -394,7 +398,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
           size="xs"
           onClick={() => addCircuit(panelId)}
         >
-          Add circuit
+          {t('builder.addCircuit')}
         </Button>
         <Button
           leftSection={<IconWand size={16} />}
@@ -403,7 +407,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
           size="xs"
           onClick={wizard.open}
         >
-          New circuit (wizard)
+          {t('builder.newCircuitWizard')}
         </Button>
         <Button
           leftSection={<IconClipboard size={16} />}
@@ -412,7 +416,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
           disabled={!hasClipboard}
           onClick={() => pasteCircuit(panelId)}
         >
-          Paste circuit
+          {t('builder.pasteCircuit')}
         </Button>
       </Group>
 

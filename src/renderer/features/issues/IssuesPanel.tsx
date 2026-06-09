@@ -1,5 +1,6 @@
 import { Alert, Button, Card, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useTranslation } from 'react-i18next';
 import { IconCircleCheck, IconTool } from '@tabler/icons-react';
 import type { PanelResult, SuggestedFix, Warning } from '@shared/types';
 import { WarningBadge, severityColor } from '@renderer/features/components/WarningBadge';
@@ -7,6 +8,7 @@ import { useProjectStore } from '@renderer/state/projectStore';
 
 /** One warning card with severity badge, message and any apply-able fixes. */
 function IssueCard({ panelId, warning }: { panelId: string; warning: Warning }) {
+  const { t } = useTranslation();
   const applyFix = useProjectStore((s) => s.applyFix);
 
   const onApply = (fix: SuggestedFix) => {
@@ -14,8 +16,8 @@ function IssueCard({ panelId, warning }: { panelId: string; warning: Warning }) 
     const handled = fix.action?.type === 'set-cable';
     applyFix(panelId, warning.circuitId, fix);
     notifications.show({
-      title: handled ? 'Fix applied' : 'Apply manually',
-      message: handled ? fix.description : 'This suggestion must be applied by hand.',
+      title: handled ? t('issues.fixAppliedTitle') : t('issues.applyManuallyTitle'),
+      message: handled ? fix.description : t('issues.applyManuallyBody'),
       color: handled ? 'teal' : 'gray',
     });
   };
@@ -45,7 +47,7 @@ function IssueCard({ panelId, warning }: { panelId: string; warning: Warning }) 
               disabled={!warning.circuitId}
               onClick={() => onApply(fix)}
             >
-              Apply: {fix.description}
+              {t('issues.apply', { description: fix.description })}
             </Button>
           ))}
         </Group>
@@ -56,6 +58,7 @@ function IssueCard({ panelId, warning }: { panelId: string; warning: Warning }) 
 
 /** Lists every warning for the active panel, with one-click fixes. */
 export function IssuesPanel({ result }: { result: PanelResult }) {
+  const { t } = useTranslation();
   const warnings = result.warnings;
 
   if (warnings.length === 0) {
@@ -65,9 +68,9 @@ export function IssuesPanel({ result }: { result: PanelResult }) {
         color="teal"
         radius="md"
         icon={<IconCircleCheck size={18} />}
-        title="No issues"
+        title={t('issues.noIssuesTitle')}
       >
-        Every circuit in this panel passes the protection, ampacity and voltage-drop checks.
+        {t('issues.noIssuesBody')}
       </Alert>
     );
   }
@@ -83,8 +86,8 @@ export function IssuesPanel({ result }: { result: PanelResult }) {
           <IconTool size={16} />
         </ThemeIcon>
         <Text size="sm" c="dimmed">
-          {errors} error{errors === 1 ? '' : 's'} · {warns} warning{warns === 1 ? '' : 's'}
-          {infos > 0 ? ` · ${infos} info` : ''}
+          {t('issues.errors', { count: errors })} · {t('issues.warnings', { count: warns })}
+          {infos > 0 ? ` · ${t('issues.infos', { count: infos })}` : ''}
         </Text>
       </Group>
 

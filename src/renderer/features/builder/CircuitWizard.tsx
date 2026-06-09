@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Group,
@@ -147,6 +148,7 @@ export function CircuitWizard({
   opened: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const [active, setActive] = useState(0);
   const [draft, setDraft] = useState<Draft>(defaultDraft);
@@ -172,17 +174,17 @@ export function CircuitWizard({
   const kindLabel = LOAD_DEFAULTS[draft.loadKind].label;
 
   return (
-    <Modal opened={opened} onClose={close} title="New circuit wizard" size="lg" centered>
+    <Modal opened={opened} onClose={close} title={t('builder.wizardTitle')} size="lg" centered>
       <Stepper active={active} onStepClick={setActive} size="sm">
-        <Stepper.Step label="Load kind" description="What does it supply?">
+        <Stepper.Step label={t('builder.wizStepKind')} description={t('builder.wizStepKindDesc')}>
           <Stack gap="sm" mt="md">
             <TextInput
-              label="Circuit name"
+              label={t('builder.wizCircuitName')}
               value={draft.name}
               onChange={(e) => set({ name: e.currentTarget.value })}
             />
             <Select
-              label="Load kind"
+              label={t('builder.wizLoadKind')}
               data={LOAD_KIND_OPTIONS}
               value={draft.loadKind}
               allowDeselect={false}
@@ -190,19 +192,20 @@ export function CircuitWizard({
               onChange={(v) => v && setDraft((prev) => applyKind(prev, v as LoadKind))}
             />
             <Text size="xs" c="dimmed">
-              {motor
-                ? 'Motor circuit — sized from rated kW and the chosen starter.'
-                : 'Final circuit — sized from connected load and power factor.'}
+              {motor ? t('builder.wizMotorNote') : t('builder.wizFinalNote')}
             </Text>
           </Stack>
         </Stepper.Step>
 
-        <Stepper.Step label="Parameters" description="Electrical details">
+        <Stepper.Step
+          label={t('builder.wizStepParams')}
+          description={t('builder.wizStepParamsDesc')}
+        >
           <Stack gap="sm" mt="md">
             {motor ? (
               <>
                 <NumberInput
-                  label="Motor rating"
+                  label={t('builder.wizMotorRating')}
                   value={draft.motorKw}
                   min={0}
                   step={0.5}
@@ -211,7 +214,7 @@ export function CircuitWizard({
                   onChange={(v) => set({ motorKw: typeof v === 'number' ? v : 0 })}
                 />
                 <Select
-                  label="Poles"
+                  label={t('builder.wizPoles')}
                   data={POLE_OPTIONS}
                   value={String(draft.motorPoles)}
                   allowDeselect={false}
@@ -219,7 +222,7 @@ export function CircuitWizard({
                   onChange={(v) => v && set({ motorPoles: Number(v) })}
                 />
                 <Select
-                  label="Starter type"
+                  label={t('builder.wizStarterType')}
                   data={STARTER_OPTIONS}
                   value={draft.starterType}
                   allowDeselect={false}
@@ -227,7 +230,7 @@ export function CircuitWizard({
                   onChange={(v) => v && set({ starterType: v as StarterType })}
                 />
                 <Select
-                  label="Starting duty"
+                  label={t('builder.wizStartingDuty')}
                   data={DUTY_OPTIONS}
                   value={draft.startingDuty}
                   allowDeselect={false}
@@ -238,7 +241,7 @@ export function CircuitWizard({
             ) : (
               <>
                 <NumberInput
-                  label="Connected load"
+                  label={t('builder.wizConnectedLoad')}
                   value={draft.loadKw}
                   min={0}
                   step={0.5}
@@ -247,7 +250,7 @@ export function CircuitWizard({
                   onChange={(v) => set({ loadKw: typeof v === 'number' ? v : 0 })}
                 />
                 <NumberInput
-                  label="Power factor (cos φ)"
+                  label={t('builder.wizPowerFactor')}
                   value={draft.cosPhi}
                   min={0.1}
                   max={1}
@@ -256,14 +259,14 @@ export function CircuitWizard({
                   onChange={(v) => set({ cosPhi: typeof v === 'number' ? v : draft.cosPhi })}
                 />
                 <Switch
-                  label="Lighting circuit (no neutral core)"
+                  label={t('builder.wizLightingSwitch')}
                   checked={draft.isLighting}
                   onChange={(e) => set({ isLighting: e.currentTarget.checked })}
                 />
               </>
             )}
             <NumberInput
-              label="Cable length"
+              label={t('builder.wizCableLength')}
               value={draft.lengthM}
               min={0}
               step={5}
@@ -271,7 +274,7 @@ export function CircuitWizard({
               onChange={(v) => set({ lengthM: typeof v === 'number' ? v : 0 })}
             />
             <NumberInput
-              label="Demand factor"
+              label={t('builder.wizDemandFactor')}
               value={draft.demandFactor}
               min={0}
               max={1}
@@ -282,33 +285,39 @@ export function CircuitWizard({
           </Stack>
         </Stepper.Step>
 
-        <Stepper.Step label="Review" description="Confirm & add">
+        <Stepper.Step
+          label={t('builder.wizStepReview')}
+          description={t('builder.wizStepReviewDesc')}
+        >
           <Table mt="md" verticalSpacing="xs" fz="sm">
             <Table.Tbody>
-              <ReviewRow k="Name" v={draft.name.trim() || 'New circuit'} />
-              <ReviewRow k="Load kind" v={kindLabel} />
+              <ReviewRow k={t('builder.wizRowName')} v={draft.name.trim() || 'New circuit'} />
+              <ReviewRow k={t('builder.wizRowLoadKind')} v={kindLabel} />
               {motor ? (
                 <>
-                  <ReviewRow k="Motor rating" v={`${draft.motorKw} kW`} />
-                  <ReviewRow k="Poles" v={String(draft.motorPoles)} />
+                  <ReviewRow k={t('builder.wizRowMotorRating')} v={`${draft.motorKw} kW`} />
+                  <ReviewRow k={t('builder.wizRowPoles')} v={String(draft.motorPoles)} />
                   <ReviewRow
-                    k="Starter"
+                    k={t('builder.wizRowStarter')}
                     v={STARTER_OPTIONS.find((o) => o.value === draft.starterType)?.label ?? ''}
                   />
                   <ReviewRow
-                    k="Starting duty"
+                    k={t('builder.wizRowStartingDuty')}
                     v={DUTY_OPTIONS.find((o) => o.value === draft.startingDuty)?.label ?? ''}
                   />
                 </>
               ) : (
                 <>
-                  <ReviewRow k="Connected load" v={`${draft.loadKw} kW`} />
-                  <ReviewRow k="Power factor" v={draft.cosPhi.toFixed(2)} />
-                  <ReviewRow k="Lighting" v={draft.isLighting ? 'Yes' : 'No'} />
+                  <ReviewRow k={t('builder.wizRowConnectedLoad')} v={`${draft.loadKw} kW`} />
+                  <ReviewRow k={t('builder.wizRowPowerFactor')} v={draft.cosPhi.toFixed(2)} />
+                  <ReviewRow
+                    k={t('builder.wizRowLighting')}
+                    v={draft.isLighting ? t('common.yes') : t('common.no')}
+                  />
                 </>
               )}
-              <ReviewRow k="Cable length" v={`${draft.lengthM} m`} />
-              <ReviewRow k="Demand factor" v={draft.demandFactor.toFixed(2)} />
+              <ReviewRow k={t('builder.wizRowCableLength')} v={`${draft.lengthM} m`} />
+              <ReviewRow k={t('builder.wizRowDemandFactor')} v={draft.demandFactor.toFixed(2)} />
             </Table.Tbody>
           </Table>
         </Stepper.Step>
@@ -316,18 +325,18 @@ export function CircuitWizard({
 
       <Group justify="space-between" mt="lg">
         <Button variant="default" onClick={close}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Group gap="xs">
           {active > 0 && (
             <Button variant="default" onClick={() => setActive((a) => a - 1)}>
-              Back
+              {t('common.back')}
             </Button>
           )}
           {active < 2 ? (
-            <Button onClick={() => setActive((a) => a + 1)}>Next</Button>
+            <Button onClick={() => setActive((a) => a + 1)}>{t('common.next')}</Button>
           ) : (
-            <Button onClick={confirm}>Add circuit</Button>
+            <Button onClick={confirm}>{t('builder.wizAdd')}</Button>
           )}
         </Group>
       </Group>
