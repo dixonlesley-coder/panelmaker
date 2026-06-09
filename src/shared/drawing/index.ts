@@ -9,3 +9,4 @@
 export * from './geometry';
 export * from './sld';
 export * from './svg';
+export * from './dxf';

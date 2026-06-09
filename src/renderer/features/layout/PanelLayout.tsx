@@ -1,7 +1,9 @@
-import { Alert, Box, Card, Group, SimpleGrid, Stack, Text } from '@mantine/core';
-import { IconRuler2 } from '@tabler/icons-react';
+import { Alert, Box, Button, Card, Group, SimpleGrid, Stack, Text } from '@mantine/core';
+import { IconFileVector, IconRuler2 } from '@tabler/icons-react';
 import type { PanelInput } from '@shared/types/project';
 import type { PanelResult } from '@shared/types/results';
+import { panelGaSvg, panelGaDxf } from '@shared/drawing';
+import { downloadSvg, downloadDxf } from '@renderer/lib/drawingExport';
 
 /** A single DIN module is 18 mm wide (one "pole" pitch). */
 const MODULE_MM = 18;
@@ -73,9 +75,27 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
     <Stack gap="md">
       <Group justify="space-between">
         <Text fw={600}>General arrangement</Text>
-        <Text size="xs" c="dimmed">
-          {panel.system} · front elevation
-        </Text>
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            {panel.system} · front elevation
+          </Text>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconFileVector size={14} />}
+            onClick={() => downloadSvg(panel.name, panelGaSvg(panel, result))}
+          >
+            Export SVG
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconFileVector size={14} />}
+            onClick={() => downloadDxf(panel.name, panelGaDxf(panel, result))}
+          >
+            Export DXF
+          </Button>
+        </Group>
       </Group>
 
       <Card withBorder radius="md" padding="md">

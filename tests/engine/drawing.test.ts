@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computePanel } from '@shared/engine';
-import { panelGaSvg, panelSldSvg } from '@shared/drawing';
+import { panelGaSvg, panelSldSvg, panelGaDxf, panelSldDxf } from '@shared/drawing';
 import type { PanelInput, CircuitInput } from '@shared/types';
 
 function branch(partial: Partial<CircuitInput> & { id: string; name: string }): CircuitInput {
@@ -99,5 +99,35 @@ describe('panel single-line SVG', () => {
     const svg = panelSldSvg(tricky, computePanel(tricky));
     expect(svg).toContain('A &amp; B &lt;main&gt;');
     expect(svg).toContain('R&amp;D &quot;lab&quot;');
+  });
+});
+
+describe('panel DXF export', () => {
+  it('emits a well-formed R12 ENTITIES document', () => {
+    const dxf = panelGaDxf(SAMPLE, computePanel(SAMPLE));
+    expect(dxf).toContain('SECTION');
+    expect(dxf).toContain('ENTITIES');
+    expect(dxf).toContain('LINE');
+    expect(dxf).toContain('ENDSEC');
+    expect(dxf.trimEnd().endsWith('EOF')).toBe(true);
+  });
+
+  it('emits LINE and TEXT entities for the single-line diagram', () => {
+    const dxf = panelSldDxf(SAMPLE, computePanel(SAMPLE));
+    expect(dxf).toContain('LINE');
+    expect(dxf).toContain('TEXT');
+    expect(dxf).toContain('CIRCLE');
+    expect(dxf).toContain('EOF');
+  });
+
+  it('strips newlines from text so group codes stay aligned', () => {
+    const tricky = panel({
+      id: 'P3',
+      name: 'Line1\nLine2',
+      circuits: [branch({ id: 'y', name: 'load', loadW: 1000 })],
+    });
+    const dxf = panelSldDxf(tricky, computePanel(tricky));
+    expect(dxf).toContain('Line1 Line2');
+    expect(dxf).not.toContain('Line1\nLine2');
   });
 });
