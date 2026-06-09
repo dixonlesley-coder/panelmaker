@@ -56,7 +56,7 @@ jobs:
           npx tsc --noEmit -p tsconfig.json
           npx vitest run
 
-      - name: Build & package (gated installer)
+      - name: Build, sign & package (gated installer)
         env:
           # --- Google Workspace licensing — baked into the main bundle ---
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -64,14 +64,46 @@ jobs:
           ALLOWED_HD: ${{ secrets.ALLOWED_HD }}
           # --- GitHub Releases publish (auto-update feed) ---
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No code-signing certs in CI: build unsigned rather than hang on mac
-          # identity auto-discovery. Add signing later (see LICENSING.md hardening).
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        # On a version tag -> publish to the GitHub Release; otherwise just build.
-        run: |
-          npx electron-vite build
-          npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+          # --- Code signing (per-OS). Each CSC_LINK is a BASE64-encoded cert.
+          #     Unset secrets resolve to '' -> electron-builder builds UNSIGNED, so
+          #     this whole block stays dormant until you add the secrets:
+          #       Windows (Authenticode .pfx): WINDOWS_CSC_LINK / WINDOWS_CSC_KEY_PASSWORD
+          #       macOS  (Developer ID .p12):  MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD
+          #     (EV / HSM-backed Windows certs can't be a .pfx file — those need a
+          #     cloud-signing integration, e.g. Azure Trusted Signing; not wired here.)
+          CSC_LINK: ${{ (matrix.os == 'macos-latest' && secrets.MAC_CSC_LINK) || (matrix.os == 'windows-latest' && secrets.WINDOWS_CSC_LINK) || '' }}
+          CSC_KEY_PASSWORD: ${{ (matrix.os == 'macos-latest' && secrets.MAC_CSC_KEY_PASSWORD) || (matrix.os == 'windows-latest' && secrets.WINDOWS_CSC_KEY_PASSWORD) || '' }}
+          # --- macOS notarization (Apple). Used only on mac when all three are set. ---
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         shell: bash
+        run: |
+          set -euo pipefail
+
+          # Publish to a GitHub Release only on a version tag; otherwise just build.
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then PUBLISH=always; else PUBLISH=never; fi
+
+          # No signing cert for this OS -> disable mac identity auto-discovery so
+          # electron-builder builds unsigned instead of hunting for a keychain id.
+          if [[ -z "${CSC_LINK}" ]]; then
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            echo "Code signing: skipped (no cert configured for ${RUNNER_OS})"
+          else
+            echo "Code signing: enabled for ${RUNNER_OS}"
+          fi
+
+          # Enable macOS notarization only when all three Apple credentials exist.
+          EXTRA=()
+          if [[ "${RUNNER_OS}" == "macOS" && -n "${APPLE_ID}" && -n "${APPLE_APP_SPECIFIC_PASSWORD}" && -n "${APPLE_TEAM_ID}" ]]; then
+            EXTRA+=("-c.mac.notarize=true")
+            echo "macOS notarization: enabled"
+          elif [[ "${RUNNER_OS}" == "macOS" ]]; then
+            echo "macOS notarization: skipped (Apple credentials not set)"
+          fi
+
+          npx electron-vite build
+          npx electron-builder --publish "${PUBLISH}" "${EXTRA[@]}"
 
       - name: Upload installers as workflow artifacts
         if: always()

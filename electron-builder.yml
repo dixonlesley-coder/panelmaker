@@ -43,6 +43,9 @@ nsis:
 
 mac:
   category: public.app-category.productivity
+  # Required for notarization; ignored on unsigned builds. The release workflow
+  # flips notarization on (-c.mac.notarize=true) when the Apple creds are present.
+  hardenedRuntime: true
   target:
     - dmg
     - zip

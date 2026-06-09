@@ -181,7 +181,16 @@ honest employees, not DRM.
 Recommended hardening:
 
 - **Code-sign** the application (Windows Authenticode, macOS notarization) so
-  tampered binaries are detectable and SmartScreen/Gatekeeper warnings appear.
+  tampered binaries are detectable and SmartScreen/Gatekeeper warnings disappear.
+  The release workflow (`.github/workflows/release.yml`) already wires this up —
+  it builds **unsigned** until you add the relevant repo secrets, then signs (and
+  notarizes) automatically. Secrets:
+  - Windows: `WINDOWS_CSC_LINK` (base64 of your `.pfx`) + `WINDOWS_CSC_KEY_PASSWORD`.
+  - macOS signing: `MAC_CSC_LINK` (base64 of your Developer ID `.p12`) + `MAC_CSC_KEY_PASSWORD`.
+  - macOS notarization: `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID`.
+  Base64-encode a cert with `base64 -w0 cert.pfx` (Linux) / `base64 -i cert.p12` (macOS).
+  EV / HSM-backed Windows certs can't be exported as a `.pfx`; those need a
+  cloud-signing service (e.g. Azure Trusted Signing) instead of `CSC_LINK`.
 - Enable **Electron Fuses** (e.g. disable `runAsNode`, `nodeCliInspect`,
   enable ASAR integrity) to make patching the main bundle harder.
 - If you need **seat metering / true revocation guarantees / audit logs**,
