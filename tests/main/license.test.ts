@@ -14,6 +14,7 @@ import {
 } from '../../src/main/license/validate';
 import { OFFLINE_GRACE_MS } from '../../src/main/license/config';
 import { createPkcePair, deriveChallenge, randomToken } from '../../src/main/license/pkce';
+import { deriveMachineId } from '../../src/main/license/machineId';
 
 const CLIENT_ID = '1234567890-abc.apps.googleusercontent.com';
 const ALLOWED_HD = 'company.example';
@@ -135,5 +136,24 @@ describe('pkce', () => {
     expect(a).not.toBe(b);
     expect(a).not.toMatch(/[+/=]/);
     expect(a.length).toBeGreaterThanOrEqual(32);
+  });
+});
+
+describe('deriveMachineId', () => {
+  it('is deterministic for the same inputs', () => {
+    const a = deriveMachineId('uuid-1', 'host-a', 'linux');
+    const b = deriveMachineId('uuid-1', 'host-a', 'linux');
+    expect(a).toBe(b);
+  });
+
+  it('changes when any input changes', () => {
+    const base = deriveMachineId('uuid-1', 'host-a', 'linux');
+    expect(deriveMachineId('uuid-2', 'host-a', 'linux')).not.toBe(base);
+    expect(deriveMachineId('uuid-1', 'host-b', 'linux')).not.toBe(base);
+    expect(deriveMachineId('uuid-1', 'host-a', 'darwin')).not.toBe(base);
+  });
+
+  it('produces a 64-char hex sha256 digest', () => {
+    expect(deriveMachineId('uuid-1', 'host-a', 'linux')).toMatch(/^[0-9a-f]{64}$/);
   });
 });
