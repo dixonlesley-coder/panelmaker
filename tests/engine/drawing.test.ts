@@ -1,0 +1,103 @@
+import { describe, it, expect } from 'vitest';
+import { computePanel } from '@shared/engine';
+import { panelGaSvg, panelSldSvg } from '@shared/drawing';
+import type { PanelInput, CircuitInput } from '@shared/types';
+
+function branch(partial: Partial<CircuitInput> & { id: string; name: string }): CircuitInput {
+  return {
+    role: 'branch',
+    loadW: 0,
+    cosPhi: 0.85,
+    lengthM: 20,
+    loadKind: 'general',
+    isLighting: false,
+    demandFactor: 1,
+    ...partial,
+  };
+}
+
+function panel(partial: Partial<PanelInput> & { id: string; name: string }): PanelInput {
+  return {
+    system: '3ph',
+    voltageV: 400,
+    ambientTempC: 30,
+    installMethod: 'conduit',
+    groupingCount: 1,
+    diversityFactor: 0.8,
+    sourceType: 'utility',
+    circuits: [],
+    ...partial,
+  };
+}
+
+const SAMPLE = panel({
+  id: 'P1',
+  name: 'Lighting & Power DB',
+  circuits: [
+    branch({ id: 'c1', name: 'Lighting 1', loadW: 2000, loadKind: 'lighting', isLighting: true }),
+    branch({ id: 'c2', name: 'Sockets', loadW: 3000 }),
+    branch({ id: 'c3', name: 'AC unit', loadW: 4500, loadKind: 'motor', motorKw: 4, starterType: 'DOL' }),
+    branch({ id: 'c4', name: 'Pump motor', loadW: 0, loadKind: 'motor', motorKw: 15, starterType: 'STAR_DELTA' }),
+  ],
+});
+
+/** Count occurrences of a literal substring. */
+function count(haystack: string, needle: string): number {
+  let n = 0;
+  let i = haystack.indexOf(needle);
+  while (i !== -1) {
+    n += 1;
+    i = haystack.indexOf(needle, i + needle.length);
+  }
+  return n;
+}
+
+describe('panel general-arrangement SVG', () => {
+  it('is a self-contained <svg> with a viewBox', () => {
+    const svg = panelGaSvg(SAMPLE, computePanel(SAMPLE));
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).toContain('viewBox=');
+    expect(svg.trimEnd().endsWith('</svg>')).toBe(true);
+  });
+
+  it('draws at least one device rect per branch circuit', () => {
+    const result = computePanel(SAMPLE);
+    const svg = panelGaSvg(SAMPLE, result);
+    // Cabinet, gutter, chamber + one rect per device → strictly more than the
+    // branch count, so >= is a safe lower bound.
+    expect(count(svg, '<rect')).toBeGreaterThanOrEqual(result.circuits.length);
+  });
+
+  it('uses only attribute styling (no CSS classes or foreignObject)', () => {
+    const svg = panelGaSvg(SAMPLE, computePanel(SAMPLE));
+    expect(svg).not.toContain('class=');
+    expect(svg).not.toContain('foreignObject');
+    expect(svg).not.toContain('<style');
+  });
+});
+
+describe('panel single-line SVG', () => {
+  it('is a self-contained <svg> with a viewBox', () => {
+    const svg = panelSldSvg(SAMPLE, computePanel(SAMPLE));
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).toContain('viewBox=');
+  });
+
+  it('draws a breaker + load rect per branch', () => {
+    const result = computePanel(SAMPLE);
+    const svg = panelSldSvg(SAMPLE, result);
+    // Each branch contributes a breaker rect and a load rect.
+    expect(count(svg, '<rect')).toBeGreaterThanOrEqual(result.circuits.length * 2);
+  });
+
+  it('escapes XML-significant characters in labels', () => {
+    const tricky = panel({
+      id: 'P2',
+      name: 'A & B <main>',
+      circuits: [branch({ id: 'x', name: 'R&D "lab"', loadW: 1000 })],
+    });
+    const svg = panelSldSvg(tricky, computePanel(tricky));
+    expect(svg).toContain('A &amp; B &lt;main&gt;');
+    expect(svg).toContain('R&amp;D &quot;lab&quot;');
+  });
+});
