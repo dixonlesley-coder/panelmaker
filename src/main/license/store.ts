@@ -25,6 +25,8 @@ export interface LicenseSession {
   refreshToken: string;
   /** Epoch ms of the last successful online verification. */
   lastVerifiedAtMs: number;
+  /** True for a demo/test session (password-based, no Google round-trip). */
+  demo?: boolean;
 }
 
 /** On-disk shape: the refresh token is split out and possibly encrypted. */
@@ -37,6 +39,8 @@ interface StoredSession {
   refreshToken: string;
   /** Whether `refreshToken` is `safeStorage`-encrypted (vs. plaintext base64). */
   refreshTokenEncrypted: boolean;
+  /** True for a demo/test session. */
+  demo?: boolean;
 }
 
 /** Resolve the `userData` directory (Electron) with a cwd fallback. */
@@ -120,6 +124,7 @@ export function loadSession(): LicenseSession | null {
       lastVerifiedAtMs: parsed.lastVerifiedAtMs,
       refreshToken: parsed.refreshToken,
       refreshTokenEncrypted: parsed.refreshTokenEncrypted === true,
+      demo: parsed.demo === true,
     };
     return {
       email: stored.email,
@@ -127,6 +132,7 @@ export function loadSession(): LicenseSession | null {
       machineId: stored.machineId,
       lastVerifiedAtMs: stored.lastVerifiedAtMs,
       refreshToken: decryptToken(stored),
+      demo: stored.demo,
     };
   } catch {
     return null;
@@ -143,6 +149,7 @@ export function saveSession(session: LicenseSession): void {
     lastVerifiedAtMs: session.lastVerifiedAtMs,
     refreshToken: value,
     refreshTokenEncrypted: encrypted,
+    ...(session.demo ? { demo: true } : {}),
   };
   const file = sessionFile();
   const dir = dirname(file);

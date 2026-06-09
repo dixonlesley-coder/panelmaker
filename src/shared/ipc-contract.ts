@@ -105,6 +105,7 @@ export const IPC = {
   appVersion: 'app:version',
   licenseStatus: 'license:status',
   licenseSignIn: 'license:signIn',
+  licenseDemoSignIn: 'license:demoSignIn',
   licenseSignOut: 'license:signOut',
 } as const;
 
@@ -194,6 +195,8 @@ export interface Api {
   licenseStatus(): Promise<LicenseStatusResult>;
   /** Run the interactive Google Workspace sign-in; returns the decision. */
   licenseSignIn(): Promise<LicenseDecisionResult>;
+  /** Sign in with the demo/test account password (bypasses Google, for testing). */
+  licenseDemoSignIn(password: string): Promise<LicenseDecisionResult>;
   /** Sign out (clear the stored session); locks the app on next launch. */
   licenseSignOut(): Promise<void>;
 }

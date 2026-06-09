@@ -54,6 +54,7 @@ const api: Api = {
 
   licenseStatus: () => ipcRenderer.invoke(IPC.licenseStatus),
   licenseSignIn: () => ipcRenderer.invoke(IPC.licenseSignIn),
+  licenseDemoSignIn: (password: string) => ipcRenderer.invoke(IPC.licenseDemoSignIn, password),
   licenseSignOut: () => ipcRenderer.invoke(IPC.licenseSignOut),
 };
 

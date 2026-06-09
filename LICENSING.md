@@ -71,6 +71,31 @@ as-yet-unconfigured desktop app are all unaffected.
 
 ---
 
+## Demo / test account
+
+So you can exercise the **enforced** gate without a real Workspace account, the
+sign-in window offers a password-based **demo login** beneath the Google button.
+
+- **Enabled by default** with a built-in password: **`panelmaker-demo`** (signed
+  in as `demo@panelmaker.local`). Just type it into the demo field and click
+  **Demo login**.
+- A demo session bypasses Google and stays valid until you sign out (or the demo
+  account is disabled).
+- **Override** the credentials with `DEMO_PASSWORD` / `DEMO_EMAIL` (env at build,
+  or in `license.config.json`).
+- **Disable for production** by building with `PANELMAKER_DISABLE_DEMO=1` (or
+  setting `DEMO_PASSWORD` to empty). The release workflow bakes this flag, so:
+
+  ```bash
+  PANELMAKER_DISABLE_DEMO=1 GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… ALLOWED_HD=… \
+    npx electron-vite build && npx electron-builder --publish always
+  ```
+
+> ⚠️ The demo password is a deliberate gate bypass. Keep it for internal test
+> builds and **disable it (or change the password) in real production releases.**
+
+---
+
 ## Setup (one-time, by an admin)
 
 ### 1. Create a Google Cloud project + OAuth client

@@ -160,6 +160,13 @@ export async function licenseSignIn(): Promise<LicenseDecisionResult> {
   return api.licenseSignIn();
 }
 
+/** Sign in with the demo/test account password (desktop only; no-op on web). */
+export async function licenseDemoSignIn(password: string): Promise<LicenseDecisionResult> {
+  const api = desktopApi();
+  if (!api) return { licensed: true, reason: 'web' };
+  return api.licenseDemoSignIn(password);
+}
+
 /** Sign out of the licensing session (desktop only; no-op on web). */
 export async function licenseSignOut(): Promise<void> {
   await desktopApi()?.licenseSignOut();

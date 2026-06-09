@@ -12,7 +12,14 @@ import {
   withinOfflineGrace,
   type IdTokenClaims,
 } from '../../src/main/license/validate';
-import { OFFLINE_GRACE_MS } from '../../src/main/license/config';
+import {
+  OFFLINE_GRACE_MS,
+  DEFAULT_DEMO_EMAIL,
+  DEFAULT_DEMO_PASSWORD,
+  getDemoConfig,
+  isDemoEnabled,
+  verifyDemoPassword,
+} from '../../src/main/license/config';
 import { createPkcePair, deriveChallenge, randomToken } from '../../src/main/license/pkce';
 import { deriveMachineId } from '../../src/main/license/machineId';
 
@@ -155,5 +162,45 @@ describe('deriveMachineId', () => {
 
   it('produces a 64-char hex sha256 digest', () => {
     expect(deriveMachineId('uuid-1', 'host-a', 'linux')).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('demo / test account', () => {
+  it('is enabled by default with the built-in credentials', () => {
+    const cfg = getDemoConfig();
+    expect(cfg.enabled).toBe(true);
+    expect(cfg.email).toBe(DEFAULT_DEMO_EMAIL);
+    expect(cfg.password).toBe(DEFAULT_DEMO_PASSWORD);
+    expect(isDemoEnabled()).toBe(true);
+  });
+
+  it('accepts the correct password and rejects others', () => {
+    expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD)).toBe(true);
+    expect(verifyDemoPassword('wrong')).toBe(false);
+    expect(verifyDemoPassword('')).toBe(false);
+    expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD + 'x')).toBe(false);
+  });
+
+  it('honours a custom password and the disable switch via env', () => {
+    const saved = {
+      pw: process.env.DEMO_PASSWORD,
+      disable: process.env.PANELMAKER_DISABLE_DEMO,
+    };
+    try {
+      process.env.DEMO_PASSWORD = 's3cret';
+      delete process.env.PANELMAKER_DISABLE_DEMO;
+      expect(getDemoConfig().password).toBe('s3cret');
+      expect(verifyDemoPassword('s3cret')).toBe(true);
+      expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD)).toBe(false);
+
+      process.env.PANELMAKER_DISABLE_DEMO = '1';
+      expect(isDemoEnabled()).toBe(false);
+      expect(verifyDemoPassword('s3cret')).toBe(false);
+    } finally {
+      if (saved.pw === undefined) delete process.env.DEMO_PASSWORD;
+      else process.env.DEMO_PASSWORD = saved.pw;
+      if (saved.disable === undefined) delete process.env.PANELMAKER_DISABLE_DEMO;
+      else process.env.PANELMAKER_DISABLE_DEMO = saved.disable;
+    }
   });
 });
