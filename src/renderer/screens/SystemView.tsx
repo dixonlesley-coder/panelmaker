@@ -239,6 +239,8 @@ export function SystemView() {
         </Text>
       </Card>
 
+      <FaultLevelsCard system={system} />
+
       {system.sources && (
         <Card withBorder radius="md" padding="md">
           <Group gap="xs" mb="xs">
@@ -324,5 +326,48 @@ function KeyStat({ k, v }: { k: string; v: string }) {
         {v}
       </Text>
     </div>
+  );
+}
+
+/**
+ * Prospective short-circuit (Isc) at each panel's bus, root-first. The fault
+ * decays down feeder runs; a panel is flagged when one of its devices cannot
+ * break the fault present at it.
+ */
+function FaultLevelsCard({ system }: { system: SystemResult }) {
+  const rows = system.order
+    .map((id) => system.panels[id])
+    .filter((p): p is NonNullable<typeof p> => Boolean(p) && p!.faultLevelKa !== undefined);
+  if (rows.length === 0) return null;
+
+  return (
+    <Card withBorder radius="md" padding="md">
+      <Group gap="xs" mb="xs">
+        <ThemeIcon variant="light" color="red">
+          <IconBolt size={16} />
+        </ThemeIcon>
+        <Text fw={600} size="sm">
+          Fault levels
+        </Text>
+        <Text size="xs" c="dimmed">
+          prospective Isc (3-phase symmetrical) at each panel bus
+        </Text>
+      </Group>
+      <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing="sm">
+        {rows.map((p) => {
+          const inadequate = p.warnings.some((w) => w.code === 'breaking-capacity-inadequate');
+          return (
+            <Group key={p.panelId} justify="space-between" wrap="nowrap" gap="xs">
+              <Text size="sm" truncate>
+                {p.name}
+              </Text>
+              <Badge variant={inadequate ? 'filled' : 'light'} color={inadequate ? 'red' : 'gray'}>
+                {p.faultLevelKa} kA
+              </Badge>
+            </Group>
+          );
+        })}
+      </SimpleGrid>
+    </Card>
   );
 }

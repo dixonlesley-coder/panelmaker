@@ -1,11 +1,21 @@
 import { useMemo } from 'react';
 import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, Title } from '@mantine/core';
-import { IconAlertTriangle, IconCpu, IconListDetails, IconSitemap, IconTable } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconColumns,
+  IconCpu,
+  IconLayoutGrid,
+  IconListDetails,
+  IconSitemap,
+  IconTable,
+} from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
 import { SchematicView } from '@renderer/features/schematic/SchematicView';
+import { PanelLayout } from '@renderer/features/layout/PanelLayout';
+import { CableSchedule } from '@renderer/features/schedule/CableSchedule';
 import { PanelSld } from '@renderer/screens/sld/PanelSld';
 import { useProjectStore } from '@renderer/state/projectStore';
 
@@ -75,6 +85,12 @@ export function PanelEditor() {
                 <Tabs.Tab value="schematic" leftSection={<IconCpu size={16} />}>
                   Control schematic
                 </Tabs.Tab>
+                <Tabs.Tab value="layout" leftSection={<IconLayoutGrid size={16} />}>
+                  Layout
+                </Tabs.Tab>
+                <Tabs.Tab value="schedule" leftSection={<IconColumns size={16} />}>
+                  Cable schedule
+                </Tabs.Tab>
                 <Tabs.Tab value="results" leftSection={<IconTable size={16} />}>
                   Results
                 </Tabs.Tab>
@@ -98,6 +114,12 @@ export function PanelEditor() {
               </Tabs.Panel>
               <Tabs.Panel value="schematic">
                 <SchematicView panel={panel} result={result} />
+              </Tabs.Panel>
+              <Tabs.Panel value="layout">
+                <PanelLayout panel={panel} result={result} />
+              </Tabs.Panel>
+              <Tabs.Panel value="schedule">
+                <CableSchedule panel={panel} result={result} />
               </Tabs.Panel>
               <Tabs.Panel value="results">
                 <ResultsPanel result={result} />

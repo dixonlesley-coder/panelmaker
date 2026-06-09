@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { AppShell, Center, Group, Loader, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import {
   IconSun,
   IconMoon,
+  IconFolder,
   IconSitemap,
   IconGauge,
   IconAdjustmentsBolt,
@@ -13,6 +15,7 @@ import {
 } from '@tabler/icons-react';
 
 import { useProjectStore, type Screen } from '@renderer/state/projectStore';
+import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
 import { Dashboard } from '@renderer/screens/Dashboard';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
@@ -31,6 +34,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { screen: 'projects', label: 'Projects', icon: <IconFolder size={18} /> },
   { screen: 'system', label: 'System', icon: <IconSitemap size={18} /> },
   { screen: 'dashboard', label: 'Dashboard', icon: <IconGauge size={18} /> },
   { screen: 'panel', label: 'Panel Editor', icon: <IconAdjustmentsBolt size={18} /> },
@@ -61,6 +65,8 @@ function ColorSchemeToggle() {
 
 function ActiveScreen({ screen }: { screen: Screen }) {
   switch (screen) {
+    case 'projects':
+      return <Projects />;
     case 'system':
       return <SystemView />;
     case 'dashboard':
@@ -78,11 +84,44 @@ function ActiveScreen({ screen }: { screen: Screen }) {
   }
 }
 
+/** True when a keystroke should be left to native field-level editing/undo. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    target.isContentEditable
+  );
+}
+
 export function App() {
   const activeScreen = useProjectStore((s) => s.activeScreen);
   const setScreen = useProjectStore((s) => s.setScreen);
   const projectName = useProjectStore((s) => s.project.name);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
   const { hydrated, saveState, target } = useAutosave();
+
+  // Global undo/redo shortcuts: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+      const isUndo = key === 'z' && !e.shiftKey;
+      const isRedo = (key === 'z' && e.shiftKey) || key === 'y';
+      if (!isUndo && !isRedo) return;
+      // Don't hijack native undo inside form fields.
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (isRedo) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undo, redo]);
 
   if (!hydrated) {
     return (

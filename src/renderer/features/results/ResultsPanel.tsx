@@ -43,6 +43,54 @@ function vdColor(within: boolean): string {
   return within ? 'teal' : 'red';
 }
 
+/**
+ * Compact protection summary: device breaking capacity (red when below the
+ * prospective fault) and the earth-fault loop (Zs) disconnection check. Renders
+ * a dash when no fault analysis is available (e.g. an isolated panel preview).
+ */
+function ProtectionCell({ circuit }: { circuit: CircuitResult }) {
+  const { breakerKa, kaAdequate, disconnectsInTime, zsOhm, zsMaxOhm } = circuit;
+  if (breakerKa === undefined && disconnectsInTime === undefined) {
+    return (
+      <Text c="dimmed" fz="xs">
+        —
+      </Text>
+    );
+  }
+  return (
+    <Group gap={4} wrap="nowrap">
+      {breakerKa !== undefined && (
+        <Badge
+          size="sm"
+          variant={kaAdequate === false ? 'filled' : 'light'}
+          color={kaAdequate === false ? 'red' : 'gray'}
+          title={
+            kaAdequate === false
+              ? 'Breaking capacity below the prospective fault'
+              : 'Breaking capacity (Icu)'
+          }
+        >
+          {breakerKa} kA
+        </Badge>
+      )}
+      {disconnectsInTime !== undefined && (
+        <Badge
+          size="sm"
+          variant="light"
+          color={disconnectsInTime ? 'teal' : 'red'}
+          title={
+            zsOhm !== undefined && zsMaxOhm !== undefined
+              ? `Zs ${zsOhm} / ${zsMaxOhm} Ω max`
+              : 'Earth-fault loop disconnection'
+          }
+        >
+          Zs {disconnectsInTime ? '✓' : '✗'}
+        </Badge>
+      )}
+    </Group>
+  );
+}
+
 /** Expandable control-gear detail shown under motor/pump rows. */
 function ControlDetail({ circuit }: { circuit: CircuitResult }) {
   const control = circuit.control;
@@ -177,10 +225,13 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
             {formatPercent(vd.dropPercent)}
           </Text>
         </Table.Td>
+        <Table.Td>
+          <ProtectionCell circuit={circuit} />
+        </Table.Td>
       </Table.Tr>
       {hasControl && (
         <Table.Tr>
-          <Table.Td colSpan={6} p={0} style={{ border: open ? undefined : 'none' }}>
+          <Table.Td colSpan={7} p={0} style={{ border: open ? undefined : 'none' }}>
             <Collapse in={open}>
               <ControlDetail circuit={circuit} />
             </Collapse>
@@ -257,7 +308,7 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
         <Text fw={600} size="sm" mb="xs">
           Branch circuits
         </Text>
-        <Table.ScrollContainer minWidth={640}>
+        <Table.ScrollContainer minWidth={760}>
           <Table verticalSpacing="xs" highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -267,6 +318,7 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
                 <Table.Th w={150}>Breaker</Table.Th>
                 <Table.Th w={170}>Cable / wiring</Table.Th>
                 <Table.Th w={80}>Vdrop</Table.Th>
+                <Table.Th w={120}>Protection</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>

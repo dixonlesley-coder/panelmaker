@@ -206,40 +206,50 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setActivePanel: (panelId) => set({ activePanelId: panelId }),
 
   updateCircuit: (panelId, circuitId, patch) =>
-    set((s) => ({
-      project: mapPanel(s.project, panelId, (panel) =>
-        mapCircuit(panel, circuitId, (c) => ({ ...c, ...patch })),
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) =>
+          mapCircuit(panel, circuitId, (c) => ({ ...c, ...patch })),
+        ),
       ),
-    })),
+    ),
 
   addCircuit: (panelId) =>
-    set((s) => ({
-      project: mapPanel(s.project, panelId, (panel) => {
-        const newCircuit: CircuitInput = {
-          id: nextId('c'),
-          name: `New circuit ${panel.circuits.length + 1}`,
-          role: 'branch',
-          loadW: 1000,
-          cosPhi: 0.85,
-          lengthM: 20,
-          loadKind: 'general',
-          isLighting: false,
-          demandFactor: 1,
-        };
-        return { ...panel, circuits: [...panel.circuits, newCircuit] };
-      }),
-    })),
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          const newCircuit: CircuitInput = {
+            id: nextId('c'),
+            name: `New circuit ${panel.circuits.length + 1}`,
+            role: 'branch',
+            loadW: 1000,
+            cosPhi: 0.85,
+            lengthM: 20,
+            loadKind: 'general',
+            isLighting: false,
+            demandFactor: 1,
+          };
+          return { ...panel, circuits: [...panel.circuits, newCircuit] };
+        }),
+      ),
+    ),
 
   removeCircuit: (panelId, circuitId) =>
-    set((s) => ({
-      project: mapPanel(s.project, panelId, (panel) => ({
-        ...panel,
-        circuits: panel.circuits.filter((c) => c.id !== circuitId),
-      })),
-    })),
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: panel.circuits.filter((c) => c.id !== circuitId),
+        })),
+      ),
+    ),
 
   updatePanel: (panelId, patch) =>
-    set((s) => ({ project: mapPanel(s.project, panelId, (panel) => ({ ...panel, ...patch })) })),
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({ ...panel, ...patch })),
+      ),
+    ),
 
   addPanel: () =>
     set((s) => {
@@ -256,7 +266,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         circuits: [],
       };
       return {
-        project: { ...s.project, panels: [...s.project.panels, newPanel] },
+        ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
         activePanelId: newPanel.id,
         activeScreen: 'panel',
       };
@@ -268,22 +278,98 @@ export const useProjectStore = create<ProjectState>((set) => ({
       if (!action || action.type !== 'set-cable') return s;
       const csaMm2 = action.payload.csaMm2;
       if (typeof csaMm2 !== 'number') return s;
-      return {
-        project: mapPanel(s.project, panelId, (panel) =>
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) =>
           mapCircuit(panel, circuitId, (c) => ({ ...c, cableOverrideMm2: csaMm2 })),
         ),
-      };
+      );
     }),
 
   mergePrices: (prices) => set((s) => ({ prices: { ...s.prices, ...prices } })),
 
   updateSources: (patch) =>
-    set((s) => ({ project: { ...s.project, sources: { ...s.project.sources, ...patch } } })),
+    set((s) =>
+      withHistory(s, (project) => ({
+        ...project,
+        sources: { ...project.sources, ...patch },
+      })),
+    ),
 
-  setEarthingSystem: (system) => set((s) => ({ project: { ...s.project, earthingSystem: system } })),
+  setEarthingSystem: (system) =>
+    set((s) => withHistory(s, (project) => ({ ...project, earthingSystem: system }))),
+
+  undo: () =>
+    set((s) => {
+      if (s.past.length === 0) return s;
+      const previous = s.past[s.past.length - 1]!;
+      const past = s.past.slice(0, -1);
+      const future = [s.project, ...s.future].slice(0, HISTORY_LIMIT);
+      const activePanelId = previous.panels.some((p) => p.id === s.activePanelId)
+        ? s.activePanelId
+        : (previous.panels[0]?.id ?? '');
+      return { project: previous, past, future, activePanelId };
+    }),
+
+  redo: () =>
+    set((s) => {
+      if (s.future.length === 0) return s;
+      const next = s.future[0]!;
+      const future = s.future.slice(1);
+      const past = [...s.past, s.project].slice(-HISTORY_LIMIT);
+      const activePanelId = next.panels.some((p) => p.id === s.activePanelId)
+        ? s.activePanelId
+        : (next.panels[0]?.id ?? '');
+      return { project: next, past, future, activePanelId };
+    }),
 
   replaceProject: (project) =>
-    set({ project, activePanelId: project.panels[0]?.id ?? '', schematics: {} }),
+    set({ project, activePanelId: project.panels[0]?.id ?? '', schematics: {}, past: [], future: [] }),
+
+  newProject: async (name) => {
+    const project: ProjectInput = {
+      ...createSampleProject(),
+      id: freshProjectId(),
+      name: name && name.trim().length > 0 ? name.trim() : 'New project',
+    };
+    useProjectStore.getState().replaceProject(project);
+    await registrySaveProject(project);
+  },
+
+  openProject: async (id) => {
+    const project = await registryLoadProject(id);
+    if (!project) return false;
+    useProjectStore.getState().replaceProject(project);
+    useProjectStore.setState({ activeScreen: 'system' });
+    return true;
+  },
+
+  duplicateActiveProject: async () => {
+    const current = useProjectStore.getState().project;
+    const copy: ProjectInput = {
+      ...current,
+      id: freshProjectId(),
+      name: `${current.name} (copy)`,
+    };
+    await registrySaveProject(copy);
+    return copy.id;
+  },
+
+  renameProject: async (name) => {
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return;
+    set((s) => ({ project: { ...s.project, name: trimmed } }));
+    await registrySaveProject(useProjectStore.getState().project);
+  },
+
+  deleteProjectById: async (id) => {
+    const deleted = await registryDeleteProject(id);
+    if (!deleted) return false;
+    const state = useProjectStore.getState();
+    if (state.project.id === id) {
+      await state.newProject();
+    }
+    return true;
+  },
 
   ensureSchematic: (circuitId, assembly) =>
     set((s) => {

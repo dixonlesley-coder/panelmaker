@@ -1,0 +1,159 @@
+import { useMemo } from 'react';
+import { Box, Button, Card, Group, Stack, Table, Text } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { IconFileSpreadsheet, IconFileText } from '@tabler/icons-react';
+import type { PanelInput } from '@shared/types/project';
+import type { CircuitResult, PanelResult } from '@shared/types/results';
+import type { Part } from '@shared/types/parts';
+import { costPanel } from '@renderer/lib/bom';
+import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
+import { formatAmps, formatPercent } from '@renderer/lib/format';
+import { useProjectStore } from '@renderer/state/projectStore';
+
+/** Slugify a panel name into a safe download filename stem. */
+function fileStem(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'panel';
+}
+
+/** Cable make-up text for a circuit: prefer the explicit spec, else size × cores. */
+function cableMakeUp(circuit: CircuitResult): string {
+  const g = circuit.grounding;
+  if (g.cableSpec) return g.cableSpec;
+  return `${circuit.cable.csaMm2} mm² · ${g.cores}-core`;
+}
+
+/**
+ * The per-circuit cable schedule — the tabular document panel builders expect.
+ * One row per computed circuit, plus an "Export BOM" control that prices the
+ * panel BOM and downloads it as `.csv` or `.xlsx` straight from the renderer.
+ */
+export function CableSchedule({ panel, result }: { panel: PanelInput; result: PanelResult }) {
+  const parts = useProjectStore((s) => s.parts);
+  const prices = useProjectStore((s) => s.prices);
+
+  // Run lengths live on the input model; match by circuit id so the order of
+  // result circuits and input circuits need not agree.
+  const lengthById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of panel.circuits) m.set(c.id, c.lengthM);
+    return m;
+  }, [panel.circuits]);
+
+  const cost = useMemo(() => {
+    const priceMap = new Map<string, number>(Object.entries(prices));
+    return costPanel(result, parts as Part[], priceMap);
+  }, [result, parts, prices]);
+
+  function exportCsv() {
+    downloadBomCsv(`${fileStem(result.name)}-bom.csv`, cost.lines, cost.currency);
+    notifications.show({ message: `Exported BOM CSV (${cost.lines.length} lines)`, color: 'teal' });
+  }
+
+  function exportXlsx() {
+    downloadBomXlsx(`${fileStem(result.name)}-bom.xlsx`, cost.lines, cost.currency);
+    notifications.show({ message: `Exported BOM workbook (${cost.lines.length} lines)`, color: 'teal' });
+  }
+
+  const bus = result.busbar;
+
+  return (
+    <Stack gap="md">
+      <Group justify="space-between" wrap="wrap">
+        <Text fw={600}>Cable schedule</Text>
+        <Button.Group>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconFileText size={14} />}
+            onClick={exportCsv}
+          >
+            Export CSV
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconFileSpreadsheet size={14} />}
+            onClick={exportXlsx}
+          >
+            Export Excel (.xlsx)
+          </Button>
+        </Button.Group>
+      </Group>
+
+      <Card withBorder radius="md" padding="sm">
+        <Table.ScrollContainer minWidth={920}>
+          <Table verticalSpacing="xs" fz="sm" highlightOnHover withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w={48}>No.</Table.Th>
+                <Table.Th>Description</Table.Th>
+                <Table.Th w={56}>Ph</Table.Th>
+                <Table.Th w={84}>Design I</Table.Th>
+                <Table.Th w={150}>Breaker</Table.Th>
+                <Table.Th w={180}>Cable</Table.Th>
+                <Table.Th w={88}>Iz derated</Table.Th>
+                <Table.Th w={72}>Length</Table.Th>
+                <Table.Th w={72}>Vdrop</Table.Th>
+                <Table.Th w={64}>PE</Table.Th>
+                <Table.Th w={64}>N</Table.Th>
+                <Table.Th w={72}>RCD</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {result.circuits.map((c, i) => {
+                const len = lengthById.get(c.circuitId);
+                const vd = c.voltageDrop;
+                return (
+                  <Table.Tr key={c.circuitId}>
+                    <Table.Td>{i + 1}</Table.Td>
+                    <Table.Td>
+                      <Text size="sm" fw={500}>
+                        {c.name}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>{c.phase}</Table.Td>
+                    <Table.Td>{formatAmps(c.designCurrentA)}</Table.Td>
+                    <Table.Td>
+                      {c.breaker.deviceClass} {c.breaker.ratingA}A · {c.breaker.curve}
+                    </Table.Td>
+                    <Table.Td>{cableMakeUp(c)}</Table.Td>
+                    <Table.Td>{formatAmps(c.cable.deratedIzA)}</Table.Td>
+                    <Table.Td>{len !== undefined ? `${len} m` : '—'}</Table.Td>
+                    <Table.Td>
+                      <Text
+                        size="sm"
+                        c={vd.withinLimit ? undefined : 'red'}
+                        fw={vd.withinLimit ? 400 : 700}
+                      >
+                        {formatPercent(vd.dropPercent)}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>{c.grounding.peCsaMm2} mm²</Table.Td>
+                    <Table.Td>
+                      {c.grounding.neutralCsaMm2 > 0 ? `${c.grounding.neutralCsaMm2} mm²` : '—'}
+                    </Table.Td>
+                    <Table.Td>{c.rcd.required ? `${c.rcd.ratingMa} mA` : '—'}</Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      </Card>
+
+      <Box>
+        <Text size="xs" c="dimmed">
+          Busbar: {bus.widthMm} × {bus.thicknessMm} mm ({bus.csaMm2} mm²) — rated {formatAmps(bus.ampacityA)},
+          carrying {formatAmps(bus.totalCurrentA)}.
+        </Text>
+        <Text size="xs" c="dimmed">
+          Engineering estimate — verify against PUIL 2011 / IEC 60364 before construction.
+        </Text>
+      </Box>
+    </Stack>
+  );
+}
