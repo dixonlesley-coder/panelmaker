@@ -118,8 +118,9 @@ shared on-disk DB.
 - `strict` + `noUncheckedIndexedAccess`: `arr[i]` is `T | undefined` — handle it.
 - Offline guarantee: no runtime CDNs/fonts/network anywhere except the *optional* GitHub
   auto-update check. Bundle assets locally; strict CSP is set in `src/main/index.ts`.
-- Known persistence gaps: project-level `sources` config is not yet saved to SQLite
-  (`schedule` and `earthingSystem` are).
+- Autosave (`src/renderer/features/autosave` + `lib/autosave.ts`): debounced save to SQLite
+  (desktop) / localStorage (web), restored on launch by `useAutosave`. The whole project
+  graph + `earthingSystem` + `sources` round-trip; `schedule` persists per circuit.
 
 ## Implemented feature set (current progress)
 

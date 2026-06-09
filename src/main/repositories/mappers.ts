@@ -196,9 +196,18 @@ export function assembleProject(
   name: string,
   panels: PanelInput[],
   earthingSystem?: string | null,
+  sourcesJson?: string | null,
 ): ProjectInput {
   const project: ProjectInput = { id, name, panels };
   const es = nullToUndef(earthingSystem);
   if (es !== undefined) project.earthingSystem = es as ProjectInput['earthingSystem'];
+  const sj = nullToUndef(sourcesJson);
+  if (sj) {
+    try {
+      project.sources = JSON.parse(sj) as ProjectInput['sources'];
+    } catch {
+      /* corrupt sources blob — ignore */
+    }
+  }
   return project;
 }

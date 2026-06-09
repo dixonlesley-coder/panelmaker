@@ -59,6 +59,8 @@ export const projects = sqliteTable('projects', {
   updatedAt: text('updated_at').notNull(),
   appVersion: text('app_version'),
   earthingSystem: text('earthing_system'),
+  /** Energy-sources config (generator/solar/battery) as JSON. */
+  sourcesJson: text('sources_json'),
 });
 
 export const panels = sqliteTable('panels', {

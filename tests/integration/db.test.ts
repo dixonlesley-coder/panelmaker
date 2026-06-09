@@ -44,6 +44,8 @@ describe('SQLite persistence', () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe(project.name);
     expect(loaded!.earthingSystem).toBe('TT');
+    expect(loaded!.sources?.generator?.enabled).toBe(true);
+    expect(loaded!.sources?.solar?.enabled).toBe(true);
     expect(loaded!.panels.length).toBe(project.panels.length);
 
     // motor circuit round-trips its starter + motor fields
