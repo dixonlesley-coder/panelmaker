@@ -12,4 +12,5 @@ export * from './capacitor';
 export * from './harmonics';
 export * from './arcFlash';
 export * from './occupancy';
+export * from './containment';
 export * from './control';

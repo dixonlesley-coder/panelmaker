@@ -8,6 +8,7 @@ import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC } from './control/motorFLC';
 import { circuitDemandFactor } from './occupancy';
+import { sizeCableTray, sizeCircuitConduit } from './containment';
 import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
@@ -156,6 +157,8 @@ function computeCircuit(
     warnings.push(...validateInterlocks(control, panel.id));
   }
 
+  const containment = sizeCircuitConduit(cable.csaMm2, grounding.cores);
+
   const result: CircuitResult = {
     circuitId: c.id,
     name: c.name,
@@ -167,6 +170,7 @@ function computeCircuit(
     grounding,
     rcd,
     control,
+    containment,
   };
 
   // Protection / fault analysis (only when the panel's prospective fault is known).
@@ -271,6 +275,9 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   const busbar = sizeBusbar(totalDemandCurrentA);
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
 
+  // Cable tray for all outgoing cables, laid side-by-side in a single layer.
+  const cableTray = sizeCableTray(circuits.map((c) => c.containment?.cableOdMm ?? 0));
+
   // Harmonics / power-quality estimate from the non-linear (VFD/soft-starter/
   // UPS/rectifier) load share. branches and comps are aligned by construction.
   const largestNeutralCsaMm2 = comps.reduce(
@@ -320,6 +327,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     },
     warnings,
     standardsVersion: STANDARDS_VERSION,
+    cableTray,
     ...(opts.faultLevelA !== undefined ? { faultLevelKa: round(opts.faultLevelA / 1000, 1) } : {}),
     ...(harmonics ? { harmonics } : {}),
     ...(arcFlash ? { arcFlash } : {}),

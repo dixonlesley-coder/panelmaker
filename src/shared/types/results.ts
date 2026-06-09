@@ -101,6 +101,28 @@ export interface CircuitResult {
   zsMaxOhm?: number;
   /** True when Zs <= Zs_max (automatic disconnection within the limit). */
   disconnectsInTime?: boolean;
+  /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
+  containment?: ContainmentResult;
+}
+
+/** Conduit sizing + fill for a single circuit cable. */
+export interface ContainmentResult {
+  /** Estimated cable outer diameter (mm). */
+  cableOdMm: number;
+  /** Smallest standard conduit nominal size that satisfies the fill rule (mm). */
+  conduitSizeMm: number;
+  /** Conduit fill (%) — cable area over the conduit's usable bore area. */
+  fillPct: number;
+}
+
+/** Cable-tray sizing for all of a panel's outgoing cables (single-layer). */
+export interface CableTrayResult {
+  /** Smallest standard tray width that holds the cables side-by-side (mm). */
+  widthMm: number;
+  /** Tray width utilisation (%). */
+  fillPct: number;
+  /** Number of cables carried. */
+  cableCount: number;
 }
 
 export interface BusbarResult {
@@ -220,6 +242,8 @@ export interface PanelResult {
   harmonics?: HarmonicsResult;
   /** Simplified arc-flash incident-energy estimate at the bus, when fault known. */
   arcFlash?: ArcFlashResult;
+  /** Cable-tray sizing for the panel's outgoing cables. */
+  cableTray?: CableTrayResult;
 }
 
 /** A 24-hour building demand profile and peak analysis. */

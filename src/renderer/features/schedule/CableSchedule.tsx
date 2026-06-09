@@ -85,16 +85,18 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
       </Group>
 
       <Card withBorder radius="md" padding="sm">
-        <Table.ScrollContainer minWidth={920}>
+        <Table.ScrollContainer minWidth={1120}>
           <Table verticalSpacing="xs" fz="sm" highlightOnHover withColumnBorders>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th w={48}>No.</Table.Th>
-                <Table.Th>Description</Table.Th>
+                <Table.Th w={120}>From</Table.Th>
+                <Table.Th>To (load)</Table.Th>
                 <Table.Th w={56}>Ph</Table.Th>
                 <Table.Th w={84}>Design I</Table.Th>
                 <Table.Th w={150}>Breaker</Table.Th>
                 <Table.Th w={180}>Cable</Table.Th>
+                <Table.Th w={110}>Conduit</Table.Th>
                 <Table.Th w={88}>Iz derated</Table.Th>
                 <Table.Th w={72}>Length</Table.Th>
                 <Table.Th w={72}>Vdrop</Table.Th>
@@ -111,6 +113,11 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
                   <Table.Tr key={c.circuitId}>
                     <Table.Td>{i + 1}</Table.Td>
                     <Table.Td>
+                      <Text size="xs" c="dimmed">
+                        {panel.name}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
                       <Text size="sm" fw={500}>
                         {c.name}
                       </Text>
@@ -121,6 +128,11 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
                       {c.breaker.deviceClass} {c.breaker.ratingA}A · {c.breaker.curve}
                     </Table.Td>
                     <Table.Td>{cableMakeUp(c)}</Table.Td>
+                    <Table.Td>
+                      {c.containment
+                        ? `${c.containment.conduitSizeMm} mm (${c.containment.fillPct}%)`
+                        : '—'}
+                    </Table.Td>
                     <Table.Td>{formatAmps(c.cable.deratedIzA)}</Table.Td>
                     <Table.Td>{len !== undefined ? `${len} m` : '—'}</Table.Td>
                     <Table.Td>
@@ -150,6 +162,12 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
           Busbar: {bus.widthMm} × {bus.thicknessMm} mm ({bus.csaMm2} mm²) — rated {formatAmps(bus.ampacityA)},
           carrying {formatAmps(bus.totalCurrentA)}.
         </Text>
+        {result.cableTray && (
+          <Text size="xs" c="dimmed">
+            Cable tray: {result.cableTray.widthMm} mm wide (single layer) — {result.cableTray.cableCount}{' '}
+            cables, ~{result.cableTray.fillPct}% of width. Conduit sizes are per-circuit at ≤53% fill.
+          </Text>
+        )}
         <Text size="xs" c="dimmed">
           Engineering estimate — verify against PUIL 2011 / IEC 60364 before construction.
         </Text>
