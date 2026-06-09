@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   Button,
@@ -21,6 +22,7 @@ import { useProjectStore } from '@renderer/state/projectStore';
 import { exportQuotationPdf } from '@renderer/api';
 
 export function Quotation() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
@@ -56,9 +58,9 @@ export function Quotation() {
       <Group justify="space-between" align="flex-end">
         <div>
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Commercial
+            {t('quotation.eyebrow')}
           </Text>
-          <Title order={3}>Quotation</Title>
+          <Title order={3}>{t('quotation.title')}</Title>
         </div>
         <Button
           size="xs"
@@ -66,23 +68,22 @@ export function Quotation() {
           leftSection={<IconDownload size={14} />}
           onClick={onExport}
         >
-          Export quotation PDF
+          {t('quotation.exportQuotationPdf')}
         </Button>
       </Group>
 
       <Card withBorder radius="md" padding="md">
         <Group gap="xs" mb="md">
           <IconReceipt2 size={18} color="var(--mantine-color-indigo-6)" />
-          <Text fw={600}>Labor &amp; mark-ups</Text>
+          <Text fw={600}>{t('quotation.laborMarkups')}</Text>
         </Group>
         <Text size="xs" c="dimmed" mb="md">
-          Applied on top of the priced consolidated bill of materials. Stored with the project; leave
-          a field at the default to use the standard assumption.
+          {t('quotation.laborMarkupsHint')}
         </Text>
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <NumberInput
-            label="Labor rate"
-            description="Shop assembly / wiring"
+            label={t('quotation.laborRate')}
+            description={t('quotation.laborRateHint')}
             suffix=" IDR/h"
             min={0}
             step={10000}
@@ -91,8 +92,8 @@ export function Quotation() {
             onChange={(v) => typeof v === 'number' && patch({ laborRatePerHour: v })}
           />
           <NumberInput
-            label="Overhead"
-            description="of material + labor"
+            label={t('quotation.overhead')}
+            description={t('quotation.ofMaterialLabor')}
             suffix=" %"
             min={0}
             max={100}
@@ -101,8 +102,8 @@ export function Quotation() {
             onChange={(v) => typeof v === 'number' && patch({ overheadPct: v })}
           />
           <NumberInput
-            label="Margin"
-            description="of loaded cost"
+            label={t('quotation.margin')}
+            description={t('quotation.ofLoadedCost')}
             suffix=" %"
             min={0}
             max={100}
@@ -111,8 +112,8 @@ export function Quotation() {
             onChange={(v) => typeof v === 'number' && patch({ marginPct: v })}
           />
           <NumberInput
-            label="Contingency"
-            description="of material + labor"
+            label={t('quotation.contingency')}
+            description={t('quotation.ofMaterialLabor')}
             suffix=" %"
             min={0}
             max={100}
@@ -126,24 +127,26 @@ export function Quotation() {
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Material
+            {t('quotation.material')}
           </Text>
           <Text fw={700} size="lg">
             {formatIdr(quote.materialSubtotal)}
           </Text>
           <Text size="xs" c="dimmed">
-            {cost.unmatchedCount > 0 ? `${cost.unmatchedCount} unpriced lines` : 'all priced'}
+            {cost.unmatchedCount > 0
+              ? t('quotation.unpricedLines', { count: cost.unmatchedCount })
+              : t('quotation.allPriced')}
           </Text>
         </Card>
         <Card withBorder radius="md" padding="md">
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Labor
+            {t('quotation.labor')}
           </Text>
           <Text fw={700} size="lg">
             {formatIdr(quote.laborSubtotal)}
           </Text>
           <Text size="xs" c="dimmed">
-            {quote.laborHours} h assembly
+            {t('quotation.hAssembly', { hours: quote.laborHours })}
           </Text>
         </Card>
         <Card withBorder radius="md" padding="md">
@@ -152,7 +155,7 @@ export function Quotation() {
               <IconCash size={14} />
             </ThemeIcon>
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-              Quoted total
+              {t('quotation.quotedTotal')}
             </Text>
           </Group>
           <Text fw={700} size="lg" c="teal">
@@ -163,13 +166,13 @@ export function Quotation() {
 
       <Card withBorder radius="md" padding="md">
         <Text fw={600} mb="sm">
-          Price breakdown
+          {t('quotation.priceBreakdown')}
         </Text>
         <Table verticalSpacing="xs" fz="sm">
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Cost element</Table.Th>
-              <Table.Th ta="right">Amount</Table.Th>
+              <Table.Th>{t('quotation.costElement')}</Table.Th>
+              <Table.Th ta="right">{t('quotation.amount')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -180,7 +183,7 @@ export function Quotation() {
               </Table.Tr>
             ))}
             <Table.Tr>
-              <Table.Td fw={700}>Quoted total</Table.Td>
+              <Table.Td fw={700}>{t('quotation.quotedTotal')}</Table.Td>
               <Table.Td ta="right" fw={700}>
                 {formatIdr(quote.grandTotal)}
               </Table.Td>
@@ -191,26 +194,25 @@ export function Quotation() {
 
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="sm">
-          <Text fw={600}>Bill of materials</Text>
+          <Text fw={600}>{t('quotation.billOfMaterials')}</Text>
           <Text size="xs" c="dimmed">
-            {quote.lines.length} line{quote.lines.length === 1 ? '' : 's'} · consolidated across all
-            panels
+            {t('quotation.linesConsolidated', { count: quote.lines.length })}
           </Text>
         </Group>
         <Table.ScrollContainer minWidth={640}>
           <Table verticalSpacing="xs" fz="sm" highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Item</Table.Th>
-                <Table.Th w={140}>Order code</Table.Th>
+                <Table.Th>{t('quotation.item')}</Table.Th>
+                <Table.Th w={140}>{t('quotation.orderCode')}</Table.Th>
                 <Table.Th w={60} ta="right">
-                  Qty
+                  {t('quotation.qty')}
                 </Table.Th>
                 <Table.Th w={140} ta="right">
-                  Unit price
+                  {t('quotation.unitPrice')}
                 </Table.Th>
                 <Table.Th w={150} ta="right">
-                  Line total
+                  {t('quotation.lineTotal')}
                 </Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -238,7 +240,7 @@ export function Quotation() {
                       formatIdr(l.lineTotal)
                     ) : (
                       <Badge size="xs" variant="light" color="gray">
-                        no price
+                        {t('quotation.noPrice')}
                       </Badge>
                     )}
                   </Table.Td>

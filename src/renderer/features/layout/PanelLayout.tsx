@@ -1,4 +1,5 @@
 import { Alert, Box, Button, Card, Group, SimpleGrid, Stack, Text } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
 import { IconFileVector, IconRuler2 } from '@tabler/icons-react';
 import type { PanelInput } from '@shared/types/project';
 import type { PanelResult } from '@shared/types/results';
@@ -28,6 +29,7 @@ function KeyVal({ k, v }: { k: string; v: string }) {
  * chamber. The surrounding legend cards summarise the enclosure and thermal spec.
  */
 export function PanelLayout({ panel, result }: { panel: PanelInput; result: PanelResult }) {
+  const { t } = useTranslation();
   const enc = result.enclosure;
   const { widthMm, heightMm, depthMm, sheetThicknessMm, modules, rows, ventilation, totalHeatW } = enc;
 
@@ -35,9 +37,8 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
   if (widthMm <= 0 || heightMm <= 0 || rows <= 0 || modules <= 0) {
     return (
       <Stack gap="md">
-        <Alert color="gray" icon={<IconRuler2 size={18} />} title="No layout yet">
-          Add branch circuits to size the enclosure — the general-arrangement elevation appears once the
-          engine computes modules and DIN rows.
+        <Alert color="gray" icon={<IconRuler2 size={18} />} title={t('layout.noLayoutTitle')}>
+          {t('layout.noLayoutBody')}
         </Alert>
       </Stack>
     );
@@ -57,10 +58,10 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
   return (
     <Stack gap="md">
       <Group justify="space-between">
-        <Text fw={600}>General arrangement</Text>
+        <Text fw={600}>{t('layout.generalArrangement')}</Text>
         <Group gap="xs">
           <Text size="xs" c="dimmed">
-            {panel.system} · front elevation
+            {t('layout.frontElevation', { system: panel.system })}
           </Text>
           <Button
             size="xs"
@@ -68,7 +69,7 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
             leftSection={<IconFileVector size={14} />}
             onClick={() => downloadSvg(panel.name, gaSvg)}
           >
-            Export SVG
+            {t('layout.exportSvg')}
           </Button>
           <Button
             size="xs"
@@ -76,7 +77,7 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
             leftSection={<IconFileVector size={14} />}
             onClick={() => downloadDxf(panel.name, panelGaDxf(panel, result))}
           >
-            Export DXF
+            {t('layout.exportDxf')}
           </Button>
         </Group>
       </Group>
@@ -89,35 +90,35 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
         */}
         <Box
           style={{ width: '100%' }}
-          aria-label={`Panel front elevation, ${widthMm} by ${heightMm} millimetres`}
+          aria-label={t('layout.frontElevationAria', { width: widthMm, height: heightMm })}
           dangerouslySetInnerHTML={{ __html: gaSvgResponsive }}
         />
 
         <Text size="xs" c="dimmed" mt="xs" ta="center">
-          Schematic general arrangement — estimate, verify against PUIL 2011.
+          {t('layout.schematicEstimate')}
         </Text>
       </Card>
 
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Enclosure
+            {t('layout.enclosure')}
           </Text>
           <Stack gap={4}>
-            <KeyVal k="Overall (W×H×D)" v={`${widthMm} × ${heightMm} × ${depthMm} mm`} />
-            <KeyVal k="Sheet thickness" v={`${sheetThicknessMm} mm`} />
-            <KeyVal k="DIN rows" v={`${rows}`} />
-            <KeyVal k="Modules (18 mm)" v={`${modules}`} />
+            <KeyVal k={t('layout.overall')} v={`${widthMm} × ${heightMm} × ${depthMm} mm`} />
+            <KeyVal k={t('layout.sheetThickness')} v={`${sheetThicknessMm} mm`} />
+            <KeyVal k={t('layout.dinRows')} v={`${rows}`} />
+            <KeyVal k={t('layout.modules18')} v={`${modules}`} />
           </Stack>
         </Card>
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
-            Thermal / cooling
+            {t('layout.thermalCooling')}
           </Text>
           <Stack gap={4}>
-            <KeyVal k="Internal heat" v={`${totalHeatW.toFixed(0)} W`} />
-            <KeyVal k="Ventilation class" v={ventilation} />
-            <KeyVal k="Devices drawn" v={`${result.circuits.length}`} />
+            <KeyVal k={t('layout.internalHeat')} v={`${totalHeatW.toFixed(0)} W`} />
+            <KeyVal k={t('layout.ventilationClass')} v={ventilation} />
+            <KeyVal k={t('layout.devicesDrawn')} v={`${result.circuits.length}`} />
           </Stack>
         </Card>
       </SimpleGrid>

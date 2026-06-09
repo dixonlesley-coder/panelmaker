@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Badge,
@@ -28,6 +29,7 @@ const idr = (n: number) =>
 
 /** Import a CSV/Excel pricelist, match parts by model, and apply unit prices. */
 export function Pricelist() {
+  const { t } = useTranslation();
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const mergePrices = useProjectStore((s) => s.mergePrices);
@@ -46,21 +48,19 @@ export function Pricelist() {
       const wb = XLSX.read(buf, { type: 'array' });
       const first = wb.SheetNames[0];
       if (!first) {
-        setError('No sheets found in the file.');
+        setError(t('pricelist.noSheets'));
         return;
       }
       const ws = wb.Sheets[first]!;
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
       const parsed = parseRows(rows);
       if (parsed.length === 0) {
-        setError(
-          'Could not find a model column and a price column. Expected one column of part models and one of unit prices.',
-        );
+        setError(t('pricelist.noColumns'));
         return;
       }
       setMatch(matchToParts(parsed, parts));
     } catch (e) {
-      setError(`Failed to read file: ${(e as Error).message}`);
+      setError(t('pricelist.readFailed', { message: (e as Error).message }));
     }
   }
 
@@ -68,7 +68,7 @@ export function Pricelist() {
     if (!match) return;
     mergePrices(pricesFromMatches(match.matched));
     notifications.show({
-      message: `Applied ${match.matched.length} unit prices to the catalog.`,
+      message: t('pricelist.appliedToast', { count: match.matched.length }),
       color: 'teal',
       icon: <IconCheck size={16} />,
     });
@@ -78,20 +78,19 @@ export function Pricelist() {
     <Stack gap="md">
       <div>
         <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-          Costing
+          {t('pricelist.eyebrow')}
         </Text>
-        <Title order={3}>Pricelist import</Title>
+        <Title order={3}>{t('pricelist.title')}</Title>
         <Text size="sm" c="dimmed">
-          Import a CSV or Excel pricelist — a column of part models and a column of unit prices.
-          Matched parts update the build cost across every panel and the whole-system total.
+          {t('pricelist.subtitle')}
         </Text>
       </div>
 
       <Card withBorder radius="md" padding="md">
         <Group align="flex-end" justify="space-between">
           <FileInput
-            label="Pricelist file"
-            placeholder="Choose .csv / .xlsx / .xls"
+            label={t('pricelist.pricelistFile')}
+            placeholder={t('pricelist.filePlaceholder')}
             accept=".csv,.xlsx,.xls"
             leftSection={<IconFileSpreadsheet size={16} />}
             clearable
@@ -99,11 +98,11 @@ export function Pricelist() {
             w={340}
           />
           <Text size="xs" c="dimmed">
-            {Object.keys(prices).length} parts currently priced
+            {t('pricelist.partsPriced', { count: Object.keys(prices).length })}
           </Text>
         </Group>
         {error && (
-          <Alert color="red" mt="sm" title="Import error">
+          <Alert color="red" mt="sm" title={t('pricelist.importError')}>
             {error}
           </Alert>
         )}
@@ -114,10 +113,10 @@ export function Pricelist() {
           <Group justify="space-between" mb="sm">
             <Group gap="xs">
               <Badge color="teal" variant="light">
-                {match.matched.length} matched
+                {t('pricelist.matched', { count: match.matched.length })}
               </Badge>
               <Badge color="gray" variant="light">
-                {match.unmatched.length} unmatched
+                {t('pricelist.unmatched', { count: match.unmatched.length })}
               </Badge>
               {fileName && (
                 <Text size="xs" c="dimmed">
@@ -130,7 +129,7 @@ export function Pricelist() {
               disabled={match.matched.length === 0}
               onClick={apply}
             >
-              Apply {match.matched.length} prices
+              {t('pricelist.applyPrices', { count: match.matched.length })}
             </Button>
           </Group>
 
@@ -138,9 +137,9 @@ export function Pricelist() {
             <Table stickyHeader striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Manufacturer</Table.Th>
-                  <Table.Th>Model</Table.Th>
-                  <Table.Th ta="right">Unit price</Table.Th>
+                  <Table.Th>{t('pricelist.manufacturer')}</Table.Th>
+                  <Table.Th>{t('pricelist.model')}</Table.Th>
+                  <Table.Th ta="right">{t('pricelist.unitPrice')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -155,7 +154,7 @@ export function Pricelist() {
                   <Table.Tr key={`u${i}`}>
                     <Table.Td colSpan={2}>
                       <Text size="xs" c="dimmed">
-                        {u.key} — no catalog match
+                        {t('pricelist.noCatalogMatch', { key: u.key })}
                       </Text>
                     </Table.Td>
                     <Table.Td ta="right">

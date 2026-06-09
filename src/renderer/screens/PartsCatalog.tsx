@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge, Card, Group, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import type { Part } from '@shared/types';
@@ -37,6 +38,7 @@ function groupByCategory(parts: Part[]): Map<string, Part[]> {
 }
 
 export function PartsCatalog() {
+  const { t } = useTranslation();
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const [query, setQuery] = useState('');
@@ -59,12 +61,12 @@ export function PartsCatalog() {
       <Group justify="space-between" align="flex-end">
         <div>
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Catalog
+            {t('parts.eyebrow')}
           </Text>
-          <Title order={3}>Parts</Title>
+          <Title order={3}>{t('parts.title')}</Title>
         </div>
         <TextInput
-          placeholder="Search manufacturer, model, attribute…"
+          placeholder={t('parts.searchPlaceholder')}
           leftSection={<IconSearch size={16} />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
@@ -74,7 +76,7 @@ export function PartsCatalog() {
 
       {grouped.size === 0 && (
         <Text c="dimmed" ta="center" py="xl">
-          No parts match “{query}”.
+          {t('parts.noMatch', { query })}
         </Text>
       )}
 
@@ -85,19 +87,19 @@ export function PartsCatalog() {
               {category}
             </Badge>
             <Text size="xs" c="dimmed">
-              {items.length} item{items.length === 1 ? '' : 's'}
+              {t('parts.items', { count: items.length })}
             </Text>
           </Group>
           <Table.ScrollContainer minWidth={760}>
             <Table verticalSpacing="xs" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th w={140}>Manufacturer</Table.Th>
-                  <Table.Th w={170}>Model</Table.Th>
-                  <Table.Th w={150}>Order code</Table.Th>
-                  <Table.Th>Attributes</Table.Th>
+                  <Table.Th w={140}>{t('parts.manufacturer')}</Table.Th>
+                  <Table.Th w={170}>{t('parts.model')}</Table.Th>
+                  <Table.Th w={150}>{t('parts.orderCode')}</Table.Th>
+                  <Table.Th>{t('parts.attributes')}</Table.Th>
                   <Table.Th w={150} ta="right">
-                    Price
+                    {t('parts.price')}
                   </Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -136,7 +138,7 @@ export function PartsCatalog() {
                           </Text>
                         ) : (
                           <Badge size="xs" variant="light" color="gray">
-                            no price
+                            {t('parts.noPrice')}
                           </Badge>
                         )}
                       </Table.Td>

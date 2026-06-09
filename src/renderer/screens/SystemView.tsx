@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Background,
   Controls,
@@ -139,6 +140,7 @@ function buildGraph(
 }
 
 export function SystemView() {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
@@ -179,7 +181,7 @@ export function SystemView() {
       <Group justify="space-between" align="flex-end">
         <div>
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            Building overview
+            {t('system.eyebrow')}
           </Text>
           <Title order={3}>{project.name}</Title>
         </div>
@@ -192,7 +194,7 @@ export function SystemView() {
                 leftSection={<IconPlus size={14} />}
                 rightSection={<IconChevronDown size={14} />}
               >
-                Add panel
+                {t('system.addPanel')}
               </Button>
             </Menu.Target>
             <Menu.Dropdown>
@@ -200,19 +202,19 @@ export function SystemView() {
                 leftSection={<IconLayoutGridAdd size={14} />}
                 onClick={() => addPanel()}
               >
-                Blank panel
+                {t('system.blankPanel')}
               </Menu.Item>
               <Menu.Divider />
-              <Menu.Label>From template</Menu.Label>
-              {PANEL_TEMPLATES.map((t) => (
+              <Menu.Label>{t('system.fromTemplate')}</Menu.Label>
+              {PANEL_TEMPLATES.map((tpl) => (
                 <Menu.Item
-                  key={t.id}
+                  key={tpl.id}
                   leftSection={<IconSitemap size={14} />}
-                  onClick={() => addPanelFromTemplate(t.id)}
+                  onClick={() => addPanelFromTemplate(tpl.id)}
                 >
-                  <Text size="sm">{t.label}</Text>
+                  <Text size="sm">{tpl.label}</Text>
                   <Text size="xs" c="dimmed">
-                    {t.description}
+                    {tpl.description}
                   </Text>
                 </Menu.Item>
               ))}
@@ -224,7 +226,7 @@ export function SystemView() {
             leftSection={<IconDeviceFloppy size={14} />}
             onClick={async () => notify(await saveProjectToDisk(project))}
           >
-            Save
+            {t('system.save')}
           </Button>
           <Button
             size="xs"
@@ -232,7 +234,7 @@ export function SystemView() {
             leftSection={<IconDownload size={14} />}
             onClick={async () => notify(await exportSystemPdf(project))}
           >
-            Export system PDF
+            {t('system.exportSystemPdf')}
           </Button>
           <Button
             size="xs"
@@ -240,28 +242,32 @@ export function SystemView() {
             leftSection={<IconTags size={14} />}
             onClick={async () => notify(await exportLabelsPdf(project))}
           >
-            Export labels (PDF)
+            {t('system.exportLabels')}
           </Button>
         </Group>
       </Group>
 
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
         <Stat
-          label="Connected load"
+          label={t('system.connectedLoad')}
           value={formatKw(system.totals.connectedLoadW)}
           icon={<IconBolt size={18} />}
         />
         <Stat
-          label="Panels"
+          label={t('system.panels')}
           value={system.totals.panelCount}
-          hint="in this building"
+          hint={t('system.inThisBuilding')}
           icon={<IconStack2 size={18} />}
           color="grape"
         />
         <Stat
-          label="Estimated cost"
+          label={t('system.estimatedCost')}
           value={formatIdr(cost.grandTotal)}
-          hint={cost.unmatchedCount > 0 ? `${cost.unmatchedCount} unpriced lines` : 'all priced'}
+          hint={
+            cost.unmatchedCount > 0
+              ? t('system.unpricedLines', { count: cost.unmatchedCount })
+              : t('system.allPriced')
+          }
           icon={<IconCash size={18} />}
           color="teal"
         />
@@ -274,23 +280,23 @@ export function SystemView() {
               <IconBolt size={16} />
             </ThemeIcon>
             <Text fw={600} size="sm">
-              Supply
+              {t('system.supply')}
             </Text>
             <Badge variant="light" color={sup.type === 'MV' ? 'orange' : 'teal'}>
-              {sup.type === 'MV' ? 'Medium voltage + transformer' : 'Low voltage (direct PLN)'}
+              {sup.type === 'MV' ? t('system.supplyMv') : t('system.supplyLv')}
             </Badge>
           </Group>
           <Text size="sm" fw={600}>
-            {sup.demandKva} kVA demand
+            {t('system.demandKva', { kva: sup.demandKva })}
           </Text>
         </Group>
         {sup.type === 'MV' && (
           <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
-            <KeyStat k="Transformer" v={`${sup.transformerKva} kVA`} />
-            <KeyStat k="MV voltage" v={`${(sup.mvVoltageV ?? 0) / 1000} kV`} />
-            <KeyStat k="Impedance" v={`${sup.transformerImpedancePct}%`} />
+            <KeyStat k={t('system.transformer')} v={`${sup.transformerKva} kVA`} />
+            <KeyStat k={t('system.mvVoltage')} v={`${(sup.mvVoltageV ?? 0) / 1000} kV`} />
+            <KeyStat k={t('system.impedance')} v={`${sup.transformerImpedancePct}%`} />
             <KeyStat
-              k="Primary / sec."
+              k={t('system.primarySecondary')}
               v={`${formatAmps(sup.transformerPrimaryA ?? 0)} / ${formatAmps(sup.transformerSecondaryA ?? 0)}`}
             />
           </SimpleGrid>
@@ -311,21 +317,21 @@ export function SystemView() {
               <IconSolarPanel size={16} />
             </ThemeIcon>
             <Text fw={600} size="sm">
-              Energy sources
+              {t('system.energySources')}
             </Text>
           </Group>
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
             {system.sources.generator && (
-              <KeyStat k="Generator" v={`${system.sources.generator.ratingKva} kVA`} />
+              <KeyStat k={t('system.generator')} v={`${system.sources.generator.ratingKva} kVA`} />
             )}
             {system.sources.solar && (
               <KeyStat
-                k="Solar PV"
+                k={t('system.solarPv')}
                 v={`${system.sources.solar.arrayKwp} kWp · ${system.sources.solar.inverterKw} kW`}
               />
             )}
             {system.sources.battery && (
-              <KeyStat k="Battery" v={`${system.sources.battery.installedKwh} kWh`} />
+              <KeyStat k={t('system.battery')} v={`${system.sources.battery.installedKwh} kWh`} />
             )}
           </SimpleGrid>
         </Card>
@@ -335,17 +341,17 @@ export function SystemView() {
         <Tabs defaultValue="building">
           <Tabs.List>
             <Tabs.Tab value="building" leftSection={<IconSitemap size={14} />}>
-              Building
+              {t('system.tabBuilding')}
             </Tabs.Tab>
             <Tabs.Tab value="power" leftSection={<IconBolt size={14} />}>
-              Power one-line
+              {t('system.tabPower')}
             </Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="building" pt="xs">
             <Group justify="flex-end" px="xs" pb={4}>
               <Text size="xs" c="dimmed">
-                Click a panel to open it in the editor
+                {t('system.clickPanelHint')}
               </Text>
             </Group>
             <Box h={460}>
@@ -387,6 +393,7 @@ export function SystemView() {
  * line set.
  */
 function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: string }) {
+  const { t } = useTranslation();
   const { lines } = cost;
   if (lines.length === 0) return null;
 
@@ -400,10 +407,10 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
             <IconListDetails size={16} />
           </ThemeIcon>
           <Text fw={600} size="sm">
-            Project bill of materials
+            {t('system.projectBom')}
           </Text>
           <Text size="xs" c="dimmed">
-            {lines.length} line{lines.length === 1 ? '' : 's'} · consolidated across all panels
+            {t('system.bomConsolidated', { count: lines.length })}
           </Text>
         </Group>
         <Group gap="xs">
@@ -413,7 +420,7 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
             leftSection={<IconFileTypeCsv size={14} />}
             onClick={() => downloadBomCsv(`${safeName} - project BOM.csv`, lines, cost.currency)}
           >
-            Export project BOM (CSV)
+            {t('system.exportProjectBomCsv')}
           </Button>
           <Button
             size="xs"
@@ -421,7 +428,7 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
             leftSection={<IconFileSpreadsheet size={14} />}
             onClick={() => downloadBomXlsx(`${safeName} - project BOM.xlsx`, lines, cost.currency)}
           >
-            Export project BOM (Excel)
+            {t('system.exportProjectBomXlsx')}
           </Button>
         </Group>
       </Group>
@@ -429,14 +436,14 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
         <Table verticalSpacing="xs" fz="sm" highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Item</Table.Th>
-              <Table.Th w={120}>Category</Table.Th>
-              <Table.Th w={120}>Order code</Table.Th>
+              <Table.Th>{t('system.bomItem')}</Table.Th>
+              <Table.Th w={120}>{t('system.bomCategory')}</Table.Th>
+              <Table.Th w={120}>{t('system.bomOrderCode')}</Table.Th>
               <Table.Th w={60} ta="right">
-                Qty
+                {t('system.bomQty')}
               </Table.Th>
               <Table.Th w={150} ta="right">
-                Line total
+                {t('system.bomLineTotal')}
               </Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -466,7 +473,7 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
                     formatIdr(l.lineTotal)
                   ) : (
                     <Badge size="xs" variant="light" color="gray">
-                      no price
+                      {t('system.noPrice')}
                     </Badge>
                   )}
                 </Table.Td>
@@ -478,8 +485,8 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
       <Group justify="space-between" mt="sm">
         <Text size="xs" c="dimmed">
           {cost.unmatchedCount > 0
-            ? `${cost.unmatchedCount} line(s) unpriced (excluded from the total)`
-            : 'all lines priced'}
+            ? t('system.unpricedExcluded', { count: cost.unmatchedCount })
+            : t('system.allLinesPriced')}
         </Text>
         <Text fw={700}>{formatIdr(cost.grandTotal)}</Text>
       </Group>
@@ -507,6 +514,7 @@ function KeyStat({ k, v }: { k: string; v: string }) {
  * is met. Full coordination still needs manufacturer time-current curves.
  */
 function SelectivityCard({ system }: { system: SystemResult }) {
+  const { t } = useTranslation();
   const rows = system.selectivity;
   if (!rows || rows.length === 0) return null;
 
@@ -517,22 +525,22 @@ function SelectivityCard({ system }: { system: SystemResult }) {
           <IconSitemap size={16} />
         </ThemeIcon>
         <Text fw={600} size="sm">
-          Selectivity
+          {t('system.selectivity')}
         </Text>
         <Text size="xs" c="dimmed">
-          feeder vs sub-panel largest branch (1.6× current screen)
+          {t('system.selectivityHint')}
         </Text>
       </Group>
       <Table.ScrollContainer minWidth={520}>
         <Table verticalSpacing="xs" fz="sm" withColumnBorders>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Feeder</Table.Th>
-              <Table.Th w={90}>Upstream</Table.Th>
-              <Table.Th>Sub-panel</Table.Th>
-              <Table.Th w={100}>Downstream</Table.Th>
-              <Table.Th w={70}>Ratio</Table.Th>
-              <Table.Th w={110}>Discrimination</Table.Th>
+              <Table.Th>{t('system.selColFeeder')}</Table.Th>
+              <Table.Th w={90}>{t('system.selColUpstream')}</Table.Th>
+              <Table.Th>{t('system.selColSubPanel')}</Table.Th>
+              <Table.Th w={100}>{t('system.selColDownstream')}</Table.Th>
+              <Table.Th w={70}>{t('system.selColRatio')}</Table.Th>
+              <Table.Th w={110}>{t('system.selColDiscrimination')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -545,7 +553,7 @@ function SelectivityCard({ system }: { system: SystemResult }) {
                 <Table.Td>{e.ratio.toFixed(2)}×</Table.Td>
                 <Table.Td>
                   <Badge variant="light" color={e.selective ? 'teal' : 'red'} size="sm">
-                    {e.selective ? 'OK' : 'risk'}
+                    {e.selective ? t('system.selOk') : t('system.selRisk')}
                   </Badge>
                 </Table.Td>
               </Table.Tr>
@@ -563,6 +571,7 @@ function SelectivityCard({ system }: { system: SystemResult }) {
  * break the fault present at it.
  */
 function FaultLevelsCard({ system }: { system: SystemResult }) {
+  const { t } = useTranslation();
   const rows = system.order
     .map((id) => system.panels[id])
     .filter((p): p is NonNullable<typeof p> => Boolean(p) && p!.faultLevelKa !== undefined);
@@ -575,10 +584,10 @@ function FaultLevelsCard({ system }: { system: SystemResult }) {
           <IconBolt size={16} />
         </ThemeIcon>
         <Text fw={600} size="sm">
-          Fault levels
+          {t('system.faultLevels')}
         </Text>
         <Text size="xs" c="dimmed">
-          prospective Isc (3-phase symmetrical) at each panel bus
+          {t('system.faultLevelsHint')}
         </Text>
       </Group>
       <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing="sm">
