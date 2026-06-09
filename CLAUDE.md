@@ -175,6 +175,12 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - **i18n:** offline **Bahasa Indonesia** localization (statically bundled `react-i18next`
   resources, no runtime fetch; `src/renderer/i18n`), a language switcher (Settings + header), and
   **PUIL 2011 / IEC 60364** clause references on the PDF reports (`standards/references`).
+- **Licensing / access control (`src/main/license/**`):** optional **Google Workspace (OIDC)**
+  gate for the *desktop* build only — system-browser OAuth (RFC 8252) + PKCE, `id_token` verified
+  with `jose`/JWKS, `hd`-claim employee check, a **7-day offline grace window**, and `safeStorage`-
+  encrypted session. **Fail-open until configured** (off when unconfigured / `PANELMAKER_DEV_BYPASS=1`
+  / unpackaged), so dev, CI, and the web preview are unaffected. The gate lives entirely in the main
+  process; the renderer only reads status via `license:*` IPC. Setup in `LICENSING.md`.
 
 ## README
 
