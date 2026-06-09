@@ -5,6 +5,22 @@ copyright: Copyright © 2026 PanelMaker
 # Rebuild native modules (better-sqlite3) against the bundled Electron ABI.
 npmRebuild: true
 
+# Electron Fuses + embedded ASAR integrity: lock down the packaged runtime so the
+# Google-Workspace licensing gate and app code are much harder to tamper with.
+# electron-builder flips these BEFORE code-signing (requires @electron/fuses).
+#   - onlyLoadAppFromAsar + enableEmbeddedAsarIntegrityValidation: the app will
+#     only run from the signed app.asar, and its contents are hash-validated, so a
+#     patched bundle (e.g. with the licence check removed) is rejected.
+#   - runAsNode / nodeOptions / nodeCliInspect off: no ELECTRON_RUN_AS_NODE,
+#     NODE_OPTIONS or --inspect backdoors into the main process.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+
 # Auto-update feed: GitHub Releases. `electron-builder --publish always` uploads
 # the installers + latest.yml; electron-updater reads them to detect new versions.
 publish:

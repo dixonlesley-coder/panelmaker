@@ -117,6 +117,98 @@ export const SEED_PARTS: readonly Part[] = [
     heatLossW: 2,
     widthMm: 36,
   }),
+
+  // --- Timers, metering & panel-mount accessories ---
+  part('seed-timer-h3dk', 'timer_relay', 'Omron', 'H3DK-M1 Digital Timer', {
+    function: 'multifunction',
+    rangeS: '0.1s-1200h',
+    supplyV: '24-240VAC/DC',
+    output: 'DPDT',
+    heatLossW: 2,
+    widthMm: 22.5,
+  }),
+  part('seed-ammeter-an96', 'panel_meter', 'Chint', 'Analog Ammeter 96x96 (0-100/5A)', {
+    display: 'analog',
+    scaleA: '0-100A',
+    input: 'CT 100/5A',
+    sizeMm: '96x96',
+  }),
+  part('seed-voltmeter-an96', 'panel_meter', 'Chint', 'Analog Voltmeter 96x96 (0-500V)', {
+    display: 'analog',
+    scaleV: '0-500V',
+    sizeMm: '96x96',
+  }),
+  part('seed-meter-iem3155', 'panel_meter', 'Schneider', 'iEM3155 Multifunction Meter', {
+    measures: 'V/A/kW/kWh/PF/Hz',
+    comms: 'Modbus RS-485',
+    input: 'CT /5A',
+    sizeMm: '96x96',
+  }),
+  part('seed-ct-100-5', 'current_transformer', 'Schneider', 'CT 100/5A Class 1', {
+    primaryA: 100,
+    secondaryA: 5,
+    burdenVA: 5,
+    accuracyClass: '1',
+  }),
+  part('seed-ct-250-5', 'current_transformer', 'Schneider', 'CT 250/5A Class 1', {
+    primaryA: 250,
+    secondaryA: 5,
+    burdenVA: 5,
+    accuracyClass: '1',
+  }),
+  part('seed-pilot-lamp-red', 'indicator_lamp', 'Schneider', 'Harmony XB7 Pilot Lamp Red 22mm LED', {
+    color: 'red',
+    type: 'LED',
+    voltage: '230VAC',
+    diameterMm: 22,
+  }),
+  part('seed-pilot-lamp-green', 'indicator_lamp', 'Schneider', 'Harmony XB7 Pilot Lamp Green 22mm LED', {
+    color: 'green',
+    type: 'LED',
+    voltage: '230VAC',
+    diameterMm: 22,
+  }),
+  part('seed-pb-start-green', 'pilot_device', 'Schneider', 'Harmony XB7 Push Button Green (1NO)', {
+    type: 'push_button',
+    color: 'green',
+    contacts: '1NO',
+    diameterMm: 22,
+  }),
+  part('seed-pb-stop-red', 'pilot_device', 'Schneider', 'Harmony XB7 Push Button Red (1NC)', {
+    type: 'push_button',
+    color: 'red',
+    contacts: '1NC',
+    diameterMm: 22,
+  }),
+  part('seed-estop-22', 'pilot_device', 'Schneider', 'Harmony Emergency Stop 40mm Turn-Release', {
+    type: 'emergency_stop',
+    contacts: '1NC',
+    diameterMm: 22,
+    head: '40mm mushroom',
+  }),
+  part('seed-selector-3pos', 'pilot_device', 'Schneider', 'Harmony 3-Position Selector Switch', {
+    type: 'selector',
+    positions: 3,
+    contacts: '2NO',
+    diameterMm: 22,
+  }),
+  part('seed-ammeter-selector', 'pilot_device', 'Salzer', 'Ammeter Selector Switch (3ph + N + OFF)', {
+    type: 'ammeter_selector',
+    positions: 4,
+    application: '3-phase ammeter',
+  }),
+  part('seed-buzzer-22', 'alarm_device', 'Schneider', 'Harmony Panel Buzzer 22mm', {
+    type: 'buzzer',
+    voltage: '230VAC',
+    soundDb: 80,
+    diameterMm: 22,
+  }),
+  part('seed-hour-meter', 'run_hour_meter', 'Omron', 'H7EC Digital Hour Meter', {
+    type: 'hour_run',
+    display: 'LCD',
+    range: '0-9999.9h',
+    sizeMm: '48x24',
+  }),
 ];
 
 /** Default IDR pricelist (unit prices in IDR; illustrative, offline). */
@@ -133,6 +225,21 @@ const SEED_PRICES: Readonly<Record<string, number>> = {
   'seed-overload-37': 410000,
   'seed-vfd-11kw': 9850000,
   'seed-level-relay': 690000,
+  'seed-timer-h3dk': 385000,
+  'seed-ammeter-an96': 165000,
+  'seed-voltmeter-an96': 165000,
+  'seed-meter-iem3155': 2850000,
+  'seed-ct-100-5': 145000,
+  'seed-ct-250-5': 175000,
+  'seed-pilot-lamp-red': 42000,
+  'seed-pilot-lamp-green': 42000,
+  'seed-pb-start-green': 58000,
+  'seed-pb-stop-red': 58000,
+  'seed-estop-22': 135000,
+  'seed-selector-3pos': 95000,
+  'seed-ammeter-selector': 210000,
+  'seed-buzzer-22': 78000,
+  'seed-hour-meter': 295000,
 };
 
 /** Insert the starter catalog + default pricelist when the DB is empty. */
