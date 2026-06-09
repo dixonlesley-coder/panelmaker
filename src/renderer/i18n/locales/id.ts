@@ -144,6 +144,15 @@ export const id: TranslationKeys = {
     updateLatest: 'Anda menggunakan versi terbaru.',
     updateCheckFailed: 'Pemeriksaan pembaruan gagal: {{message}}',
     updateChecking: 'Memeriksa…',
+    licensing: 'Lisensi',
+    licenseSignedInAs: 'Masuk sebagai',
+    licenseStatus: 'Status',
+    licenseSignOut: 'Keluar',
+    licenseSignedOut: 'Telah keluar. Aplikasi akan meminta masuk saat dijalankan berikutnya.',
+    licenseLastVerified: 'Terakhir diverifikasi',
+    licenseNotEnforced: 'Tidak diberlakukan (gerbang Google Workspace belum dikonfigurasi)',
+    licenseLicensed: 'Berlisensi',
+    licenseLocked: 'Terkunci — perlu masuk',
   },
 
   schematic: {

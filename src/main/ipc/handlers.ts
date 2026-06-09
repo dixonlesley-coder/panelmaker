@@ -30,6 +30,7 @@ import {
   exportSystemPdf,
 } from '../services/export.service';
 import { checkForUpdates, installUpdate } from '../updater';
+import { getStatus, runSignIn, signOut } from '../license/session';
 
 /* ------------------------------- validators ------------------------------- */
 
@@ -96,12 +97,21 @@ function asProject(value: unknown): ProjectInput {
   return projectSchema.parse(value) as unknown as ProjectInput;
 }
 
+/** Hooks the main process can supply to the licensing handlers. */
+export interface IpcHandlerHooks {
+  /**
+   * Called after a successful interactive sign-in so the main process can swap
+   * the sign-in window for the real app window.
+   */
+  onSignedIn?: () => void;
+}
+
 /**
  * Register every IPC handler. Call once during app startup (after the DB is
  * ready). Idempotent guard prevents duplicate registration on hot reload.
  */
 let registered = false;
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(hooks: IpcHandlerHooks = {}): void {
   if (registered) return;
   registered = true;
 
@@ -182,5 +192,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.updateCheck, () => checkForUpdates());
   ipcMain.handle(IPC.updateInstall, () => {
     installUpdate();
+  });
+
+  ipcMain.handle(IPC.licenseStatus, () => getStatus());
+  ipcMain.handle(IPC.licenseSignIn, async () => {
+    const decision = await runSignIn();
+    if (decision.licensed) hooks.onSignedIn?.();
+    return decision;
+  });
+  ipcMain.handle(IPC.licenseSignOut, () => {
+    signOut();
   });
 }

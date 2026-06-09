@@ -51,6 +51,10 @@ const api: Api = {
     ipcRenderer.on(IPC.updateStatus, listener);
     return () => ipcRenderer.removeListener(IPC.updateStatus, listener);
   },
+
+  licenseStatus: () => ipcRenderer.invoke(IPC.licenseStatus),
+  licenseSignIn: () => ipcRenderer.invoke(IPC.licenseSignIn),
+  licenseSignOut: () => ipcRenderer.invoke(IPC.licenseSignOut),
 };
 
 contextBridge.exposeInMainWorld('api', api);

@@ -141,6 +141,15 @@ export const en = {
     updateLatest: "You're on the latest version.",
     updateCheckFailed: 'Update check failed: {{message}}',
     updateChecking: 'Checking…',
+    licensing: 'Licensing',
+    licenseSignedInAs: 'Signed in as',
+    licenseStatus: 'Status',
+    licenseSignOut: 'Sign out',
+    licenseSignedOut: 'Signed out. The app will require sign-in on next launch.',
+    licenseLastVerified: 'Last verified',
+    licenseNotEnforced: 'Not enforced (no Google Workspace gate configured)',
+    licenseLicensed: 'Licensed',
+    licenseLocked: 'Locked — sign-in required',
   },
 
   schematic: {

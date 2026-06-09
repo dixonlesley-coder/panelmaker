@@ -45,6 +45,30 @@ export interface ExportResult {
   byteLength: number;
 }
 
+/**
+ * Result of an interactive sign-in / startup gate check, surfaced to the
+ * renderer. On the web build (no main process) this is always
+ * `{ licensed: true, reason: 'web' }` so the preview is unaffected.
+ */
+export interface LicenseDecisionResult {
+  licensed: boolean;
+  /** Machine-readable reason (e.g. 'web' | 'unenforced' | 'verified-online'). */
+  reason: string;
+  /** The signed-in email, when a session exists. */
+  email?: string;
+}
+
+/** Current licensing status for the Settings panel. */
+export interface LicenseStatusResult {
+  /** Whether the gate is actually enforced (vs. fail-open). */
+  enforced: boolean;
+  licensed: boolean;
+  reason: string;
+  email?: string;
+  /** Last successful online verification (epoch ms), when known. */
+  lastVerifiedAtMs?: number;
+}
+
 /** Auto-update lifecycle status pushed from the main process. */
 export type UpdateStatus =
   | { state: 'checking' }
@@ -79,6 +103,9 @@ export const IPC = {
   updateInstall: 'update:install',
   updateStatus: 'update:status',
   appVersion: 'app:version',
+  licenseStatus: 'license:status',
+  licenseSignIn: 'license:signIn',
+  licenseSignOut: 'license:signOut',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -162,6 +189,13 @@ export interface Api {
   installUpdate(): Promise<void>;
   /** Subscribe to auto-update status events; returns an unsubscribe function. */
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
+
+  /** Current licensing status (enforced? licensed? signed-in email?). */
+  licenseStatus(): Promise<LicenseStatusResult>;
+  /** Run the interactive Google Workspace sign-in; returns the decision. */
+  licenseSignIn(): Promise<LicenseDecisionResult>;
+  /** Sign out (clear the stored session); locks the app on next launch. */
+  licenseSignOut(): Promise<void>;
 }
 
 /** Re-export of the priced item type for renderer convenience. */

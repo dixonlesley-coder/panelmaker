@@ -1,4 +1,9 @@
-import type { Api, UpdateStatus } from '@shared/ipc-contract';
+import type {
+  Api,
+  LicenseDecisionResult,
+  LicenseStatusResult,
+  UpdateStatus,
+} from '@shared/ipc-contract';
 import type { ControlSchematic, Part, ProjectInput } from '@shared/types';
 
 type WindowWithApi = Window & typeof globalThis & { api?: Api };
@@ -133,4 +138,29 @@ export function onUpdateStatus(cb: (status: UpdateStatus) => void): () => void {
   const api = desktopApi();
   if (!api) return () => undefined;
   return api.onUpdateStatus(cb);
+}
+
+/* -------------------------------- licensing ------------------------------- */
+
+/**
+ * Current licensing status. On the web build (no main process) licensing does
+ * not apply, so this reports an unenforced, licensed status and the preview is
+ * unaffected.
+ */
+export async function licenseStatus(): Promise<LicenseStatusResult> {
+  const api = desktopApi();
+  if (!api) return { enforced: false, licensed: true, reason: 'web' };
+  return api.licenseStatus();
+}
+
+/** Run the interactive Google Workspace sign-in (desktop only; no-op on web). */
+export async function licenseSignIn(): Promise<LicenseDecisionResult> {
+  const api = desktopApi();
+  if (!api) return { licensed: true, reason: 'web' };
+  return api.licenseSignIn();
+}
+
+/** Sign out of the licensing session (desktop only; no-op on web). */
+export async function licenseSignOut(): Promise<void> {
+  await desktopApi()?.licenseSignOut();
 }

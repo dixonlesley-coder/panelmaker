@@ -15,6 +15,9 @@ import { seed } from './db/seed';
 import { registerIpcHandlers } from './ipc/handlers';
 import { createMainWindow } from './window';
 import { initAutoUpdater } from './updater';
+import { ensureLicensed } from './license/session';
+import { getLicensingConfig } from './license/config';
+import { createSigninWindow } from './license/signinWindow';
 
 /**
  * Strict CSP: only same-origin resources, inline styles allowed for the UI
@@ -69,17 +72,50 @@ function bootstrap(): void {
     }
   });
 
-  void app.whenReady().then(() => {
-    applyContentSecurityPolicy();
-    initDatabase();
-    registerIpcHandlers();
+  // Holds the transient sign-in window so the IPC sign-in hook can close it.
+  let signinWindow: BrowserWindow | undefined;
+
+  /** Open the real app window and wire auto-update. */
+  function launchApp(): void {
     const win = createMainWindow();
     initAutoUpdater(win);
+  }
+
+  void app.whenReady().then(async () => {
+    applyContentSecurityPolicy();
+    initDatabase();
+
+    // Register IPC first so the (optional) sign-in window can call back in. The
+    // onSignedIn hook swaps the sign-in window for the real app window.
+    registerIpcHandlers({
+      onSignedIn: () => {
+        launchApp();
+        signinWindow?.close();
+        signinWindow = undefined;
+      },
+    });
+
+    // The licensing gate. Fail-open: when unconfigured / dev / unpackaged,
+    // ensureLicensed() returns { licensed: true } so the app starts as before.
+    const decision = await ensureLicensed();
+    if (decision.licensed) {
+      launchApp();
+    } else {
+      const { allowedHd } = getLicensingConfig();
+      signinWindow = createSigninWindow(allowedHd);
+    }
 
     app.on('activate', () => {
       // macOS: re-create a window when the dock icon is clicked and none exist.
       if (BrowserWindow.getAllWindows().length === 0) {
-        initAutoUpdater(createMainWindow());
+        // Re-run the gate so a locked app re-prompts rather than bypassing it.
+        void ensureLicensed().then((d) => {
+          if (d.licensed) launchApp();
+          else {
+            const { allowedHd } = getLicensingConfig();
+            signinWindow = createSigninWindow(allowedHd);
+          }
+        });
       }
     });
   });

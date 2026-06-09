@@ -17,6 +17,7 @@ import { notifications } from '@mantine/notifications';
 import {
   IconBuildingFactory2,
   IconInfoCircle,
+  IconLock,
   IconPhoto,
   IconRefresh,
   IconShieldBolt,
@@ -27,7 +28,14 @@ import { computeSystem } from '@shared/engine';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
-import { appVersion, checkForUpdates } from '@renderer/api';
+import {
+  appVersion,
+  checkForUpdates,
+  isDesktop,
+  licenseSignOut,
+  licenseStatus,
+} from '@renderer/api';
+import type { LicenseStatusResult } from '@shared/ipc-contract';
 import { getLanguage, setLanguage, type Language } from '@renderer/i18n';
 
 /** Install-method values for the panel default Select (labels are translated). */
@@ -76,9 +84,17 @@ export function Settings() {
 
   const [version, setVersion] = useState('…');
   const [checking, setChecking] = useState(false);
+  const [license, setLicense] = useState<LicenseStatusResult | null>(null);
   useEffect(() => {
     void appVersion().then(setVersion);
+    if (isDesktop()) void licenseStatus().then(setLicense);
   }, []);
+
+  async function onSignOut() {
+    await licenseSignOut();
+    setLicense(await licenseStatus());
+    notifications.show({ message: t('settings.licenseSignedOut'), color: 'gray' });
+  }
 
   async function onCheckUpdates() {
     setChecking(true);
@@ -301,6 +317,56 @@ export function Settings() {
           {earthing.note}
         </Text>
       </Card>
+
+      {isDesktop() && license && (
+        <Card withBorder radius="md" padding="md">
+          <Group gap="xs" mb="md">
+            <IconLock size={18} color="var(--mantine-color-indigo-6)" />
+            <Text fw={600}>{t('settings.licensing')}</Text>
+          </Group>
+          {license.enforced ? (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('settings.licenseStatus')}
+                </Text>
+                <Text size="sm" fw={500} c={license.licensed ? 'teal' : 'red'}>
+                  {license.licensed ? t('settings.licenseLicensed') : t('settings.licenseLocked')}
+                </Text>
+              </Group>
+              {license.email && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {t('settings.licenseSignedInAs')}
+                  </Text>
+                  <Text size="sm" fw={500}>
+                    {license.email}
+                  </Text>
+                </Group>
+              )}
+              {license.lastVerifiedAtMs && (
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {t('settings.licenseLastVerified')}
+                  </Text>
+                  <Text size="sm" fw={500}>
+                    {new Date(license.lastVerifiedAtMs).toLocaleString()}
+                  </Text>
+                </Group>
+              )}
+              <Group justify="flex-end">
+                <Button size="xs" variant="light" color="red" onClick={onSignOut}>
+                  {t('settings.licenseSignOut')}
+                </Button>
+              </Group>
+            </SimpleGrid>
+          ) : (
+            <Text size="sm" c="dimmed">
+              {t('settings.licenseNotEnforced')}
+            </Text>
+          )}
+        </Card>
+      )}
 
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="md">
