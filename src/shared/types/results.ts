@@ -122,6 +122,32 @@ export interface EnclosureResult {
   rows: number;
 }
 
+/**
+ * Harmonics / power-quality estimate for a panel carrying non-linear
+ * (electronically switched) loads — VFDs, soft-starters, UPS and 6-pulse
+ * rectifier loads. See `engine/harmonics`.
+ */
+export interface HarmonicsResult {
+  /** Non-linear demand over total panel demand (0-1). */
+  nonLinearFraction: number;
+  /** Recommended neutral-current multiplier of phase current (1.0 = standard). */
+  neutralOversizeFactor: number;
+  /**
+   * Recommended neutral CSA (mm^2) for the panel's largest neutral, oversized
+   * for triplen-harmonic content. Equals the phase CSA when no oversize needed.
+   */
+  recommendedNeutralCsaMm2: number;
+  /** True when a 6-pulse input line reactor is recommended. */
+  reactorRecommended: boolean;
+  /** Recommended input line-reactor impedance (% Z) when reactorRecommended. */
+  reactorPctZ: number;
+  /** True when a harmonic filter (passive/active) is recommended. */
+  filterRecommended: boolean;
+  /** Qualitative voltage/current THD band. */
+  thdBand: 'low' | 'moderate' | 'high';
+  note: string;
+}
+
 export type WarningSeverity = 'info' | 'warning' | 'error';
 
 export interface SuggestedFix {
@@ -171,6 +197,8 @@ export interface PanelResult {
   standardsVersion: string;
   /** Prospective 3-phase symmetrical fault current at this panel's bus (kA). */
   faultLevelKa?: number;
+  /** Harmonics / power-quality estimate, when non-linear loads are present. */
+  harmonics?: HarmonicsResult;
 }
 
 /** A 24-hour building demand profile and peak analysis. */

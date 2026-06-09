@@ -330,6 +330,52 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
         </Table.ScrollContainer>
       </Card>
 
+      {result.harmonics && (
+        <Card withBorder radius="md" padding="sm">
+          <Group justify="space-between" mb={4}>
+            <Text fw={600} size="sm">
+              Harmonics / power quality
+            </Text>
+            <Group gap={6}>
+              <Badge
+                size="sm"
+                variant="light"
+                color={
+                  result.harmonics.thdBand === 'high'
+                    ? 'red'
+                    : result.harmonics.thdBand === 'moderate'
+                      ? 'orange'
+                      : 'teal'
+                }
+              >
+                {result.harmonics.thdBand} THD
+              </Badge>
+              <Badge size="sm" variant="light" color="gray">
+                {formatPercent(result.harmonics.nonLinearFraction * 100)} non-linear
+              </Badge>
+              {result.harmonics.reactorRecommended && (
+                <Badge size="sm" variant="light" color="indigo">
+                  {result.harmonics.reactorPctZ}% line reactor
+                </Badge>
+              )}
+              {result.harmonics.filterRecommended && (
+                <Badge size="sm" variant="light" color="grape">
+                  harmonic filter
+                </Badge>
+              )}
+              {result.harmonics.neutralOversizeFactor > 1 && (
+                <Badge size="sm" variant="light" color="yellow">
+                  neutral {result.harmonics.recommendedNeutralCsaMm2} mm²
+                </Badge>
+              )}
+            </Group>
+          </Group>
+          <Text size="xs" c="dimmed">
+            {result.harmonics.note}
+          </Text>
+        </Card>
+      )}
+
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">

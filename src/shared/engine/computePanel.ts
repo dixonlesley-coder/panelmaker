@@ -14,6 +14,7 @@ import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
+import { computeHarmonics, harmonicsWarnings } from './harmonics';
 import { checkBreakerKa, checkZs, type Impedance } from './fault';
 import { circuitRcd, sizeGrounding } from './grounding';
 import { round } from './util';
@@ -263,6 +264,23 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   const busbar = sizeBusbar(totalDemandCurrentA);
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
 
+  // Harmonics / power-quality estimate from the non-linear (VFD/soft-starter/
+  // UPS/rectifier) load share. branches and comps are aligned by construction.
+  const largestNeutralCsaMm2 = comps.reduce(
+    (m, cm) => Math.max(m, cm.result.grounding.neutralCsaMm2),
+    0,
+  );
+  const harmonics = computeHarmonics({
+    loads: branches.map((b, idx) => ({
+      loadW: comps[idx]!.effectiveLoadW,
+      loadKind: b.loadKind,
+      starterType: b.starterType,
+      threePhase: comps[idx]!.threePhase,
+    })),
+    largestNeutralCsaMm2,
+  });
+  if (harmonics) warnings.push(...harmonicsWarnings(harmonics, panel.id));
+
   return {
     panelId: panel.id,
     name: panel.name,
@@ -280,5 +298,6 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     warnings,
     standardsVersion: STANDARDS_VERSION,
     ...(opts.faultLevelA !== undefined ? { faultLevelKa: round(opts.faultLevelA / 1000, 1) } : {}),
+    ...(harmonics ? { harmonics } : {}),
   };
 }

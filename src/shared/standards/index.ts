@@ -9,4 +9,5 @@ export * from './transformer';
 export * from './grounding';
 export * from './sources';
 export * from './capacitor';
+export * from './harmonics';
 export * from './control';
