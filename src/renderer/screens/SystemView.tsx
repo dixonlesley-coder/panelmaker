@@ -30,6 +30,7 @@ import {
   IconSitemap,
   IconSolarPanel,
   IconStack2,
+  IconTags,
 } from '@tabler/icons-react';
 import { computeSystem } from '@shared/engine';
 import type { PanelInput, ProjectInput, SystemResult } from '@shared/types';
@@ -39,7 +40,7 @@ import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem } from '@renderer/lib/bom';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
-import { exportSystemPdf, saveProjectToDisk } from '@renderer/api';
+import { exportLabelsPdf, exportSystemPdf, saveProjectToDisk } from '@renderer/api';
 
 const NODE_W = 200;
 const NODE_H = 130;
@@ -181,6 +182,14 @@ export function SystemView() {
             onClick={async () => notify(await exportSystemPdf(project))}
           >
             Export system PDF
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconTags size={14} />}
+            onClick={async () => notify(await exportLabelsPdf(project))}
+          >
+            Export labels (PDF)
           </Button>
         </Group>
       </Group>

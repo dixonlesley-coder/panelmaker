@@ -393,6 +393,108 @@ function systemDocDefinition(
   };
 }
 
+/* ----------------------------- circuit labels ----------------------------- */
+
+/** Labels per row across the sheet (an Avery-style 3-up grid). */
+const LABEL_COLUMNS = 3;
+
+/** One printable circuit label / nameplate. */
+interface LabelData {
+  panelName: string;
+  circuitName: string;
+  breaker: string;
+  cable: string;
+  phase: string;
+}
+
+/** Human label for a circuit's phase assignment. */
+function phaseLabel(phase: string): string {
+  return phase === '3ph' ? '3-phase' : phase;
+}
+
+/** Collect one label per circuit across every panel in the computed system. */
+function labelsForSystem(system: SystemResult): LabelData[] {
+  const labels: LabelData[] = [];
+  // Walk panels in root-first order for a stable, readable label sheet.
+  for (const panelId of system.order) {
+    const panel = system.panels[panelId];
+    if (!panel) continue;
+    for (const c of panel.circuits) {
+      labels.push({
+        panelName: panel.name,
+        circuitName: c.name,
+        breaker: `${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve}`,
+        // Prefer the engine's human-readable cable make-up; fall back to the CSA.
+        cable: c.grounding.cableSpec || `${c.cable.csaMm2} mm²`,
+        phase: phaseLabel(c.phase),
+      });
+    }
+  }
+  return labels;
+}
+
+/** Render one label as a bordered cell (panel/circuit + breaker/cable/phase). */
+function labelCell(label: LabelData | null): TableCell {
+  if (!label) {
+    // Empty filler cell to keep the final row a full grid; no border.
+    return { text: '', border: [false, false, false, false] };
+  }
+  return {
+    margin: [6, 6, 6, 6],
+    stack: [
+      { text: label.panelName, fontSize: 7, color: '#777' },
+      { text: label.circuitName, bold: true, fontSize: 11, margin: [0, 1, 0, 3] },
+      { text: label.breaker, fontSize: 8 },
+      { text: label.cable, fontSize: 8 },
+      { text: label.phase, fontSize: 8, color: '#555' },
+    ],
+  };
+}
+
+/** Build the document definition for the circuit-label sheet. */
+function labelsDocDefinition(
+  system: SystemResult,
+  project: ProjectInput,
+): TDocumentDefinitions {
+  const labels = labelsForSystem(system);
+
+  // Chunk the labels into rows of LABEL_COLUMNS, padding the last row.
+  const body: TableCell[][] = [];
+  for (let i = 0; i < labels.length; i += LABEL_COLUMNS) {
+    const row: TableCell[] = [];
+    for (let col = 0; col < LABEL_COLUMNS; col += 1) {
+      row.push(labelCell(labels[i + col] ?? null));
+    }
+    body.push(row);
+  }
+
+  const content: Content[] = [...titleBlock(project, 'Circuit Labels')];
+  if (labels.length === 0) {
+    content.push({ text: 'No circuits to label.', style: 'subtitle' });
+  } else {
+    content.push({
+      table: {
+        widths: Array<string>(LABEL_COLUMNS).fill('*'),
+        body,
+      },
+      // A boxed grid so each cell reads as a self-contained adhesive label.
+      layout: {
+        hLineColor: () => '#999',
+        vLineColor: () => '#999',
+        paddingTop: () => 0,
+        paddingBottom: () => 0,
+      },
+    });
+  }
+
+  return {
+    defaultStyle: DEFAULT_STYLE,
+    styles: STYLES,
+    pageMargins: [24, 24, 24, 24],
+    content,
+  };
+}
+
 /* --------------------------------- API ------------------------------------ */
 
 /** Generate a single-panel PDF as a Buffer. */
@@ -409,6 +511,14 @@ export function exportSystemPdfBuffer(
   project: ProjectInput,
 ): Promise<Buffer> {
   return renderToBuffer(systemDocDefinition(system, project));
+}
+
+/** Generate the circuit-label sheet PDF as a Buffer. */
+export function exportLabelsPdfBuffer(
+  system: SystemResult,
+  project: ProjectInput,
+): Promise<Buffer> {
+  return renderToBuffer(labelsDocDefinition(system, project));
 }
 
 /**
@@ -436,6 +546,21 @@ export async function exportSystemPdf(
 ): Promise<ExportResult> {
   const system = computeProject(project);
   const buffer = await exportSystemPdfBuffer(system, project);
+  await writeFile(filePath, buffer);
+  return { filePath, byteLength: buffer.byteLength };
+}
+
+/**
+ * Compute + render the circuit-label sheet (a grid of per-circuit nameplates)
+ * and write it to `filePath`. Recomputes from the project so the breaker/cable
+ * specs on each label match the engine.
+ */
+export async function exportLabelsPdf(
+  project: ProjectInput,
+  filePath: string,
+): Promise<ExportResult> {
+  const system = computeProject(project);
+  const buffer = await exportLabelsPdfBuffer(system, project);
   await writeFile(filePath, buffer);
   return { filePath, byteLength: buffer.byteLength };
 }

@@ -70,6 +70,7 @@ export const IPC = {
   importPricelist: 'pricelists:import',
   exportPanelPdf: 'export:panelPdf',
   exportSystemPdf: 'export:systemPdf',
+  exportLabelsPdf: 'export:labelsPdf',
   saveSchematic: 'schematic:save',
   loadSchematic: 'schematic:load',
   chooseSavePath: 'dialog:saveAs',
@@ -124,6 +125,12 @@ export interface Api {
 
   /** Render the whole-system PDF report and write it to `filePath`. */
   exportSystemPdf(project: ProjectInput, filePath: string): Promise<ExportResult>;
+
+  /**
+   * Render a grid of per-circuit labels / device nameplates (one per circuit
+   * across every panel) and write the PDF to `filePath`.
+   */
+  exportLabelsPdf(project: ProjectInput, filePath: string): Promise<ExportResult>;
 
   /** Persist a circuit's control/ladder schematic (manual edits included). */
   saveSchematic(schematic: ControlSchematic): Promise<{ id: string }>;

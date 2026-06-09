@@ -47,6 +47,20 @@ export async function exportSystemPdf(project: ProjectInput): Promise<ActionResu
   }
 }
 
+/** Export the circuit-label / nameplate sheet PDF via a native save dialog (desktop only). */
+export async function exportLabelsPdf(project: ProjectInput): Promise<ActionResult> {
+  const api = desktopApi();
+  if (!api) return { ok: false, reason: 'web', message: WEB_MESSAGE };
+  try {
+    const path = await api.chooseSavePath(`${project.name} - labels.pdf`);
+    if (!path) return { ok: false, reason: 'cancelled', message: 'Export cancelled.' };
+    const res = await api.exportLabelsPdf(project, path);
+    return { ok: true, message: `Exported circuit labels to ${res.filePath}.` };
+  } catch (e) {
+    return { ok: false, reason: 'error', message: (e as Error).message };
+  }
+}
+
 /** Export a single panel's PDF via a native save dialog (desktop only). */
 export async function exportPanelPdf(
   project: ProjectInput,

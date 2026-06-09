@@ -23,7 +23,7 @@ import { listParts, upsertPart } from '../repositories/parts.repo';
 import { importPricelist } from '../repositories/pricelists.repo';
 import { saveSchematic, loadSchematic } from '../repositories/schematic.repo';
 import { computeProject } from '../services/calc.service';
-import { exportPanelPdf, exportSystemPdf } from '../services/export.service';
+import { exportLabelsPdf, exportPanelPdf, exportSystemPdf } from '../services/export.service';
 import { checkForUpdates, installUpdate } from '../updater';
 
 /* ------------------------------- validators ------------------------------- */
@@ -136,6 +136,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.exportSystemPdf, (_e, project: unknown, filePath: unknown) =>
     exportSystemPdf(asProject(project), z.string().min(1).parse(filePath)),
+  );
+
+  ipcMain.handle(IPC.exportLabelsPdf, (_e, project: unknown, filePath: unknown) =>
+    exportLabelsPdf(asProject(project), z.string().min(1).parse(filePath)),
   );
 
   ipcMain.handle(IPC.saveSchematic, (_e, schematic: unknown) =>
