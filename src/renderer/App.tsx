@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppShell, Center, Group, Loader, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
+import { AppShell, Center, Group, Loader, Menu, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import {
   IconSun,
   IconMoon,
@@ -16,7 +16,11 @@ import {
   IconBolt,
   IconArrowBackUp,
   IconArrowForwardUp,
+  IconLanguage,
+  IconCheck,
 } from '@tabler/icons-react';
+
+import { setLanguage, SUPPORTED_LANGUAGES, type Language } from '@renderer/i18n';
 
 import {
   useProjectStore,
@@ -73,6 +77,42 @@ function ColorSchemeToggle() {
         {isDark ? <IconSun size={18} /> : <IconMoon size={18} />}
       </ActionIcon>
     </Tooltip>
+  );
+}
+
+/** Endonyms for the shipped languages (shown in their own language by convention). */
+const LANGUAGE_LABELS: Record<Language, string> = {
+  en: 'English',
+  id: 'Bahasa Indonesia',
+};
+
+/** Compact UI-language picker for the header (mirrors the Settings switcher). */
+function LanguageMenu() {
+  const { t, i18n } = useTranslation();
+  const current = (i18n.resolvedLanguage as Language | undefined) ?? 'en';
+  return (
+    <Menu shadow="md" width={200} position="bottom-end" withinPortal>
+      <Menu.Target>
+        <Tooltip label={t('settings.language')}>
+          <ActionIcon variant="default" size="lg" aria-label={t('settings.language')}>
+            <IconLanguage size={18} />
+          </ActionIcon>
+        </Tooltip>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {SUPPORTED_LANGUAGES.map((lng) => (
+          <Menu.Item
+            key={lng}
+            onClick={() => setLanguage(lng)}
+            leftSection={
+              lng === current ? <IconCheck size={14} /> : <span style={{ display: 'inline-block', width: 14 }} />
+            }
+          >
+            {LANGUAGE_LABELS[lng]}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
   );
 }
 
@@ -205,6 +245,7 @@ export function App() {
           <Group gap="md">
             <HistoryControls />
             <AutosaveIndicator saveState={saveState} target={target} />
+            <LanguageMenu />
             <ColorSchemeToggle />
           </Group>
         </Group>
