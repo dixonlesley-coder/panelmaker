@@ -86,6 +86,10 @@ export interface ProjectState {
   copyCircuit: (panelId: string, circuitId: string) => void;
   /** Paste the clipboard circuit (fresh id) onto a panel, enabling cross-panel copy. */
   pasteCircuit: (panelId: string) => void;
+  /** Apply the same partial patch to several circuits in a panel (one undo step). */
+  bulkUpdateCircuits: (panelId: string, ids: string[], patch: Partial<CircuitInput>) => void;
+  /** Remove several circuits from a panel in a single undoable step. */
+  removeCircuits: (panelId: string, ids: string[]) => void;
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
@@ -307,6 +311,30 @@ export const useProjectStore = create<ProjectState>((set) => ({
         mapPanel(project, panelId, (panel) => ({
           ...panel,
           circuits: [...panel.circuits, cloneCircuit(clip)],
+        })),
+      );
+    }),
+
+  bulkUpdateCircuits: (panelId, ids, patch) =>
+    set((s) => {
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: panel.circuits.map((c) => (idSet.has(c.id) ? { ...c, ...patch } : c)),
+        })),
+      );
+    }),
+
+  removeCircuits: (panelId, ids) =>
+    set((s) => {
+      if (ids.length === 0) return s;
+      const idSet = new Set(ids);
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: panel.circuits.filter((c) => !idSet.has(c.id)),
         })),
       );
     }),

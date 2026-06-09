@@ -225,4 +225,56 @@ describe('projectStore', () => {
       ).toBe(start);
     });
   });
+
+  describe('bulk edit circuits', () => {
+    /** The panel with the most branch circuits, plus its branch ids. */
+    function pickMultiBranch() {
+      const { project } = useProjectStore.getState();
+      const panel = [...project.panels]
+        .filter((p) => p.circuits.some((c) => c.role === 'branch'))
+        .sort((a, b) => b.circuits.length - a.circuits.length)[0]!;
+      const ids = panel.circuits.filter((c) => c.role === 'branch').map((c) => c.id);
+      return { panelId: panel.id, ids };
+    }
+
+    it('bulkUpdateCircuits patches every selected circuit in one undo step', () => {
+      const { panelId, ids } = pickMultiBranch();
+      const targetIds = ids.slice(0, 2);
+
+      useProjectStore.getState().bulkUpdateCircuits(panelId, targetIds, { lengthM: 99 });
+
+      const panel = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      for (const c of panel.circuits) {
+        if (targetIds.includes(c.id)) expect(c.lengthM).toBe(99);
+      }
+      // a single undo reverts all of them at once
+      useProjectStore.getState().undo();
+      const reverted = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      expect(reverted.circuits.filter((c) => c.lengthM === 99).length).toBe(0);
+    });
+
+    it('bulkUpdateCircuits with an empty id list is a no-op', () => {
+      const { panelId } = pickMultiBranch();
+      useProjectStore.getState().bulkUpdateCircuits(panelId, [], { lengthM: 1 });
+      expect(selectCanUndo(useProjectStore.getState())).toBe(false);
+    });
+
+    it('removeCircuits deletes every listed circuit in one undo step', () => {
+      const { panelId, ids } = pickMultiBranch();
+      const start = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!
+        .circuits.length;
+      const toRemove = ids.slice(0, 2);
+
+      useProjectStore.getState().removeCircuits(panelId, toRemove);
+
+      const after = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      expect(after.circuits.length).toBe(start - toRemove.length);
+      expect(after.circuits.some((c) => toRemove.includes(c.id))).toBe(false);
+
+      useProjectStore.getState().undo();
+      expect(
+        useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits.length,
+      ).toBe(start);
+    });
+  });
 });
