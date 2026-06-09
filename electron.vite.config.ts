@@ -54,6 +54,19 @@ export default defineConfig({
     resolve: {
       alias: { '@shared': shared },
     },
+    build: {
+      rollupOptions: {
+        // Emit a CommonJS `.cjs` preload. The package is `type: module`, but a
+        // SANDBOXED preload (webPreferences.sandbox: true) must be CommonJS, and
+        // a `.js` file here would be treated as ESM. `.cjs` forces CJS so the
+        // preload actually loads under the sandbox (otherwise window.api is
+        // undefined in every window).
+        output: {
+          format: 'cjs',
+          entryFileNames: 'index.cjs',
+        },
+      },
+    },
   },
   renderer: {
     root,

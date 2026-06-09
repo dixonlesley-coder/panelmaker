@@ -13,8 +13,8 @@
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
 
-/** Path to the compiled main preload (same bridge the app window uses). */
-const PRELOAD_PATH = join(__dirname, '../preload/index.js');
+/** Path to the compiled main preload (same CJS bridge the app window uses). */
+const PRELOAD_PATH = join(__dirname, '../preload/index.cjs');
 
 /** Minimal HTML-escape for interpolating the domain into the page. */
 function escapeHtml(s: string): string {

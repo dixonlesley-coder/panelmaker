@@ -20,9 +20,37 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { shell } from 'electron';
+import { clipboard, dialog, shell } from 'electron';
 import { createPkcePair, randomToken } from './pkce';
 import { getLicensingConfig } from './config';
+
+/**
+ * Fallback when the OS can't auto-open the system browser (seen on some Windows
+ * setups, e.g. a broken default-browser association). Copy the sign-in link to
+ * the clipboard and show it, so the user can paste it into a browser manually;
+ * the loopback server stays open, so a manually-opened link still completes.
+ */
+function showManualSignInFallback(url: string, err: unknown): void {
+  try {
+    clipboard.writeText(url);
+  } catch {
+    // ignore — clipboard is best-effort
+  }
+  const reason = err instanceof Error ? err.message : String(err ?? '');
+  void dialog.showMessageBox({
+    type: 'warning',
+    title: 'Open your browser to sign in',
+    message: 'Finish signing in in your web browser',
+    detail:
+      "PanelMaker couldn't open your browser automatically. The sign-in link has " +
+      'been copied to your clipboard — paste it into your browser to finish ' +
+      'signing in, then return to the app.\n\n' +
+      url +
+      (reason ? `\n\n(${reason})` : ''),
+    buttons: ['OK'],
+    noLink: true,
+  });
+}
 
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -137,7 +165,12 @@ export function runInteractiveSignIn(timeoutMs = 5 * 60 * 1000): Promise<TokenSe
       authUrl.searchParams.set('state', state);
       // Hint Google to pre-scope the account chooser to the Workspace domain.
       if (cfg.allowedHd) authUrl.searchParams.set('hd', cfg.allowedHd);
-      void shell.openExternal(authUrl.toString());
+      const urlStr = authUrl.toString();
+      // Open the system browser (RFC 8252). If it fails (some Windows setups
+      // can't auto-launch the default browser), fall back to a copy-able link
+      // instead of silently hanging until the timeout; the server stays open so
+      // a manually-pasted link still completes the flow.
+      shell.openExternal(urlStr).catch((e: unknown) => showManualSignInFallback(urlStr, e));
     });
   });
 }
