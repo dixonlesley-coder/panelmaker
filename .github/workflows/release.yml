@@ -94,16 +94,19 @@ jobs:
           fi
 
           # Enable macOS notarization only when all three Apple credentials exist.
-          EXTRA=()
+          # Use a plain string (not a bash array): macOS runners ship bash 3.2,
+          # where expanding an empty "${arr[@]}" errors under `set -u`.
+          NOTARIZE_FLAG=""
           if [[ "${RUNNER_OS}" == "macOS" && -n "${APPLE_ID}" && -n "${APPLE_APP_SPECIFIC_PASSWORD}" && -n "${APPLE_TEAM_ID}" ]]; then
-            EXTRA+=("-c.mac.notarize=true")
+            NOTARIZE_FLAG="-c.mac.notarize=true"
             echo "macOS notarization: enabled"
           elif [[ "${RUNNER_OS}" == "macOS" ]]; then
             echo "macOS notarization: skipped (Apple credentials not set)"
           fi
 
           npx electron-vite build
-          npx electron-builder --publish "${PUBLISH}" "${EXTRA[@]}"
+          # NOTARIZE_FLAG is intentionally unquoted (empty = no extra arg).
+          npx electron-builder --publish "${PUBLISH}" ${NOTARIZE_FLAG}
 
       - name: Upload installers as workflow artifacts
         if: always()
