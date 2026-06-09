@@ -254,6 +254,27 @@ export interface CapacitorBankResult {
   note: string;
 }
 
+/**
+ * Current-based discrimination report for one upstream→downstream device pair
+ * (feeder breaker vs the sub-panel's largest branch breaker). `selective` is a
+ * first-pass screen on the rating ratio; full coordination needs manufacturer
+ * time-current / let-through curves.
+ */
+export interface SelectivityEntry {
+  upstreamPanelId: string;
+  upstreamCircuitId: string;
+  upstreamName: string;
+  upstreamRatingA: number;
+  downstreamPanelId: string;
+  downstreamName: string;
+  downstreamRatingA: number;
+  /** Upstream rating / downstream rating. */
+  ratio: number;
+  /** True when ratio meets the discrimination rule of thumb. */
+  selective: boolean;
+  marginNote: string;
+}
+
 export interface SystemResult {
   projectId: string;
   panels: Record<string, PanelResult>;
@@ -266,6 +287,8 @@ export interface SystemResult {
   powerFactor: CapacitorBankResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
+  /** Current-based discrimination report per cascaded device pair. */
+  selectivity?: SelectivityEntry[];
   totals: {
     connectedLoadW: number;
     panelCount: number;

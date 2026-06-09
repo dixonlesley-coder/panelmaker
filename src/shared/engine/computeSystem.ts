@@ -1,5 +1,5 @@
 import type { ProjectInput } from '../types/project';
-import type { PanelResult, SystemResult, Warning } from '../types/results';
+import type { PanelResult, SelectivityEntry, SystemResult, Warning } from '../types/results';
 import { peConductorSize } from '../standards/grounding';
 import { circuitConnectedW, computePanel } from './computePanel';
 import { determineSupply } from './transformer';
@@ -8,6 +8,7 @@ import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
 import {
   type Impedance,
+  SELECTIVITY_RATIO,
   addImpedance,
   conductorImpedance,
   downstreamFaultA,
@@ -17,6 +18,7 @@ import {
 } from './fault';
 import { selectBreaker } from './breakerSelect';
 import { sizeCable } from './cableSizing';
+import { round } from './util';
 
 /**
  * Compute a whole project (building) by walking the panel feeder tree
@@ -165,7 +167,18 @@ export function computeSystem(project: ProjectInput): SystemResult {
   }
 
   // Current-based selectivity between cascaded breakers (feeder vs sub-panel).
-  warnings.push(...selectivityWarnings(project, results, parentOf));
+  const selectivity = selectivityReport(project, results, parentOf);
+  for (const e of selectivity) {
+    if (!e.selective) {
+      warnings.push({
+        code: 'selectivity-risk',
+        severity: 'warning',
+        message: `Feeder "${e.upstreamName}" (${e.upstreamRatingA} A) may not discriminate with ${e.downstreamName}'s ${e.downstreamRatingA} A branch — ${e.marginNote} Verify with manufacturer curves.`,
+        panelId: e.upstreamPanelId,
+        circuitId: e.upstreamCircuitId,
+      });
+    }
+  }
 
   // Earthing system designed from the main incomer's PE conductor.
   const mainResult = roots[0] ? results[roots[0].id] : undefined;
@@ -191,24 +204,27 @@ export function computeSystem(project: ProjectInput): SystemResult {
     earthing,
     powerFactor,
     ...(sources ? { sources } : {}),
+    ...(selectivity.length > 0 ? { selectivity } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
     warnings,
   };
 }
 
 /**
- * Current-based discrimination screen across the feeder tree. For each sub-panel,
+ * Current-based discrimination report across the feeder tree. For each sub-panel,
  * compare its upstream feeder breaker (in the parent) against the most onerous
- * downstream device — the panel's largest branch breaker. Flag likely
- * non-selectivity when the upstream rating is below the rule-of-thumb ratio.
- * Full selectivity needs manufacturer time-current / let-through curves.
+ * downstream device — the panel's largest branch breaker — and report the rating
+ * ratio and the discrimination margin. `selective` flags whether the ratio meets
+ * the rule-of-thumb threshold; full selectivity needs manufacturer time-current
+ * / let-through curves. computeSystem turns each non-selective pair into a
+ * 'selectivity-risk' warning.
  */
-function selectivityWarnings(
+function selectivityReport(
   project: ProjectInput,
   results: Record<string, PanelResult>,
   parentOf: Map<string, string>,
-): Warning[] {
-  const out: Warning[] = [];
+): SelectivityEntry[] {
+  const out: SelectivityEntry[] = [];
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
   for (const [childId, parentId] of parentOf) {
@@ -224,15 +240,25 @@ function selectivityWarnings(
     const downstreamIn = childResult.circuits.reduce((m, c) => Math.max(m, c.breaker.ratingA), 0);
     if (downstreamIn <= 0) continue;
 
-    if (nonSelective(upstreamIn, downstreamIn)) {
-      out.push({
-        code: 'selectivity-risk',
-        severity: 'warning',
-        message: `Feeder "${feeder.name}" (${upstreamIn} A) may not discriminate with ${childResult.name}'s ${downstreamIn} A branch — upstream rating below ${(downstreamIn * 1.6).toFixed(0)} A (1.6×). Verify with manufacturer curves.`,
-        panelId: parentId,
-        circuitId: feeder.id,
-      });
-    }
+    const ratio = round(upstreamIn / downstreamIn, 2);
+    const selective = !nonSelective(upstreamIn, downstreamIn);
+    const requiredA = Math.ceil(downstreamIn * SELECTIVITY_RATIO);
+    const marginNote = selective
+      ? `ratio ${ratio} ≥ ${SELECTIVITY_RATIO}× — discriminates (screen).`
+      : `upstream rating below ${requiredA} A (${SELECTIVITY_RATIO}×); ratio ${ratio}.`;
+
+    out.push({
+      upstreamPanelId: parentId,
+      upstreamCircuitId: feeder.id,
+      upstreamName: feeder.name,
+      upstreamRatingA: upstreamIn,
+      downstreamPanelId: childId,
+      downstreamName: childResult.name,
+      downstreamRatingA: downstreamIn,
+      ratio,
+      selective,
+      marginNote,
+    });
   }
 
   return out;

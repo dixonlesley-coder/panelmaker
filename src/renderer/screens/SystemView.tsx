@@ -15,6 +15,7 @@ import {
   Group,
   SimpleGrid,
   Stack,
+  Table,
   Tabs,
   Text,
   ThemeIcon,
@@ -241,6 +242,8 @@ export function SystemView() {
 
       <FaultLevelsCard system={system} />
 
+      <SelectivityCard system={system} />
+
       {system.sources && (
         <Card withBorder radius="md" padding="md">
           <Group gap="xs" mb="xs">
@@ -326,6 +329,62 @@ function KeyStat({ k, v }: { k: string; v: string }) {
         {v}
       </Text>
     </div>
+  );
+}
+
+/**
+ * Current-based discrimination report per cascaded feeder→sub-panel pair: the
+ * upstream/downstream ratings, their ratio, and whether the rule-of-thumb screen
+ * is met. Full coordination still needs manufacturer time-current curves.
+ */
+function SelectivityCard({ system }: { system: SystemResult }) {
+  const rows = system.selectivity;
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <Card withBorder radius="md" padding="md">
+      <Group gap="xs" mb="xs">
+        <ThemeIcon variant="light" color="indigo">
+          <IconSitemap size={16} />
+        </ThemeIcon>
+        <Text fw={600} size="sm">
+          Selectivity
+        </Text>
+        <Text size="xs" c="dimmed">
+          feeder vs sub-panel largest branch (1.6× current screen)
+        </Text>
+      </Group>
+      <Table.ScrollContainer minWidth={520}>
+        <Table verticalSpacing="xs" fz="sm" withColumnBorders>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Feeder</Table.Th>
+              <Table.Th w={90}>Upstream</Table.Th>
+              <Table.Th>Sub-panel</Table.Th>
+              <Table.Th w={100}>Downstream</Table.Th>
+              <Table.Th w={70}>Ratio</Table.Th>
+              <Table.Th w={110}>Discrimination</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {rows.map((e) => (
+              <Table.Tr key={`${e.upstreamCircuitId}-${e.downstreamPanelId}`}>
+                <Table.Td>{e.upstreamName}</Table.Td>
+                <Table.Td>{formatAmps(e.upstreamRatingA)}</Table.Td>
+                <Table.Td>{e.downstreamName}</Table.Td>
+                <Table.Td>{formatAmps(e.downstreamRatingA)}</Table.Td>
+                <Table.Td>{e.ratio.toFixed(2)}×</Table.Td>
+                <Table.Td>
+                  <Badge variant="light" color={e.selective ? 'teal' : 'red'} size="sm">
+                    {e.selective ? 'OK' : 'risk'}
+                  </Badge>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
+    </Card>
   );
 }
 
