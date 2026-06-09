@@ -71,6 +71,10 @@ export interface ProjectState {
   /** Set the installation earthing system. */
   setEarthingSystem: (system: EarthingSystem) => void;
 
+  // project lifecycle
+  /** Replace the entire working project (e.g. autosave restore on launch). */
+  replaceProject: (project: ProjectInput) => void;
+
   // control schematics
   /** Build the schematic from the assembly the first time it is requested. */
   ensureSchematic: (circuitId: string, assembly: ControlAssembly) => void;
@@ -222,6 +226,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set((s) => ({ project: { ...s.project, sources: { ...s.project.sources, ...patch } } })),
 
   setEarthingSystem: (system) => set((s) => ({ project: { ...s.project, earthingSystem: system } })),
+
+  replaceProject: (project) =>
+    set({ project, activePanelId: project.panels[0]?.id ?? '', schematics: {} }),
 
   ensureSchematic: (circuitId, assembly) =>
     set((s) => {

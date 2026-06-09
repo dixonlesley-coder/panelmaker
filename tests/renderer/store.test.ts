@@ -78,4 +78,13 @@ describe('projectStore', () => {
     removeCircuit(panelId, added.circuits[added.circuits.length - 1]!.id);
     expect(useProjectStore.getState().project.panels[0]!.circuits.length).toBe(startCount);
   });
+
+  it('replaceProject swaps the working project and resets the active panel', () => {
+    const restored = createSampleProject();
+    restored.id = 'RESTORED';
+    restored.name = 'Restored project';
+    useProjectStore.getState().replaceProject(restored);
+    expect(useProjectStore.getState().project.id).toBe('RESTORED');
+    expect(useProjectStore.getState().activePanelId).toBe(restored.panels[0]!.id);
+  });
 });

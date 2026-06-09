@@ -1,4 +1,4 @@
-import { AppShell, Group, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
+import { AppShell, Center, Group, Loader, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import {
   IconSun,
   IconMoon,
@@ -21,6 +21,8 @@ import { Pricelist } from '@renderer/screens/Pricelist';
 import { Sources } from '@renderer/screens/Sources';
 import { Settings } from '@renderer/screens/Settings';
 import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
+import { useAutosave } from '@renderer/features/autosave/useAutosave';
+import { AutosaveIndicator } from '@renderer/features/autosave/AutosaveIndicator';
 
 interface NavItem {
   screen: Screen;
@@ -80,6 +82,15 @@ export function App() {
   const activeScreen = useProjectStore((s) => s.activeScreen);
   const setScreen = useProjectStore((s) => s.setScreen);
   const projectName = useProjectStore((s) => s.project.name);
+  const { hydrated, saveState, target } = useAutosave();
+
+  if (!hydrated) {
+    return (
+      <Center h="100vh">
+        <Loader />
+      </Center>
+    );
+  }
 
   return (
     <AppShell
@@ -96,7 +107,10 @@ export function App() {
               · {projectName}
             </Text>
           </Group>
-          <ColorSchemeToggle />
+          <Group gap="md">
+            <AutosaveIndicator saveState={saveState} target={target} />
+            <ColorSchemeToggle />
+          </Group>
         </Group>
       </AppShell.Header>
 
