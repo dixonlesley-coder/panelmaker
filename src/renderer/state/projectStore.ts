@@ -504,3 +504,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }),
     })),
 }));
+
+/** Selector: whether an undo is currently available (the past stack is non-empty). */
+export const selectCanUndo = (s: ProjectState): boolean => s.past.length > 0;
+
+/** Selector: whether a redo is currently available (the future stack is non-empty). */
+export const selectCanRedo = (s: ProjectState): boolean => s.future.length > 0;

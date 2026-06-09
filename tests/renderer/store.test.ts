@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useProjectStore } from '@renderer/state/projectStore';
+import {
+  useProjectStore,
+  selectCanUndo,
+  selectCanRedo,
+} from '@renderer/state/projectStore';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { computeSystem } from '@shared/engine';
 import type { Warning } from '@shared/types';
@@ -19,8 +23,8 @@ function findVoltageDropWarning() {
 
 describe('projectStore', () => {
   beforeEach(() => {
-    // reset to a fresh sample project between tests
-    useProjectStore.setState({ project: createSampleProject() });
+    // reset to a fresh sample project (and clear history) between tests
+    useProjectStore.setState({ project: createSampleProject(), past: [], future: [] });
   });
 
   it('seeds the realistic sample building', () => {
@@ -86,5 +90,57 @@ describe('projectStore', () => {
     useProjectStore.getState().replaceProject(restored);
     expect(useProjectStore.getState().project.id).toBe('RESTORED');
     expect(useProjectStore.getState().activePanelId).toBe(restored.panels[0]!.id);
+  });
+
+  describe('undo / redo', () => {
+    it('undo restores the previous project; redo re-applies the edit', () => {
+      const { project, updatePanel } = useProjectStore.getState();
+      const panelId = project.panels[0]!.id;
+      const original = useProjectStore.getState().project;
+
+      updatePanel(panelId, { name: 'Renamed panel' });
+      const edited = useProjectStore.getState().project;
+      expect(edited.panels[0]!.name).toBe('Renamed panel');
+      expect(edited).not.toBe(original);
+
+      useProjectStore.getState().undo();
+      // undo restores the exact previous project reference
+      expect(useProjectStore.getState().project).toBe(original);
+
+      useProjectStore.getState().redo();
+      expect(useProjectStore.getState().project).toBe(edited);
+      expect(useProjectStore.getState().project.panels[0]!.name).toBe('Renamed panel');
+    });
+
+    it('canUndo / canRedo reflect the history stacks', () => {
+      expect(selectCanUndo(useProjectStore.getState())).toBe(false);
+      expect(selectCanRedo(useProjectStore.getState())).toBe(false);
+
+      const panelId = useProjectStore.getState().project.panels[0]!.id;
+      useProjectStore.getState().updatePanel(panelId, { name: 'Edited' });
+      expect(selectCanUndo(useProjectStore.getState())).toBe(true);
+      expect(selectCanRedo(useProjectStore.getState())).toBe(false);
+
+      useProjectStore.getState().undo();
+      expect(selectCanUndo(useProjectStore.getState())).toBe(false);
+      expect(selectCanRedo(useProjectStore.getState())).toBe(true);
+
+      useProjectStore.getState().redo();
+      expect(selectCanUndo(useProjectStore.getState())).toBe(true);
+      expect(selectCanRedo(useProjectStore.getState())).toBe(false);
+    });
+
+    it('a new edit after undo clears the redo stack', () => {
+      const panelId = useProjectStore.getState().project.panels[0]!.id;
+
+      useProjectStore.getState().updatePanel(panelId, { name: 'First' });
+      useProjectStore.getState().undo();
+      expect(selectCanRedo(useProjectStore.getState())).toBe(true);
+
+      // a fresh edit discards the redo future
+      useProjectStore.getState().updatePanel(panelId, { name: 'Second' });
+      expect(selectCanRedo(useProjectStore.getState())).toBe(false);
+      expect(useProjectStore.getState().project.panels[0]!.name).toBe('Second');
+    });
   });
 });

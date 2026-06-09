@@ -13,9 +13,16 @@ import {
   IconSolarPanel,
   IconSettings,
   IconBolt,
+  IconArrowBackUp,
+  IconArrowForwardUp,
 } from '@tabler/icons-react';
 
-import { useProjectStore, type Screen } from '@renderer/state/projectStore';
+import {
+  useProjectStore,
+  selectCanUndo,
+  selectCanRedo,
+  type Screen,
+} from '@renderer/state/projectStore';
 import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
 import { Dashboard } from '@renderer/screens/Dashboard';
@@ -63,6 +70,45 @@ function ColorSchemeToggle() {
         {isDark ? <IconSun size={18} /> : <IconMoon size={18} />}
       </ActionIcon>
     </Tooltip>
+  );
+}
+
+/** Platform-aware modifier label for the undo/redo shortcut tooltips. */
+const MOD_KEY =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+
+/** Undo / redo buttons, disabled when the matching history stack is empty. */
+function HistoryControls() {
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
+  const canUndo = useProjectStore(selectCanUndo);
+  const canRedo = useProjectStore(selectCanRedo);
+
+  return (
+    <Group gap={4}>
+      <Tooltip label={`Undo (${MOD_KEY}+Z)`}>
+        <ActionIcon
+          variant="default"
+          size="lg"
+          aria-label="Undo"
+          disabled={!canUndo}
+          onClick={() => undo()}
+        >
+          <IconArrowBackUp size={18} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label={`Redo (${MOD_KEY}+Shift+Z)`}>
+        <ActionIcon
+          variant="default"
+          size="lg"
+          aria-label="Redo"
+          disabled={!canRedo}
+          onClick={() => redo()}
+        >
+          <IconArrowForwardUp size={18} />
+        </ActionIcon>
+      </Tooltip>
+    </Group>
   );
 }
 
@@ -152,6 +198,7 @@ export function App() {
             </Text>
           </Group>
           <Group gap="md">
+            <HistoryControls />
             <AutosaveIndicator saveState={saveState} target={target} />
             <ColorSchemeToggle />
           </Group>
