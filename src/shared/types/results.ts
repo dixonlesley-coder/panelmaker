@@ -148,6 +148,25 @@ export interface HarmonicsResult {
   note: string;
 }
 
+/**
+ * Simplified arc-flash / incident-energy estimate for a panel bus — a Ralph Lee
+ * approximation mapped to an NFPA 70E PPE category. A design risk-screen, NOT a
+ * full IEEE 1584 study. See `engine/arcFlash`.
+ */
+export interface ArcFlashResult {
+  /** Estimated incident energy at the working distance (cal/cm²). */
+  incidentEnergyCalCm2: number;
+  /** Working distance the estimate is referenced to (mm). */
+  workingDistanceMm: number;
+  /** Assumed arcing (clearing) time (s). */
+  arcingTimeS: number;
+  /** NFPA 70E PPE category label. */
+  ppeCategory: string;
+  /** Arc-flash boundary distance where incident energy falls to 1.2 cal/cm² (mm). */
+  arcFlashBoundaryMm: number;
+  note: string;
+}
+
 export type WarningSeverity = 'info' | 'warning' | 'error';
 
 export interface SuggestedFix {
@@ -199,6 +218,8 @@ export interface PanelResult {
   faultLevelKa?: number;
   /** Harmonics / power-quality estimate, when non-linear loads are present. */
   harmonics?: HarmonicsResult;
+  /** Simplified arc-flash incident-energy estimate at the bus, when fault known. */
+  arcFlash?: ArcFlashResult;
 }
 
 /** A 24-hour building demand profile and peak analysis. */

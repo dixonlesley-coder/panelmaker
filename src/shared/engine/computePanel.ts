@@ -15,6 +15,7 @@ import { sizeBusbar } from './busbar';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
 import { computeHarmonics, harmonicsWarnings } from './harmonics';
+import { computeArcFlash, arcFlashWarnings } from './arcFlash';
 import { checkBreakerKa, checkZs, type Impedance } from './fault';
 import { circuitRcd, sizeGrounding } from './grounding';
 import { round } from './util';
@@ -281,6 +282,22 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   });
   if (harmonics) warnings.push(...harmonicsWarnings(harmonics, panel.id));
 
+  // Arc-flash incident-energy estimate at the bus (needs the prospective fault).
+  // The clearing device is approximated by the panel's heaviest breaker class —
+  // an MCCB-fed bus is assumed to clear more slowly than an MCB-only board.
+  let arcFlash;
+  if (opts.faultLevelA !== undefined) {
+    const incomerClass = comps.some((cm) => cm.result.breaker.deviceClass === 'MCCB')
+      ? 'MCCB'
+      : 'MCB';
+    arcFlash = computeArcFlash({
+      boltedFaultA: opts.faultLevelA,
+      voltageV: panel.voltageV,
+      incomerClass,
+    });
+    if (arcFlash) warnings.push(...arcFlashWarnings(arcFlash, panel.id));
+  }
+
   return {
     panelId: panel.id,
     name: panel.name,
@@ -299,5 +316,6 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     standardsVersion: STANDARDS_VERSION,
     ...(opts.faultLevelA !== undefined ? { faultLevelKa: round(opts.faultLevelA / 1000, 1) } : {}),
     ...(harmonics ? { harmonics } : {}),
+    ...(arcFlash ? { arcFlash } : {}),
   };
 }

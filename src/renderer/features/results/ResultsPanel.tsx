@@ -376,6 +376,40 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
         </Card>
       )}
 
+      {result.arcFlash && (
+        <Card withBorder radius="md" padding="sm">
+          <Group justify="space-between" mb={4}>
+            <Text fw={600} size="sm">
+              Arc flash (estimate)
+            </Text>
+            <Group gap={6}>
+              <Badge
+                size="sm"
+                variant="light"
+                color={
+                  result.arcFlash.incidentEnergyCalCm2 > 40
+                    ? 'red'
+                    : result.arcFlash.incidentEnergyCalCm2 > 8
+                      ? 'orange'
+                      : 'teal'
+                }
+              >
+                {result.arcFlash.incidentEnergyCalCm2} cal/cm²
+              </Badge>
+              <Badge size="sm" variant="light" color="gray">
+                {result.arcFlash.ppeCategory}
+              </Badge>
+              <Badge size="sm" variant="light" color="gray">
+                boundary {result.arcFlash.arcFlashBoundaryMm} mm
+              </Badge>
+            </Group>
+          </Group>
+          <Text size="xs" c="dimmed">
+            {result.arcFlash.note}
+          </Text>
+        </Card>
+      )}
+
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
