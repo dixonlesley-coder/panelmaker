@@ -80,14 +80,58 @@ export function balancePhases(circuits: PhaseCircuit[], panelSystem: SystemType)
     assignment[c.id] = c.pinned;
   }
 
+  const keys = ['L1', 'L2', 'L3'] as const;
+  type Line = (typeof keys)[number];
   const singles = circuits
     .filter((c) => !c.threePhase && !c.pinned)
     .sort((a, b) => b.currentA - a.currentA);
-  const keys = ['L1', 'L2', 'L3'] as const;
   for (const c of singles) {
-    const min = keys.reduce((m, p) => (phases[p] < phases[m] ? p : m), 'L1' as 'L1' | 'L2' | 'L3');
+    const min = keys.reduce<Line>((m, p) => (phases[p] < phases[m] ? p : m), 'L1');
     phases[min] += c.currentA;
     assignment[c.id] = min;
+  }
+
+  // Local-search refinement: greedy LPT can leave a lumpy load set unbalanced, so
+  // relocate / swap the movable single-phase circuits while it shrinks the
+  // L1/L2/L3 spread. Only the unpinned singles move; pinned + 3-phase stay put.
+  const spread = () => Math.max(phases.L1, phases.L2, phases.L3) - Math.min(phases.L1, phases.L2, phases.L3);
+  for (let pass = 0; pass < 40; pass++) {
+    let improved = false;
+    for (const c of singles) {
+      const from = assignment[c.id] as Line;
+      for (const to of keys) {
+        if (to === from) continue;
+        const before = spread();
+        phases[from] -= c.currentA;
+        phases[to] += c.currentA;
+        if (spread() < before - 1e-9) {
+          assignment[c.id] = to;
+          improved = true;
+        } else {
+          phases[from] += c.currentA;
+          phases[to] -= c.currentA;
+        }
+      }
+    }
+    for (const a of singles) {
+      for (const b of singles) {
+        const pa = assignment[a.id] as Line;
+        const pb = assignment[b.id] as Line;
+        if (a.id === b.id || pa === pb) continue;
+        const before = spread();
+        phases[pa] += b.currentA - a.currentA;
+        phases[pb] += a.currentA - b.currentA;
+        if (spread() < before - 1e-9) {
+          assignment[a.id] = pb;
+          assignment[b.id] = pa;
+          improved = true;
+        } else {
+          phases[pa] -= b.currentA - a.currentA;
+          phases[pb] -= a.currentA - b.currentA;
+        }
+      }
+    }
+    if (!improved) break;
   }
 
   const vals = [phases.L1, phases.L2, phases.L3];

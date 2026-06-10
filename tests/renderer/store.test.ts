@@ -441,6 +441,22 @@ describe('projectStore', () => {
       expect(selectCanUndo(useProjectStore.getState())).toBe(canUndoBefore);
     });
 
+    it('setPhaseAssignments pins the listed circuits to their lines (undoable)', () => {
+      const panel = useProjectStore
+        .getState()
+        .project.panels.find((p) => p.circuits.length >= 2)!;
+      const [a, b] = panel.circuits;
+      useProjectStore.getState().setPhaseAssignments(panel.id, { [a!.id]: 'L2', [b!.id]: 'L3' });
+
+      const after = useProjectStore.getState().project.panels.find((p) => p.id === panel.id)!;
+      expect(after.circuits.find((c) => c.id === a!.id)!.phaseOverride).toBe('L2');
+      expect(after.circuits.find((c) => c.id === b!.id)!.phaseOverride).toBe('L3');
+
+      useProjectStore.getState().undo();
+      const reverted = useProjectStore.getState().project.panels.find((p) => p.id === panel.id)!;
+      expect(reverted.circuits.find((c) => c.id === a!.id)!.phaseOverride).toBe(a!.phaseOverride);
+    });
+
     it('copyCircuit + pasteCircuit clones into any panel with a fresh id', () => {
       const { project } = useProjectStore.getState();
       const source = project.panels.find((p) => p.circuits.some((c) => c.role === 'branch'))!;

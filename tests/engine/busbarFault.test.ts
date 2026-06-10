@@ -1,10 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { checkBusbarWithstand } from '@shared/engine/busbarFault';
+import { checkBusbarWithstand, minCsaForWithstand } from '@shared/engine/busbarFault';
 import type { BusbarWithstandResult } from '@shared/engine/busbarFault';
 import {
   BUSBAR_SHORT_TIME_DENSITY_A_PER_MM2,
   peakFactor,
 } from '@shared/standards/busbarFault';
+
+describe('minCsaForWithstand — the section a fault demands', () => {
+  it('returns the CSA whose Icw exactly meets the fault, so a bar at it passes', () => {
+    // Icw(1 s) = density · csa / 1000 ⇒ csa = faultKa · 1000 / density.
+    const csa = minCsaForWithstand(16);
+    expect(csa).toBeCloseTo((16 * 1000) / BUSBAR_SHORT_TIME_DENSITY_A_PER_MM2, 6);
+    // A bar floored at this CSA is adequate for that fault.
+    expect(checkBusbarWithstand(Math.ceil(csa), 16).adequate).toBe(true);
+  });
+
+  it('scales with √t and is zero for no fault', () => {
+    expect(minCsaForWithstand(0)).toBe(0);
+    expect(minCsaForWithstand(16, 0.25)).toBeCloseTo(minCsaForWithstand(16) * 0.5, 6);
+  });
+});
 
 describe('checkBusbarWithstand — thermal (Icw) adequacy', () => {
   it('flags a small bar under a high fault as inadequate', () => {

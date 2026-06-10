@@ -9,7 +9,7 @@ import {
   ReactFlowProvider,
   useNodesState,
 } from '@xyflow/react';
-import { Badge, Box, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Box, Button, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconAirConditioning,
@@ -23,6 +23,7 @@ import {
   IconHandMove,
   IconPlug,
   IconPlugConnected,
+  IconScale,
   IconSitemap,
   IconSolarPanel,
   IconSparkles,
@@ -30,6 +31,7 @@ import {
 import type { CircuitInput, LoadKind, PanelInput, PanelResult, SourcesResult } from '@shared/types';
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
+import { balancePhases, type PhaseCircuit } from '@shared/engine';
 import { NODE_TYPES, OVERRIDE_MIME, type BranchNodeData } from '@renderer/screens/sld/nodes';
 import { circuitIssues, incomerIssues, busbarIssues } from '@renderer/lib/nodeIssues';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -535,6 +537,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
+  const setPhaseAssignments = useProjectStore((s) => s.setPhaseAssignments);
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const allPanels = useProjectStore((s) => s.project.panels);
@@ -602,6 +605,31 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
       }),
       color: 'violet',
     });
+  };
+
+  /**
+   * One-click phase rebalance: re-optimise ALL single-phase ways across L1/L2/L3
+   * (ignoring any current pins) and pin the result, so the as-built schedule
+   * carries a stable, balanced phase assignment.
+   */
+  const onAutoBalance = () => {
+    const phaseCircuits: PhaseCircuit[] = result.circuits.map((cr) => ({
+      id: cr.circuitId,
+      currentA: cr.designCurrentA,
+      threePhase: cr.phase === '3ph',
+    }));
+    const bal = balancePhases(phaseCircuits, panel.system);
+    const assignment: Record<string, 'L1' | 'L2' | 'L3'> = {};
+    for (const cr of result.circuits) {
+      const a = bal.assignment[cr.circuitId];
+      if (a === 'L1' || a === 'L2' || a === 'L3') assignment[cr.circuitId] = a;
+    }
+    if (Object.keys(assignment).length === 0) {
+      notifications.show({ message: t('vbuilder.phaseNothing'), color: 'yellow' });
+      return;
+    }
+    setPhaseAssignments(panel.id, assignment);
+    notifications.show({ message: t('vbuilder.phaseBalanced', { pct: bal.imbalancePct }), color: 'teal' });
   };
 
   // Change marking: diff this result against the previous one for this panel.
@@ -725,11 +753,23 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
             {t('vbuilder.hint')} {t('vbuilder.editHint')}
           </Text>
         </Group>
-        {changes.size > 0 && (
-          <Badge variant="light" color="teal" leftSection={<IconSparkles size={12} />}>
-            {t('vbuilder.resized', { count: changes.size })}
-          </Badge>
-        )}
+        <Group gap="xs">
+          {changes.size > 0 && (
+            <Badge variant="light" color="teal" leftSection={<IconSparkles size={12} />}>
+              {t('vbuilder.resized', { count: changes.size })}
+            </Badge>
+          )}
+          {panel.system === '3ph' && (
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconScale size={14} />}
+              onClick={onAutoBalance}
+            >
+              {t('vbuilder.autoBalance')}
+            </Button>
+          )}
+        </Group>
       </Group>
 
       <Group align="stretch" gap="sm" wrap="nowrap">
