@@ -22,6 +22,8 @@ export const theme = createTheme({
   primaryShade: { light: 6, dark: 5 },
   defaultRadius: 'md',
   cursorType: 'pointer',
+  autoContrast: true,
+  respectReducedMotion: true,
 
   fontFamily: FONT_STACK,
   fontFamilyMonospace: MONO_STACK,
@@ -71,20 +73,54 @@ export const theme = createTheme({
       },
     },
     Tooltip: {
-      defaultProps: { openDelay: 350, radius: 'md', withArrow: true },
+      defaultProps: {
+        openDelay: 350,
+        radius: 'md',
+        withArrow: true,
+        transitionProps: { transition: 'fade', duration: 120 },
+      },
     },
     Modal: {
       defaultProps: {
         radius: 'lg',
         centered: true,
-        overlayProps: { backgroundOpacity: 0.45, blur: 4 },
+        overlayProps: { backgroundOpacity: 0.45, blur: 6 },
+        transitionProps: { transition: 'pop', duration: 200 },
+        shadow: 'xl',
       },
       styles: { title: { fontWeight: 650 } },
+    },
+    Menu: {
+      defaultProps: {
+        radius: 'md',
+        shadow: 'lg',
+        transitionProps: { transition: 'fade-down', duration: 140 },
+      },
+    },
+    Popover: {
+      defaultProps: {
+        radius: 'md',
+        shadow: 'lg',
+        transitionProps: { transition: 'fade-down', duration: 140 },
+      },
+    },
+    Tabs: {
+      styles: {
+        tab: {
+          fontWeight: 500,
+          transition: 'background-color 140ms ease, color 140ms ease',
+        },
+      },
+    },
+    SegmentedControl: {
+      defaultProps: { radius: 'md', transitionDuration: 200 },
+    },
+    Loader: {
+      defaultProps: { type: 'dots' },
     },
     TextInput: { defaultProps: { radius: 'md' } },
     NumberInput: { defaultProps: { radius: 'md' } },
     Select: { defaultProps: { radius: 'md' } },
-    SegmentedControl: { defaultProps: { radius: 'md' } },
     Table: {
       styles: { th: { fontWeight: 600 } },
     },

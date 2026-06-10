@@ -21,7 +21,7 @@ if (!root) throw new Error('Root element #root not found');
 createRoot(root).render(
   <StrictMode>
     <MantineProvider theme={theme} defaultColorScheme="auto">
-      <Notifications position="top-right" />
+      <Notifications position="top-right" autoClose={3500} limit={4} />
       <App />
     </MantineProvider>
   </StrictMode>,

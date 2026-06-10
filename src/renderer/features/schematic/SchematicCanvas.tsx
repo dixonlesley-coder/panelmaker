@@ -136,7 +136,12 @@ export function SchematicCanvas({
   return (
     <Box
       h={Math.max(340, Math.min(height + 40, 620))}
-      style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}
+      style={{
+        border: '1px solid var(--mantine-color-default-border)',
+        borderRadius: 'var(--mantine-radius-lg)',
+        background: 'var(--mantine-color-body)',
+        overflow: 'hidden',
+      }}
     >
       <ReactFlowProvider>
         <ReactFlow
