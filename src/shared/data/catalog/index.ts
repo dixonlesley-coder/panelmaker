@@ -14,6 +14,7 @@
  */
 
 import { PART_CATEGORIES, type Part, type PartCategory } from '@shared/types/parts';
+import { parseCsv } from '@shared/io/csv';
 import schneiderRaw from './schneider.parts.json';
 
 /** One ordering-table row as it appears in the committed JSON. */
@@ -175,4 +176,85 @@ export function partsToCatalogFile(parts: readonly Part[], opts: SerializeOpts =
 /** Serialize the current parts to the exact committed JSON text (trailing newline). */
 export function serializeCatalogJson(parts: readonly Part[], opts: SerializeOpts = {}): string {
   return JSON.stringify(partsToCatalogFile(parts, opts), null, 2) + '\n';
+}
+
+/* ----------------------------- import (file → DB) -------------------------- */
+
+// Header aliases so a distributor/extractor CSV need not use our exact names.
+const SKU_HEADERS = ['sku', 'order code', 'ordercode', 'reference', 'cat no', 'catalogue number', 'code'];
+const MODEL_HEADERS = ['model', 'description', 'designation'];
+const SERIES_HEADERS = ['series', 'range'];
+const norm = (h: string) => h.toLowerCase().replace(/[\s_]+/g, ' ').trim();
+
+/** Parse a catalogue CSV (headers: sku, category, series, model, + attribute columns). */
+function csvToCatalogFile(text: string): CatalogFile {
+  const rows = parseCsv(text);
+  const header = rows[0];
+  if (!header || rows.length < 2) {
+    return { catalogVersion: 'import', manufacturer: 'Schneider Electric', source: 'CSV import', parts: [] };
+  }
+  const roleOf = (h: string): 'sku' | 'category' | 'series' | 'model' | 'unit' | 'attr' => {
+    const k = norm(h);
+    if (SKU_HEADERS.includes(k)) return 'sku';
+    if (k === 'category') return 'category';
+    if (SERIES_HEADERS.includes(k)) return 'series';
+    if (MODEL_HEADERS.includes(k)) return 'model';
+    if (k === 'unit') return 'unit';
+    return 'attr';
+  };
+  const roles = header.map(roleOf);
+
+  const parts: CatalogEntry[] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r] ?? [];
+    if (row.every((c) => (c ?? '').trim() === '')) continue;
+    let sku = '';
+    let category = '';
+    let series = '';
+    let model = '';
+    let unit: string | undefined;
+    const attributes: Record<string, unknown> = {};
+    header.forEach((h, i) => {
+      const val = (row[i] ?? '').trim();
+      if (val === '') return;
+      switch (roles[i]) {
+        case 'sku': sku = val.replace(/\s+/g, ''); break;
+        case 'category': category = val; break;
+        case 'series': series = val; break;
+        case 'model': model = val; break;
+        case 'unit': unit = val; break;
+        default: {
+          // Coerce numeric-looking cells to numbers (ratingA, poles, …); keep the rest as text.
+          const num = Number(val);
+          attributes[h.trim()] = /^-?\d/.test(val) && !Number.isNaN(num) ? num : val;
+        }
+      }
+    });
+    parts.push({
+      sku,
+      category: category as PartCategory,
+      series: series || model,
+      model: model || series,
+      attributes,
+      ...(unit ? { unit } : {}),
+    });
+  }
+  return { catalogVersion: 'import', manufacturer: 'Schneider Electric', source: 'CSV import', parts };
+}
+
+/** Parse a catalogue file's text as JSON ({…}) or CSV (auto-detected). */
+export function parseCatalogText(text: string): CatalogFile {
+  return text.trimStart().startsWith('{') ? (JSON.parse(text) as CatalogFile) : csvToCatalogFile(text);
+}
+
+/**
+ * Import a catalogue file's text (JSON or CSV) into validated {@link Part}s.
+ * Never throws — a malformed file is reported as a single issue.
+ */
+export function importCatalogText(text: string): { parts: Part[]; issues: CatalogIssue[] } {
+  try {
+    return loadCatalog(parseCatalogText(text));
+  } catch (e) {
+    return { parts: [], issues: [{ index: -1, sku: '', reason: `could not parse file: ${(e as Error).message}` }] };
+  }
 }

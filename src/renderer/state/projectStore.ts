@@ -184,6 +184,10 @@ export interface ProjectState {
   /** Merge a partial branding/title-block metadata patch into the project. */
   setProjectMeta: (patch: Partial<ProjectMeta>) => void;
 
+  // parts catalogue
+  /** Merge imported catalogue parts into the catalogue (de-duped by id; imported wins). Returns the count merged. */
+  importParts: (list: Part[]) => number;
+
   // undo / redo (project edits only)
   /** Restore the previous project state (no-op when the past stack is empty). */
   undo: () => void;
@@ -779,6 +783,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
         `meta:${Object.keys(patch).sort().join('+')}`,
       ),
     ),
+
+  importParts: (list) => {
+    // Catalogue parts live outside the undo/redo project history; merge by id so
+    // a re-import updates existing rows rather than duplicating them.
+    set((s) => {
+      const byId = new Map(s.parts.map((p) => [p.id, p]));
+      for (const p of list) byId.set(p.id, p);
+      return { parts: [...byId.values()] };
+    });
+    return list.length;
+  },
 
   undo: () =>
     set((s) => {

@@ -19,6 +19,7 @@ import { notifications } from '@mantine/notifications';
 import {
   IconBuildingFactory2,
   IconDatabaseExport,
+  IconDatabaseImport,
   IconInfoCircle,
   IconLock,
   IconPhoto,
@@ -29,7 +30,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import { SOIL_TYPES } from '@shared/standards/soil';
-import { loadCatalog, serializeCatalogJson, type CatalogFile } from '@shared/data/catalog';
+import {
+  importCatalogText,
+  loadCatalog,
+  serializeCatalogJson,
+  type CatalogFile,
+} from '@shared/data/catalog';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
@@ -70,10 +76,36 @@ export function Settings() {
   const setSiteConditions = useProjectStore((s) => s.setSiteConditions);
 
   const parts = useProjectStore((s) => s.parts);
+  const importParts = useProjectStore((s) => s.importParts);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
   const meta = project.meta ?? {};
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const catalogInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Import the extractor's output (JSON or CSV) into the in-app catalogue. The
+   * file is parsed + validated; valid rows merge into the catalogue (review them
+   * in Parts Catalog), then the export button writes the committed dataset.
+   */
+  function onCatalogFile(file: File | null) {
+    if (!file) return;
+    void file.text().then((text) => {
+      const { parts: loaded, issues } = importCatalogText(text);
+      if (loaded.length > 0) importParts(loaded);
+      const color = loaded.length === 0 ? 'red' : issues.length > 0 ? 'yellow' : 'teal';
+      notifications.show({
+        message:
+          loaded.length === 0
+            ? t('settings.catalogImportNone', { reason: issues[0]?.reason ?? '—' })
+            : t('settings.catalogImported', { count: loaded.length, skipped: issues.length }),
+        color,
+      });
+      for (const i of issues.slice(0, 4)) {
+        notifications.show({ message: `${i.sku || `row ${i.index + 1}`}: ${i.reason}`, color: 'yellow' });
+      }
+    });
+  }
 
   /**
    * One-click: serialize the current parts catalogue to the committed dataset
@@ -532,14 +564,35 @@ export function Settings() {
         <Text size="xs" c="dimmed" mb="md">
           {t('settings.catalogHint')}
         </Text>
-        <Button
-          variant="light"
-          color="grape"
-          leftSection={<IconDatabaseExport size={16} />}
-          onClick={onExportCatalog}
-        >
-          {t('settings.catalogExport')}
-        </Button>
+        <Group gap="sm">
+          <Button
+            variant="light"
+            color="grape"
+            leftSection={<IconDatabaseImport size={16} />}
+            onClick={() => catalogInputRef.current?.click()}
+          >
+            {t('settings.catalogImport')}
+          </Button>
+          <Button
+            variant="light"
+            color="grape"
+            leftSection={<IconDatabaseExport size={16} />}
+            onClick={onExportCatalog}
+          >
+            {t('settings.catalogExport')}
+          </Button>
+        </Group>
+        {/* Hidden picker for the extractor's JSON/CSV output. */}
+        <input
+          ref={catalogInputRef}
+          type="file"
+          accept=".json,.csv,application/json,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            onCatalogFile(e.currentTarget.files?.[0] ?? null);
+            e.currentTarget.value = '';
+          }}
+        />
       </Card>
 
       <Card withBorder radius="md" padding="md">
