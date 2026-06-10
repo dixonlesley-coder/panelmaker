@@ -518,6 +518,26 @@ export const en = {
     estimateNote: 'Engineering estimate — verify against PUIL 2011 / IEC 60364 before construction.',
   },
 
+  catalogPdf: {
+    button: 'Import from PDF',
+    title: 'Import catalogue from PDF',
+    hint: 'Pick a catalogue PDF; the bundled extractor reads its ordering tables, then you review and import. Narrow it to the order-code pages for the best results.',
+    pages: 'Pages (optional)',
+    choose: 'Choose PDF & extract',
+    pagesWord: 'pages',
+    detected: '{{tables}} tables → {{parts}} candidate parts',
+    defaultCategory: 'Category (for rows without one)',
+    defaultSeries: 'Series (optional)',
+    noRows: 'No order-code rows detected on these pages. Try a different page range, or use the JSON/CSV import.',
+    preview: 'Preview — {{shown}} of {{total}}',
+    skipped: '{{count}} skipped',
+    colCategory: 'Category',
+    colModel: 'Model',
+    colCurve: 'Curve',
+    import: 'Import {{count}} parts',
+    imported: 'Imported {{count}} parts ({{skipped}} skipped). Review in Parts Catalog, then export.',
+  },
+
   sldMenu: {
     circuit: 'Circuit',
     edit: 'Edit circuit…',

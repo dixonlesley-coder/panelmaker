@@ -65,6 +65,31 @@ jobs:
           npx tsc --noEmit -p tsconfig.json
           npx vitest run
 
+      # The in-app catalogue-PDF extractor: a standalone PyInstaller binary built
+      # here and dropped into resources/extractor/, which electron-builder bundles
+      # via extraResources (the app spawns it in --auto-json mode). Built in CI so
+      # end users need no Python. Custom workpath/specpath so PyInstaller's default
+      # ./build dir never collides with electron-builder's buildResources.
+      - name: Set up Python (catalogue extractor)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build bundled PDF extractor (PyInstaller)
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pdfplumber
+          pyinstaller --onefile --noconfirm --clean \
+            --name extract_catalogue \
+            --collect-all pdfminer \
+            --collect-all pdfplumber \
+            --distpath resources/extractor \
+            --workpath .pyinstaller-build \
+            --specpath .pyinstaller-build \
+            scripts/extract_catalogue.py
+          ls -la resources/extractor
+
       - name: Build, sign & package (gated installer)
         env:
           # --- Google Workspace licensing — baked into the main bundle ---

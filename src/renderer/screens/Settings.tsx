@@ -40,6 +40,7 @@ import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
 import { downloadText } from '@renderer/lib/download';
+import { CatalogPdfImport } from '@renderer/features/catalog/CatalogPdfImport';
 import {
   appVersion,
   checkForUpdates,
@@ -565,6 +566,7 @@ export function Settings() {
           {t('settings.catalogHint')}
         </Text>
         <Group gap="sm">
+          {isDesktop() && <CatalogPdfImport />}
           <Button
             variant="light"
             color="grape"

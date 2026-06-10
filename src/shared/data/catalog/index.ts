@@ -180,57 +180,96 @@ export function serializeCatalogJson(parts: readonly Part[], opts: SerializeOpts
 
 /* ----------------------------- import (file → DB) -------------------------- */
 
-// Header aliases so a distributor/extractor CSV need not use our exact names.
-const SKU_HEADERS = ['sku', 'order code', 'ordercode', 'reference', 'cat no', 'catalogue number', 'code'];
+/** A table as the in-app PDF extractor dumps it (header row + data rows). */
+export interface RawTable {
+  page: number;
+  index?: number;
+  header: string[];
+  rows: string[][];
+}
+
+/** Overrides applied to every row when mapping a PDF table the user is reviewing. */
+export interface TableMapDefaults {
+  defaultCategory?: PartCategory;
+  defaultSeries?: string;
+  extraAttributes?: Record<string, unknown>;
+}
+
+// Header aliases so a distributor/extractor CSV or a PDF table need not use our
+// exact names. norm() strips punctuation so "Cat. No." == "cat no", "In (A)" == "in a".
+const SKU_HEADERS = ['sku', 'order code', 'ordercode', 'reference', 'ref', 'cat no', 'catalogue number', 'code'];
 const MODEL_HEADERS = ['model', 'description', 'designation'];
 const SERIES_HEADERS = ['series', 'range'];
-const norm = (h: string) => h.toLowerCase().replace(/[\s_]+/g, ' ').trim();
+const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-/** Parse a catalogue CSV (headers: sku, category, series, model, + attribute columns). */
-function csvToCatalogFile(text: string): CatalogFile {
-  const rows = parseCsv(text);
-  const header = rows[0];
-  if (!header || rows.length < 2) {
-    return { catalogVersion: 'import', manufacturer: 'Schneider Electric', source: 'CSV import', parts: [] };
+// Map a catalogue column header to a canonical attribute key (so "In (A)" →
+// ratingA, "Icu (kA)" → breakingKa) for tables that don't use our names.
+const ATTR_ALIASES: { key: string; test: (k: string) => boolean }[] = [
+  { key: 'ratingA', test: (k) => /^(in|in a)$/.test(k) || /rating|rated current|nominal current/.test(k) },
+  { key: 'poles', test: (k) => /^poles?$/.test(k) || /no of poles?/.test(k) },
+  { key: 'curve', test: (k) => /curve|trip/.test(k) },
+  { key: 'breakingKa', test: (k) => /icu|icn|breaking/.test(k) || /^ka$/.test(k) },
+];
+
+type ColRole = { kind: 'sku' | 'category' | 'series' | 'model' | 'unit' } | { kind: 'attr'; key: string };
+function classify(header: string): ColRole {
+  const k = norm(header);
+  if (SKU_HEADERS.includes(k)) return { kind: 'sku' };
+  if (k === 'category') return { kind: 'category' };
+  if (SERIES_HEADERS.includes(k)) return { kind: 'series' };
+  if (MODEL_HEADERS.includes(k)) return { kind: 'model' };
+  if (k === 'unit') return { kind: 'unit' };
+  for (const a of ATTR_ALIASES) if (a.test(k)) return { kind: 'attr', key: a.key };
+  return { kind: 'attr', key: header.trim() || 'col' };
+}
+
+/** Coerce a cell to the right type for its canonical attribute key. */
+function coerce(key: string, val: string): unknown {
+  if (key === 'ratingA' || key === 'breakingKa') {
+    const m = val.match(/(\d+(?:[.,]\d+)?)/);
+    return m ? Number(m[1]!.replace(',', '.')) : val;
   }
-  const roleOf = (h: string): 'sku' | 'category' | 'series' | 'model' | 'unit' | 'attr' => {
-    const k = norm(h);
-    if (SKU_HEADERS.includes(k)) return 'sku';
-    if (k === 'category') return 'category';
-    if (SERIES_HEADERS.includes(k)) return 'series';
-    if (MODEL_HEADERS.includes(k)) return 'model';
-    if (k === 'unit') return 'unit';
-    return 'attr';
-  };
-  const roles = header.map(roleOf);
+  if (key === 'poles') {
+    const m = val.match(/[1-4]/);
+    return m ? Number(m[0]) : val;
+  }
+  if (key === 'curve') {
+    const m = val.toUpperCase().match(/[BCD]/);
+    return m ? m[0] : val;
+  }
+  const num = Number(val);
+  return /^-?\d/.test(val) && !Number.isNaN(num) ? num : val;
+}
 
-  const parts: CatalogEntry[] = [];
-  for (let r = 1; r < rows.length; r++) {
-    const row = rows[r] ?? [];
+/** Map one header + its data rows to catalogue entries. Empty when no SKU column. */
+function rowsToEntries(header: string[], rows: string[][], defaults: TableMapDefaults = {}): CatalogEntry[] {
+  const roles = header.map(classify);
+  if (!roles.some((r) => r.kind === 'sku')) return [];
+
+  const entries: CatalogEntry[] = [];
+  for (const row of rows) {
     if (row.every((c) => (c ?? '').trim() === '')) continue;
     let sku = '';
-    let category = '';
-    let series = '';
+    let category = defaults.defaultCategory ?? '';
+    let series = defaults.defaultSeries ?? '';
     let model = '';
     let unit: string | undefined;
-    const attributes: Record<string, unknown> = {};
-    header.forEach((h, i) => {
+    const attributes: Record<string, unknown> = { ...(defaults.extraAttributes ?? {}) };
+    header.forEach((_h, i) => {
+      const role = roles[i]!;
       const val = (row[i] ?? '').trim();
       if (val === '') return;
-      switch (roles[i]) {
+      switch (role.kind) {
         case 'sku': sku = val.replace(/\s+/g, ''); break;
         case 'category': category = val; break;
         case 'series': series = val; break;
         case 'model': model = val; break;
         case 'unit': unit = val; break;
-        default: {
-          // Coerce numeric-looking cells to numbers (ratingA, poles, …); keep the rest as text.
-          const num = Number(val);
-          attributes[h.trim()] = /^-?\d/.test(val) && !Number.isNaN(num) ? num : val;
-        }
+        default: attributes[role.key] = coerce(role.key, val);
       }
     });
-    parts.push({
+    if (!sku) continue;
+    entries.push({
       sku,
       category: category as PartCategory,
       series: series || model,
@@ -239,7 +278,27 @@ function csvToCatalogFile(text: string): CatalogFile {
       ...(unit ? { unit } : {}),
     });
   }
+  return entries;
+}
+
+/** Parse a catalogue CSV (headers: sku, category, series, model, + attribute columns). */
+function csvToCatalogFile(text: string): CatalogFile {
+  const rows = parseCsv(text);
+  const header = rows[0];
+  const parts = header && rows.length >= 2 ? rowsToEntries(header, rows.slice(1)) : [];
   return { catalogVersion: 'import', manufacturer: 'Schneider Electric', source: 'CSV import', parts };
+}
+
+/**
+ * Map the PDF extractor's raw tables to catalogue entries (de-duped by SKU).
+ * `defaults` carries the user's review choices (category/series the tables omit).
+ */
+export function tablesToCandidates(tables: RawTable[], defaults: TableMapDefaults = {}): CatalogEntry[] {
+  const bySku = new Map<string, CatalogEntry>();
+  for (const t of tables) {
+    for (const e of rowsToEntries(t.header ?? [], t.rows ?? [], defaults)) bySku.set(e.sku, e);
+  }
+  return [...bySku.values()];
 }
 
 /** Parse a catalogue file's text as JSON ({…}) or CSV (auto-detected). */

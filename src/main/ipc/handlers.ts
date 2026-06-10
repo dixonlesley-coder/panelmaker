@@ -23,6 +23,7 @@ import { listParts, upsertPart } from '../repositories/parts.repo';
 import { importPricelist } from '../repositories/pricelists.repo';
 import { saveSchematic, loadSchematic } from '../repositories/schematic.repo';
 import { computeProject } from '../services/calc.service';
+import { extractPdfTables } from '../services/catalog-extract.service';
 import {
   exportLabelsPdf,
   exportPanelPdf,
@@ -132,6 +133,26 @@ export function registerIpcHandlers(hooks: IpcHandlerHooks = {}): void {
   ipcMain.handle(IPC.upsertPart, (_e, part: unknown) =>
     upsertPart(partSchema.parse(part) as unknown as Part),
   );
+
+  ipcMain.handle(IPC.extractCatalogPdf, async (e, pages: unknown) => {
+    const win = BrowserWindow.fromWebContents(e.sender) ?? undefined;
+    const opts = {
+      properties: ['openFile' as const],
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    };
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    const pdfPath = res.filePaths[0];
+    if (res.canceled || !pdfPath) return { canceled: true, tables: [] };
+
+    const pdfName = pdfPath.split(/[\\/]/).pop() ?? pdfPath;
+    const range = pages === undefined ? undefined : z.string().parse(pages);
+    try {
+      const { pages: pageCount, tables } = await extractPdfTables(pdfPath, range);
+      return { canceled: false, pdfName, pages: pageCount, tables };
+    } catch (err) {
+      return { canceled: false, pdfName, tables: [], error: (err as Error).message };
+    }
+  });
 
   ipcMain.handle(
     IPC.importPricelist,

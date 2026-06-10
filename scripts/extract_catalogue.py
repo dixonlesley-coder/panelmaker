@@ -247,15 +247,45 @@ def inspect(pdf_path: Path, page_range: str) -> None:
                     print(f"    sample = {r}")
 
 
+def auto_json(pdf_path: Path, page_range: str | None) -> None:
+    """Dump every detected table (header + rows) for a page range as JSON to
+    stdout. This is the mode the bundled in-app extractor calls — the app maps
+    columns and validates in TypeScript, so this stays a dumb, deterministic
+    table dump: {"tables":[{"page","index","header","rows"}]}."""
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        total = len(pdf.pages)
+        if page_range and "-" in page_range:
+            lo, hi = (int(x) for x in page_range.split("-"))
+        elif page_range:
+            lo = hi = int(page_range)
+        else:
+            lo, hi = 1, total
+        out: dict = {"pages": total, "tables": []}
+        for pageno in range(max(1, lo), min(total, hi) + 1):
+            page = pdf.pages[pageno - 1]
+            for ti, table in enumerate(page.extract_tables() or []):
+                if not table or len(table) < 2:
+                    continue
+                header = [(c or "").strip() for c in table[0]]
+                rows = [[(c or "").strip() for c in r] for r in table[1:]]
+                out["tables"].append({"page": pageno, "index": ti, "header": header, "rows": rows})
+    print(json.dumps(out, ensure_ascii=False))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Extract catalogue tables → committed parts JSON")
     ap.add_argument("--pdf", required=True, type=Path, help="path to the catalogue PDF")
     ap.add_argument("--out", default=OUT_DEFAULT, type=Path, help="target JSON (default: the committed catalogue)")
     ap.add_argument("--inspect", metavar="A-B", help="dump table headers for a page range and exit")
+    ap.add_argument("--auto-json", action="store_true", help="print detected tables as JSON to stdout (used by the app)")
+    ap.add_argument("--pages", metavar="A-B", help="page range for --auto-json (default: whole document)")
     args = ap.parse_args()
 
     if not args.pdf.exists():
         sys.exit(f"no such PDF: {args.pdf}")
+    if args.auto_json:
+        auto_json(args.pdf, args.pages)
+        return
     if args.inspect:
         inspect(args.pdf, args.inspect)
         return
