@@ -155,6 +155,12 @@ export const en = {
     electrodeTarget: 'Electrode target',
     application: 'Application',
     checkUpdates: 'Check for updates',
+    catalogTitle: 'Parts catalogue',
+    catalogHint:
+      'After extracting a manufacturer catalogue, export the current parts to the committed dataset (schneider.parts.json). The app is offline and can’t push to git itself — save this file over src/shared/data/catalog/ and commit it (or hand it to Claude). On the next release it seeds into every install.',
+    catalogExport: 'Export catalogue → git dataset (JSON)',
+    catalogExported: 'Exported {{count}} catalogue parts to schneider.parts.json — commit it to ship.',
+    catalogEmpty: 'No catalogue parts to export (none carry an order code / SKU yet).',
     version: 'Version',
     currency: 'Currency',
     standards: 'Standards',

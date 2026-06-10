@@ -124,3 +124,55 @@ export function withSchneiderCatalog(base: readonly Part[]): Part[] {
   });
   return [...filtered, ...SCHNEIDER_CATALOG_PARTS];
 }
+
+/* --------------------------- export (DB → git JSON) ------------------------ */
+
+export interface SerializeOpts {
+  catalogVersion?: string;
+  source?: string;
+}
+
+const DEFAULT_EXPORT_SOURCE =
+  'Exported from the in-app parts catalogue. Verify every order code / rating against the manufacturer datasheet before use.';
+
+/**
+ * Project the current Schneider parts (those carrying an order code) back to the
+ * committed {@link CatalogFile} shape — the inverse of {@link loadCatalog}. This
+ * is what the Settings "export catalogue" button writes, so it can be committed
+ * to git and seeded into every install. Deterministic order → clean PR diffs.
+ */
+export function partsToCatalogFile(parts: readonly Part[], opts: SerializeOpts = {}): CatalogFile {
+  const bySku = new Map<string, CatalogEntry>();
+  for (const p of parts) {
+    const sku = typeof p.attributes.sku === 'string' ? p.attributes.sku.trim() : '';
+    if (!sku) continue; // only real catalogue entries (with an order code)
+    if (!p.manufacturer.toLowerCase().includes('schneider')) continue;
+
+    const series = typeof p.attributes.series === 'string' ? p.attributes.series : p.model;
+    const attributes: Record<string, unknown> = { ...p.attributes };
+    delete attributes.sku; // redundant — it's the id
+    delete attributes.series; // promoted to its own field
+
+    bySku.set(sku, { sku, category: p.category, series, model: p.model, attributes });
+  }
+
+  const entries = [...bySku.values()].sort(
+    (a, b) =>
+      a.category.localeCompare(b.category) ||
+      a.series.localeCompare(b.series) ||
+      (((a.attributes.ratingA as number) ?? 0) - ((b.attributes.ratingA as number) ?? 0)) ||
+      a.sku.localeCompare(b.sku),
+  );
+
+  return {
+    catalogVersion: opts.catalogVersion ?? `schneider-${new Date().toISOString().slice(0, 10)}`,
+    manufacturer: 'Schneider Electric',
+    source: opts.source ?? DEFAULT_EXPORT_SOURCE,
+    parts: entries,
+  };
+}
+
+/** Serialize the current parts to the exact committed JSON text (trailing newline). */
+export function serializeCatalogJson(parts: readonly Part[], opts: SerializeOpts = {}): string {
+  return JSON.stringify(partsToCatalogFile(parts, opts), null, 2) + '\n';
+}
