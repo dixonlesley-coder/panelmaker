@@ -129,7 +129,13 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const lvVoltageV = roots[0]?.voltageV ?? 400;
   const totalDemandKva = rootDemandW / 1000 / ASSUMED_BUILDING_PF;
   const supply = determineSupply(totalDemandKva, lvVoltageV);
-  const sources = computeSources(project.sources, totalDemandKva);
+  // Building motors (for the genset motor-start voltage-dip check).
+  const motors = project.panels.flatMap((p) =>
+    p.circuits
+      .filter((c) => c.motorKw !== undefined && c.motorKw > 0)
+      .map((c) => ({ name: c.name, kW: c.motorKw!, starterType: c.starterType })),
+  );
+  const sources = computeSources(project.sources, totalDemandKva, motors);
 
   // Prospective fault at the origin (main LV bus) and the source impedance behind
   // it. Each panel's bus fault decays down its feeder run from its parent's bus.

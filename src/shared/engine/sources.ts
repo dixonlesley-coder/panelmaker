@@ -23,6 +23,7 @@ import type {
   SourcesConfig,
   SourcesResult,
 } from '../types/sources';
+import { assessGensetStart, type GensetMotor } from './gensetTransient';
 import { round } from './util';
 
 /** Size a standby/prime generator to back up a fraction of the building demand. */
@@ -98,10 +99,15 @@ export function sizeBattery(cfg: BatteryConfig, module: BatteryModule = BATTERY_
 export function computeSources(
   config: SourcesConfig | undefined,
   buildingDemandKva: number,
+  motors: GensetMotor[] = [],
 ): SourcesResult | undefined {
   if (!config) return undefined;
   const out: SourcesResult = {};
-  if (config.generator?.enabled) out.generator = sizeGenerator(buildingDemandKva, config.generator);
+  if (config.generator?.enabled) {
+    out.generator = sizeGenerator(buildingDemandKva, config.generator);
+    // Verify the genset holds the worst-case motor-start voltage dip within limits.
+    out.gensetStart = assessGensetStart({ gensetKva: out.generator.ratingKva, motors });
+  }
   if (config.solar?.enabled) out.solar = sizeSolar(config.solar);
   if (config.battery?.enabled) out.battery = sizeBattery(config.battery);
   return out;

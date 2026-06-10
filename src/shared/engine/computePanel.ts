@@ -15,6 +15,7 @@ import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
 import { checkBusbarWithstand } from './busbarFault';
+import { verifyEnclosureThermal } from './enclosureThermal';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
 import { computeHarmonics, harmonicsWarnings } from './harmonics';
@@ -301,6 +302,37 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     }
   }
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
+  // Verify the internal temperature rise (IEC 61439-1 / 60890) and recommend an IP
+  // rating; floor-standing assemblies dissipate through different faces than wall-
+  // mounted ones.
+  enclosure.thermal = verifyEnclosureThermal({
+    widthMm: enclosure.widthMm,
+    heightMm: enclosure.heightMm,
+    depthMm: enclosure.depthMm,
+    totalHeatW,
+    mounting: hasFloorGear ? 'free-standing' : 'wall',
+    ambientC: panel.ambientTempC,
+  });
+  if (!enclosure.thermal.withinLimit) {
+    warnings.push({
+      code: 'enclosure-overtemp',
+      severity: 'warning',
+      message: `${panel.name}: estimated internal temperature rise ${enclosure.thermal.tempRiseK} K (≈ ${enclosure.thermal.internalTempC} °C internal) exceeds the recommended limit — add ventilation/cooling or use a larger enclosure.`,
+      panelId: panel.id,
+    });
+  }
+
+  // Future-expansion headroom: busbar reserve over the present demand, and a
+  // recommended spare-ways allowance (good practice ≥ 25% busbar / ~20% ways).
+  const busbarHeadroomPct =
+    busbar.ampacityA > 0
+      ? round(((busbar.ampacityA - totalDemandCurrentA) / busbar.ampacityA) * 100, 0)
+      : 0;
+  const spare = {
+    busbarHeadroomPct,
+    meetsReserveTarget: busbarHeadroomPct >= 25,
+    recommendedSpareWays: Math.max(3, Math.ceil(totalModules * 0.2)),
+  };
 
   // Cable tray for all outgoing cables, laid side-by-side in a single layer.
   const cableTray = sizeCableTray(circuits.map((c) => c.containment?.cableOdMm ?? 0));
@@ -346,6 +378,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     enclosure,
     totalConnectedLoadW: round(totalConnectedLoadW, 0),
     totalDemandCurrentA,
+    spare,
     phaseBalance: {
       L1: balance.L1,
       L2: balance.L2,

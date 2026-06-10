@@ -10,6 +10,8 @@ export * from './busbarFault';
 export * from './spd';
 export * from './electrode';
 export * from './catalogMatch';
+export * from './gensetTransient';
+export * from './enclosureThermal';
 export * from './enclosure';
 export * from './costing';
 export * from './bom';

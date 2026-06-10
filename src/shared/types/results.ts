@@ -10,6 +10,7 @@ import type { SourcesResult } from './sources';
 import type { SpdResult } from '../engine/spd';
 import type { ElectrodeResult } from '../engine/electrode';
 import type { BusbarWithstandResult } from '../engine/busbarFault';
+import type { EnclosureThermalResult } from '../engine/enclosureThermal';
 
 /** Residual-current device requirement for a circuit. */
 export interface RcdSpec {
@@ -162,6 +163,16 @@ export interface BusbarResult {
   withstand?: BusbarWithstandResult;
 }
 
+/** Future-expansion headroom on a panel's busbar and ways. */
+export interface SpareCapacityResult {
+  /** Busbar continuous-current headroom over the present demand (%). */
+  busbarHeadroomPct: number;
+  /** True when the busbar reserve meets the recommended ≥ 25% future allowance. */
+  meetsReserveTarget: boolean;
+  /** Recommended spare DIN ways to leave for future circuits (≈ 20%, min 3). */
+  recommendedSpareWays: number;
+}
+
 export interface EnclosureResult {
   widthMm: number;
   heightMm: number;
@@ -171,6 +182,8 @@ export interface EnclosureResult {
   ventilation: Ventilation;
   modules: number;
   rows: number;
+  /** Temperature-rise verification + IP-rating recommendation (IEC 61439-1 / 60890). */
+  thermal?: EnclosureThermalResult;
 }
 
 /**
@@ -310,6 +323,8 @@ export interface PanelResult {
   enclosure: EnclosureResult;
   totalConnectedLoadW: number;
   totalDemandCurrentA: number;
+  /** Future-expansion headroom on the busbar + recommended spare ways. */
+  spare?: SpareCapacityResult;
   phaseBalance: PhaseBalanceResult;
   warnings: Warning[];
   standardsVersion: string;
