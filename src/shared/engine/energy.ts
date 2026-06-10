@@ -33,21 +33,26 @@ function lossPhases(phase: string): number {
   return phase === '3ph' ? 3 : 2;
 }
 
-/** Conductor (copper) I²R loss summed across every leaf circuit (W). */
+/** Conductor I²R loss summed across every leaf circuit (W), material-aware. */
 function copperLossW(project: ProjectInput, system: SystemResult): number {
-  // Circuit length lives on the engine input, not the result — index it by id.
+  // Circuit length + the panel's conductor material live on the engine input.
   const lengthById = new Map<string, number>();
+  const materialByPanel = new Map<string, 'Cu' | 'Al'>();
   for (const p of project.panels) {
+    materialByPanel.set(p.id, p.material ?? 'Cu');
     for (const c of p.circuits) lengthById.set(c.id, c.lengthM);
   }
 
   let total = 0;
   for (const panel of Object.values(system.panels)) {
+    const material = materialByPanel.get(panel.panelId) ?? 'Cu';
     for (const c of panel.circuits) {
       const lengthM = lengthById.get(c.circuitId) ?? 0;
       if (lengthM <= 0 || c.designCurrentA <= 0) continue;
-      const rOhm = conductorResistanceOhmPerKm(c.cable.csaMm2) * (lengthM / 1000);
-      total += lossPhases(c.phase) * c.designCurrentA ** 2 * rOhm;
+      // Parallel runs split the current; per-run I²R summed over runs = I²R/runs.
+      const runs = c.cable.runsPerPhase ?? 1;
+      const rOhm = conductorResistanceOhmPerKm(c.cable.csaMm2, material) * (lengthM / 1000);
+      total += (lossPhases(c.phase) * c.designCurrentA ** 2 * rOhm) / runs;
     }
   }
   return total;

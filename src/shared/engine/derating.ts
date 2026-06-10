@@ -2,7 +2,6 @@ import {
   AMBIENT_TEMP_FACTORS,
   AMBIENT_TEMP_FACTORS_XLPE,
   GROUPING_FACTORS,
-  INSTALL_METHOD_FACTORS,
   SOIL_THERMAL_RESISTIVITY_FACTORS,
 } from '../standards/conductors';
 import type { InstallMethod, Insulation } from '../types/electrical';
@@ -23,11 +22,6 @@ export function groupingFactor(count: number): number {
   const last = keys[keys.length - 1]!;
   if (n >= last) return GROUPING_FACTORS[last]!;
   return GROUPING_FACTORS[n] ?? 1;
-}
-
-/** Installation-method multiplier on the reference KHA. */
-export function methodFactor(method: InstallMethod): number {
-  return INSTALL_METHOD_FACTORS[method] ?? 1;
 }
 
 /**
@@ -52,7 +46,12 @@ export interface DeratingInput {
   soilThermalResistivityKmW?: number;
 }
 
-/** Combined derating factor = ambient x grouping x method x soil (buried). */
+/**
+ * Combined derating factor = ambient × grouping × soil (buried only). The
+ * installation method itself is no longer a multiplier — `khaFor` selects the
+ * per-method IEC ampacity table instead, since the method changes the SHAPE of
+ * the ampacity curve, not just its level.
+ */
 export function deratingFactor({
   ambientC,
   groupingCount,
@@ -63,7 +62,6 @@ export function deratingFactor({
   return (
     ambientFactor(ambientC, insulation ?? 'PVC') *
     groupingFactor(groupingCount) *
-    methodFactor(installMethod) *
     soilThermalFactor(installMethod, soilThermalResistivityKmW)
   );
 }

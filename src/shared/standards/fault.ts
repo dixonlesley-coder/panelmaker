@@ -39,13 +39,20 @@ export const SOURCE_XR_RATIO = 7;
 export const PE_ADIABATIC_K = 115;
 
 /**
- * Adiabatic k by insulation family (IEC 60364-5-54 Table 54.3, copper PE as a
- * core of the cable): PVC (70 °C) → 115; XLPE (90 °C) → 143.
+ * Adiabatic k by conductor material and insulation family (IEC 60364-5-54
+ * Table 54.3, PE as a core of the cable): Cu/PVC 115, Cu/XLPE 143,
+ * Al/PVC 76, Al/XLPE 94.
  */
-export const PE_ADIABATIC_K_BY_INSULATION: Readonly<Record<'PVC' | 'XLPE', number>> = {
-  PVC: 115,
-  XLPE: 143,
+export const PE_ADIABATIC_K_TABLE: Readonly<
+  Record<'Cu' | 'Al', Readonly<Record<'PVC' | 'XLPE', number>>>
+> = {
+  Cu: { PVC: 115, XLPE: 143 },
+  Al: { PVC: 76, XLPE: 94 },
 };
+
+/** Back-compat copper view of {@link PE_ADIABATIC_K_TABLE}. */
+export const PE_ADIABATIC_K_BY_INSULATION: Readonly<Record<'PVC' | 'XLPE', number>> =
+  PE_ADIABATIC_K_TABLE.Cu;
 
 /**
  * Typical sustained (AVR-forced) short-circuit capability of a standby

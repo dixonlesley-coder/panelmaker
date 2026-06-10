@@ -204,6 +204,7 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     ambientTempC: p.ambientTempC,
     installMethod: p.installMethod,
     insulation: undefToNull(p.insulation),
+    material: undefToNull(p.material),
     groupingCount: p.groupingCount,
     activePricelistId: null,
     diversityFactor: p.diversityFactor,
@@ -233,6 +234,8 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (occupancy !== undefined) p.occupancy = occupancy as PanelInput['occupancy'];
   const insulation = nullToUndef(r.insulation);
   if (insulation !== undefined) p.insulation = insulation as PanelInput['insulation'];
+  const material = nullToUndef(r.material);
+  if (material !== undefined) p.material = material as PanelInput['material'];
   return p;
 }
 

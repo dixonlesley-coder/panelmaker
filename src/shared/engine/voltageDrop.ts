@@ -1,5 +1,5 @@
 import { conductorResistanceOhmPerKm, CONDUCTOR_X_OHM_PER_KM } from '../standards/conductors';
-import type { SystemType } from '../types/electrical';
+import type { ConductorMaterial, SystemType } from '../types/electrical';
 import type { VoltageDropResult } from '../types/results';
 import { round } from './util';
 
@@ -11,6 +11,8 @@ export interface VoltageDropInput {
   system: SystemType;
   voltageV: number;
   isLighting: boolean;
+  /** Conductor material (default Cu) — aluminum has ~1.6× the resistance. */
+  material?: ConductorMaterial;
 }
 
 /**
@@ -21,7 +23,7 @@ export interface VoltageDropInput {
  */
 export function voltageDrop(input: VoltageDropInput): VoltageDropResult {
   const { currentA, lengthM, csaMm2, cosPhi, system, voltageV, isLighting } = input;
-  const rPerM = conductorResistanceOhmPerKm(csaMm2) / 1000;
+  const rPerM = conductorResistanceOhmPerKm(csaMm2, input.material ?? 'Cu') / 1000;
   const xPerM = CONDUCTOR_X_OHM_PER_KM / 1000;
   const sinPhi = Math.sqrt(Math.max(0, 1 - cosPhi * cosPhi));
   const factor = system === '3ph' ? Math.sqrt(3) : 2;

@@ -86,6 +86,8 @@ export const panels = sqliteTable('panels', {
   installMethod: text('install_method').notNull().default('conduit'),
   /** Insulation family: 'PVC' | 'XLPE' (null = PVC). */
   insulation: text('insulation'),
+  /** Conductor material: 'Cu' | 'Al' (null = Cu). */
+  material: text('material'),
   groupingCount: integer('grouping_count').notNull().default(1),
   activePricelistId: text('active_pricelist_id').references(() => pricelists.id, {
     onDelete: 'set null',

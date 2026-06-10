@@ -2,13 +2,20 @@
 
 export type SystemType = '1ph' | '3ph';
 
-export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF' | 'N2XY';
+export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF' | 'N2XY' | 'NAYY' | 'NA2XY';
 
 /**
  * Conductor insulation family: PVC (70 °C — NYM/NYY) or XLPE (90 °C — N2XY).
  * Drives the ampacity table, the ambient-correction table and the PE adiabatic k.
  */
 export type Insulation = 'PVC' | 'XLPE';
+
+/**
+ * Conductor material. Aluminum carries ~78% of copper's current at equal
+ * section, has ~1.6× the resistance (voltage drop / loop impedance) and a lower
+ * adiabatic k — and is only practical from 16 mm² up (NAYY / NA2XY cables).
+ */
+export type ConductorMaterial = 'Cu' | 'Al';
 
 export type LoadKind =
   | 'general'
