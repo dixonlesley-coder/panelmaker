@@ -45,6 +45,7 @@ import {
 import type { CostResult, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
 import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
+import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
 import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
@@ -117,6 +118,7 @@ function buildGraph(
         incomerA: formatAmps(result.totalDemandCurrentA),
         source: panel.sourceType,
         warn: result.warnings.some((w) => w.severity === 'error' || w.severity === 'warning'),
+        issues: toNodeIssues(result.warnings),
       };
       nodes.push({
         id,
