@@ -522,6 +522,26 @@ export const id: TranslationKeys = {
       'Perkiraan teknis — verifikasi terhadap PUIL 2011 / IEC 60364 sebelum konstruksi.',
   },
 
+  catalogPdf: {
+    button: 'Impor dari PDF',
+    title: 'Impor katalog dari PDF',
+    hint: 'Pilih PDF katalog; ekstraktor bawaan membaca tabel pemesanannya, lalu Anda tinjau dan impor. Persempit ke halaman kode pesanan untuk hasil terbaik.',
+    pages: 'Halaman (opsional)',
+    choose: 'Pilih PDF & ekstrak',
+    pagesWord: 'halaman',
+    detected: '{{tables}} tabel → {{parts}} kandidat komponen',
+    defaultCategory: 'Kategori (untuk baris tanpa kategori)',
+    defaultSeries: 'Seri (opsional)',
+    noRows: 'Tidak ada baris kode pesanan terdeteksi di halaman ini. Coba rentang halaman lain, atau gunakan impor JSON/CSV.',
+    preview: 'Pratinjau — {{shown}} dari {{total}}',
+    skipped: '{{count}} dilewati',
+    colCategory: 'Kategori',
+    colModel: 'Model',
+    colCurve: 'Kurva',
+    import: 'Impor {{count}} komponen',
+    imported: 'Mengimpor {{count}} komponen ({{skipped}} dilewati). Tinjau di Katalog Komponen, lalu ekspor.',
+  },
+
   sldMenu: {
     circuit: 'Sirkuit',
     edit: 'Edit sirkuit…',

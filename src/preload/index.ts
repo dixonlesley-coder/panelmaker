@@ -23,6 +23,8 @@ const api: Api = {
   listParts: () => ipcRenderer.invoke(IPC.listParts),
   upsertPart: (part: Part) => ipcRenderer.invoke(IPC.upsertPart, part),
 
+  extractCatalogPdf: (pages?: string) => ipcRenderer.invoke(IPC.extractCatalogPdf, pages),
+
   importPricelist: (name: string, rows: PricelistRowInput[], currency?: string) =>
     ipcRenderer.invoke(IPC.importPricelist, name, rows, currency),
 

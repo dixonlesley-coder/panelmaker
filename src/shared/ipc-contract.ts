@@ -12,6 +12,21 @@ import type { ProjectInput } from './types/project';
 import type { Part, PricelistItem } from './types/parts';
 import type { SystemResult } from './types/results';
 import type { ControlSchematic } from './types/schematic';
+import type { RawTable } from './data/catalog';
+
+/** Result of an in-app catalogue-PDF extraction (raw tables for review). */
+export interface CatalogExtractResult {
+  /** True when the user dismissed the file dialog. */
+  canceled: boolean;
+  /** The chosen PDF's base name (for the review header). */
+  pdfName?: string;
+  /** Total pages in the PDF (so the UI can hint a page range). */
+  pages?: number;
+  /** Detected tables (header + rows) for in-app column mapping. */
+  tables: RawTable[];
+  /** Populated when extraction failed (e.g. the bundled extractor is missing). */
+  error?: string;
+}
 
 /** A lightweight project summary for list views (avoids loading full graphs). */
 export interface ProjectSummary {
@@ -91,6 +106,7 @@ export const IPC = {
   computeProject: 'calc:computeProject',
   listParts: 'parts:list',
   upsertPart: 'parts:upsert',
+  extractCatalogPdf: 'catalog:extractPdf',
   importPricelist: 'pricelists:import',
   exportPanelPdf: 'export:panelPdf',
   exportSystemPdf: 'export:systemPdf',
@@ -133,6 +149,13 @@ export interface Api {
   listParts(): Promise<Part[]>;
   /** Insert or update a catalog part; returns the stored row. */
   upsertPart(part: Part): Promise<Part>;
+
+  /**
+   * Open a PDF (native file dialog) and extract its ordering tables with the
+   * bundled Python extractor. Returns the raw tables for in-app column mapping
+   * + review. `pages` is an optional "A-B" page range (default: whole document).
+   */
+  extractCatalogPdf(pages?: string): Promise<CatalogExtractResult>;
 
   /** Import a named pricelist of rows; returns the new pricelist id + count. */
   importPricelist(

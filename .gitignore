@@ -17,3 +17,8 @@ panelmaker.db*
 license.config.json
 license.json
 machine.id
+
+# PyInstaller (in-app catalogue extractor — built in CI, not committed)
+/resources/extractor/
+/.pyinstaller-build/
+scripts/__pycache__/

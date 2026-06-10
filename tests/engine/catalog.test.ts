@@ -6,6 +6,7 @@ import {
   loadCatalog,
   partsToCatalogFile,
   serializeCatalogJson,
+  tablesToCandidates,
   withSchneiderCatalog,
   type CatalogFile,
 } from '@shared/data/catalog';
@@ -105,6 +106,36 @@ describe('manufacturer catalogue', () => {
     expect(parts[0]!.attributes.ratingA).toBe(16); // coerced to number
     expect(parts[0]!.attributes.poles).toBe(1);
     expect(parts[1]!.category).toBe('contactor');
+  });
+
+  it('maps PDF-extractor raw tables to candidates (canonical attribute keys + defaults)', () => {
+    const tables = [
+      {
+        page: 120,
+        header: ['Reference', 'In (A)', 'No. of poles', 'Curve', 'Icu (kA)'],
+        rows: [
+          ['A9F44116', '16', '1', 'C', '6'],
+          ['A9F44120', '20 A', '1', 'C', '6 kA'],
+          ['', '', '', '', ''], // blank spacer row
+        ],
+      },
+    ];
+    const candidates = tablesToCandidates(tables, { defaultCategory: 'breaker', defaultSeries: 'Acti9 iC60N' });
+    expect(candidates.map((c) => c.sku)).toEqual(['A9F44116', 'A9F44120']);
+    expect(candidates[0]!.category).toBe('breaker'); // from default
+    expect(candidates[0]!.series).toBe('Acti9 iC60N'); // from default
+    expect(candidates[0]!.attributes.ratingA).toBe(16); // "In (A)" → ratingA
+    expect(candidates[1]!.attributes.ratingA).toBe(20); // "20 A" coerced
+    expect(candidates[0]!.attributes.breakingKa).toBe(6); // "Icu (kA)" → breakingKa
+    // and the candidates validate cleanly through the loader
+    const { parts, issues } = loadCatalog({ catalogVersion: 'x', manufacturer: 'Schneider Electric', source: 'pdf', parts: candidates });
+    expect(issues).toEqual([]);
+    expect(parts).toHaveLength(2);
+  });
+
+  it('ignores tables with no order-code column', () => {
+    const candidates = tablesToCandidates([{ page: 1, header: ['Feature', 'Benefit'], rows: [['a', 'b']] }]);
+    expect(candidates).toEqual([]);
   });
 
   it('reports a malformed file as a single issue instead of throwing', () => {

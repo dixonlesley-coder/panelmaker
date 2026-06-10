@@ -1,5 +1,6 @@
 import type {
   Api,
+  CatalogExtractResult,
   LicenseDecisionResult,
   LicenseStatusResult,
   UpdateStatus,
@@ -36,6 +37,16 @@ export async function saveProjectToDisk(project: ProjectInput): Promise<ActionRe
   } catch (e) {
     return { ok: false, reason: 'error', message: (e as Error).message };
   }
+}
+
+/**
+ * Open a catalogue PDF and extract its ordering tables with the bundled
+ * extractor (desktop only). Returns `null` on the web (no Electron bridge).
+ */
+export async function extractCatalogPdf(pages?: string): Promise<CatalogExtractResult | null> {
+  const api = desktopApi();
+  if (!api) return null;
+  return api.extractCatalogPdf(pages);
 }
 
 /** Export the whole-system PDF via a native save dialog (desktop only). */
