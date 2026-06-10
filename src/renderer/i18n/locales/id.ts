@@ -145,6 +145,8 @@ export const id: TranslationKeys = {
     installMethod: 'Metode pemasangan',
     diversityFactor: 'Faktor diversitas',
     diversityFactorHint: 'Diterapkan pada beban hilir teragregasi',
+    targetPf: 'Target faktor daya',
+    targetPfHint: 'Bank kapasitor diukur untuk mencapai ini (denda PLN < 0,85)',
     earthing: 'Pembumian & grounding',
     earthingSystem: 'Sistem pembumian',
     earthingSystemHint: 'Berlaku seproyek; menentukan kebutuhan RCD dan bonding',

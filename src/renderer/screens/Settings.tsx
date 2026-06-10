@@ -310,6 +310,16 @@ export function Settings() {
               typeof v === 'number' && updatePanel(panel.id, { diversityFactor: v })
             }
           />
+          <NumberInput
+            label={t('settings.targetPf')}
+            description={t('settings.targetPfHint')}
+            min={0.85}
+            max={0.99}
+            step={0.01}
+            decimalScale={2}
+            value={meta.targetPf ?? 0.95}
+            onChange={(v) => typeof v === 'number' && setProjectMeta({ targetPf: v })}
+          />
         </SimpleGrid>
       </Card>
 

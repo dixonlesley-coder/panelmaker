@@ -1,6 +1,7 @@
 import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
+import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
 import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
 import type { CircuitInput, PanelInput } from '../types/project';
 import type { SystemType, EarthingSystem } from '../types/electrical';
@@ -452,6 +453,20 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     largestNeutralCsaMm2,
   });
   if (harmonics) warnings.push(...harmonicsWarnings(harmonics, panel.id));
+  // APPLY the triplen-harmonic neutral oversize to the affected cable specs —
+  // a recommendation that never reaches the schedule doesn't get built.
+  if (harmonics && harmonics.neutralOversizeFactor > 1) {
+    for (const cm of comps) {
+      const g = cm.result.grounding;
+      if (g.neutralCsaMm2 <= 0) continue;
+      const targetN = cm.result.cable.csaMm2 * harmonics.neutralOversizeFactor;
+      const newN = STANDARD_SECTIONS_MM2.find((s) => s >= targetN) ?? STANDARD_SECTIONS_MM2[STANDARD_SECTIONS_MM2.length - 1]!;
+      if (newN > g.neutralCsaMm2) {
+        g.neutralCsaMm2 = newN;
+        g.cableSpec += ` · N ${newN} mm² (triplen)`;
+      }
+    }
+  }
 
   // Arc-flash incident-energy estimate at the bus (needs the prospective fault).
   // The clearing device is approximated by the panel's heaviest breaker class —

@@ -430,6 +430,8 @@ export interface CapacitorBankResult {
   bankKvar: number;
   steps: number;
   stepKvar: number;
+  /** True when the bank should be DETUNED (≈7% reactors) — harmonic-rich bus. */
+  detunedRecommended?: boolean;
   note: string;
 }
 
@@ -478,6 +480,12 @@ export interface SystemResult {
   spd?: SpdResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
+  /**
+   * Sustained fault level the standby generator can drive into the main bus
+   * (kA) — the alternate-source fault study's basis. Far below the utility's;
+   * circuits failing ADS only on the generator get 'ads-fails-on-generator'.
+   */
+  generatorFaultKa?: number;
   /** Current-based discrimination report per cascaded device pair. */
   selectivity?: SelectivityEntry[];
   totals: {

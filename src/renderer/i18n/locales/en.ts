@@ -142,6 +142,8 @@ export const en = {
     installMethod: 'Install method',
     diversityFactor: 'Diversity factor',
     diversityFactorHint: 'Applied to aggregated downstream load',
+    targetPf: 'Target power factor',
+    targetPfHint: 'Capacitor bank sized to reach this (PLN penalty < 0.85)',
     earthing: 'Earthing & grounding',
     earthingSystem: 'Earthing system',
     earthingSystemHint: 'Project-wide; drives RCD requirements and bonding',

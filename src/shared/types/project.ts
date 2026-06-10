@@ -172,6 +172,11 @@ export interface ProjectMeta {
   revisions?: ProjectRevision[];
   /** Commercial quotation settings (labor rate + mark-ups). */
   quotation?: QuotationSettings;
+  /**
+   * Power-factor correction target (0-1). Default 0.95 — comfortably above the
+   * 0.85 PLN penalty threshold. The capacitor bank is sized to reach this.
+   */
+  targetPf?: number;
 }
 
 /**

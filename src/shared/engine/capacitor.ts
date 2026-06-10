@@ -22,6 +22,8 @@ function clampPf(pf: number): number {
 export function computePowerFactor(
   project: ProjectInput,
   targetPf = PF_TARGET_DEFAULT,
+  /** True when the installation carries significant harmonic distortion. */
+  harmonicRich = false,
 ): CapacitorBankResult {
   let kw = 0;
   let kvar = 0;
@@ -57,11 +59,20 @@ export function computePowerFactor(
     steps = Math.max(1, Math.round(bankKvar / stepKvar));
   }
 
-  const note = needed
+  // A plain capacitor bank on a harmonic-rich bus risks parallel resonance
+  // with the supply inductance — detuning reactors (typ. 7%, 189 Hz) shift the
+  // resonance below the 5th harmonic so the bank doesn't amplify it.
+  const detunedRecommended = harmonicRich && bankKvar > 0;
+
+  let note = needed
     ? `Power factor ${round(existingPf, 2)} is below the ${PF_PENALTY_THRESHOLD} PLN penalty threshold — fit a ${bankKvar} kVAR automatic bank (${steps} × ${stepKvar} kVAR) to reach ${targetPf}.`
     : existingPf < targetPf
       ? `Power factor ${round(existingPf, 2)} avoids the PLN penalty; a ${bankKvar} kVAR bank would raise it to ${targetPf} and cut losses.`
       : `Power factor ${round(existingPf, 2)} is already at/above target — no correction needed.`;
+  if (detunedRecommended) {
+    note +=
+      ' The installation carries significant harmonic distortion — specify a DETUNED bank (≈7% reactors) so the capacitors do not resonate with the supply.';
+  }
 
   return {
     totalKw: round(kw, 1),
@@ -73,6 +84,7 @@ export function computePowerFactor(
     bankKvar,
     steps,
     stepKvar,
+    ...(detunedRecommended ? { detunedRecommended } : {}),
     note,
   };
 }
