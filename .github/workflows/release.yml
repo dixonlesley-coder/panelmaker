@@ -17,13 +17,20 @@ name: Release
 # Cut a release by pushing a tag that matches package.json "version":
 #   npm version patch        # bumps version + creates the tag
 #   git push --follow-tags
-# Or run the workflow manually (workflow_dispatch) for an unpublished test build.
+# Or run the workflow manually (workflow_dispatch): with publish=true it
+# publishes a GitHub Release at the package.json version (no tag needed);
+# without it, it's an unpublished test build (workflow artifacts only).
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish a GitHub Release (download + auto-update feed)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write # electron-builder uploads the installers to a GitHub Release
@@ -66,6 +73,8 @@ jobs:
           ALLOWED_HD: ${{ secrets.ALLOWED_HD }}
           # --- GitHub Releases publish (auto-update feed) ---
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # True when a manual run asked to publish (tag pushes always publish).
+          PUBLISH_INPUT: ${{ inputs.publish }}
           # --- Code signing (per-OS). Each *_CSC_LINK is a BASE64-encoded cert.
           #     Passed under NEUTRAL names (SIGN_*) so an empty value is never seen
           #     by electron-builder as a (broken) cert path — the script exports the
@@ -84,8 +93,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Publish to a GitHub Release only on a version tag; otherwise just build.
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then PUBLISH=always; else PUBLISH=never; fi
+          # Publish to a GitHub Release on a version tag, or when a manual run
+          # asks for it (electron-builder then tags/names the release from
+          # package.json "version"); otherwise just build.
+          if [[ "${GITHUB_REF}" == refs/tags/v* || "${PUBLISH_INPUT:-}" == "true" ]]; then PUBLISH=always; else PUBLISH=never; fi
 
           # Code signing is OPTIONAL (internal-use deployment; certs need a paid
           # subscription). Unsigned publishing is allowed — but warn, because the
