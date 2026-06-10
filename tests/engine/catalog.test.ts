@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SCHNEIDER_CATALOG_ISSUES,
   SCHNEIDER_CATALOG_PARTS,
+  importCatalogText,
   loadCatalog,
   partsToCatalogFile,
   serializeCatalogJson,
@@ -78,6 +79,39 @@ describe('manufacturer catalogue', () => {
       { id: 'noSku', category: 'cable', manufacturer: 'Schneider', model: 'NYY', attributes: {}, defaultUnit: 'm' }, // no SKU
     ]);
     expect(file.parts.map((p) => p.sku)).toEqual(['A9X1']);
+  });
+
+  it('imports a JSON catalogue file', () => {
+    const json = JSON.stringify({
+      catalogVersion: 'x', manufacturer: 'Schneider Electric', source: 's',
+      parts: [{ sku: 'A9F1', category: 'breaker', series: 'iC60N', model: 'iC60N C16', attributes: { ratingA: 16, poles: 1, curve: 'C' } }],
+    });
+    const { parts, issues } = importCatalogText(json);
+    expect(issues).toEqual([]);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]!.id).toBe('A9F1');
+    expect(parts[0]!.attributes.ratingA).toBe(16);
+  });
+
+  it('imports a CSV catalogue file (numeric cells coerced, header aliases)', () => {
+    const csv = [
+      'Order Code,category,series,model,ratingA,poles,curve',
+      'A9F44116,breaker,Acti9 iC60N,iC60N 1P C16,16,1,C',
+      'LC1D25,contactor,TeSys D,LC1D25 AC-3,,,', // no rating/poles/curve
+    ].join('\n');
+    const { parts, issues } = importCatalogText(csv);
+    expect(issues).toEqual([]);
+    expect(parts.map((p) => p.id)).toEqual(['A9F44116', 'LC1D25']);
+    expect(parts[0]!.attributes.ratingA).toBe(16); // coerced to number
+    expect(parts[0]!.attributes.poles).toBe(1);
+    expect(parts[1]!.category).toBe('contactor');
+  });
+
+  it('reports a malformed file as a single issue instead of throwing', () => {
+    const { parts, issues } = importCatalogText('{ not valid json');
+    expect(parts).toEqual([]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.reason).toContain('could not parse');
   });
 
   it('merges onto a base list, de-duplicating by SKU (catalogue wins)', () => {
