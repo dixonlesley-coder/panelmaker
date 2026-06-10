@@ -6,6 +6,7 @@
 
 import type { Part } from '@shared/types/parts';
 import { STANDARDS_VERSION } from '@shared/standards/version';
+import { SCHNEIDER_CATALOG_PARTS } from '@shared/data/catalog';
 import { getDb, type Db } from './connection';
 import { insertPartsIfAbsent, partsCount } from '../repositories/parts.repo';
 import { importPricelist, listPricelists } from '../repositories/pricelists.repo';
@@ -242,25 +243,34 @@ const SEED_PRICES: Readonly<Record<string, number>> = {
   'seed-hour-meter': 295000,
 };
 
-/** Insert the starter catalog + default pricelist when the DB is empty. */
+/**
+ * Seed the catalogue. The small starter set + default pricelist seed only into a
+ * fresh (empty) DB. The committed manufacturer catalogue
+ * ({@link SCHNEIDER_CATALOG_PARTS}) is then upserted on *every* launch — idempotent
+ * by SKU — so updating the committed JSON propagates new parts to existing
+ * installs without ever clobbering parts/prices the user added themselves.
+ */
 export function seed(db: Db = getDb()): { partsInserted: number; pricelistCreated: boolean } {
-  if (partsCount(db) > 0) {
-    return { partsInserted: 0, pricelistCreated: false };
-  }
-
-  const partsInserted = insertPartsIfAbsent([...SEED_PARTS], db);
-
+  let partsInserted = 0;
   let pricelistCreated = false;
-  if (listPricelists(db).length === 0) {
-    const rows = SEED_PARTS.map((p) => ({
-      partId: p.id,
-      matchKey: p.model,
-      unitPrice: SEED_PRICES[p.id] ?? 0,
-      currency: 'IDR',
-    }));
-    importPricelist('Default IDR Catalog', rows, 'IDR', 'seed', db);
-    pricelistCreated = true;
+
+  if (partsCount(db) === 0) {
+    partsInserted += insertPartsIfAbsent([...SEED_PARTS], db);
+
+    if (listPricelists(db).length === 0) {
+      const rows = SEED_PARTS.map((p) => ({
+        partId: p.id,
+        matchKey: p.model,
+        unitPrice: SEED_PRICES[p.id] ?? 0,
+        currency: 'IDR',
+      }));
+      importPricelist('Default IDR Catalog', rows, 'IDR', 'seed', db);
+      pricelistCreated = true;
+    }
   }
+
+  // Manufacturer catalogue: idempotent top-up on every launch (skips existing ids).
+  partsInserted += insertPartsIfAbsent([...SCHNEIDER_CATALOG_PARTS], db);
 
   return { partsInserted, pricelistCreated };
 }
