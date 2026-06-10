@@ -257,9 +257,15 @@ function hasMigrations(): boolean {
 export function migrate(db: Db = getConnection().db): 'drizzle' | 'bootstrap' {
   if (hasMigrations()) {
     drizzleMigrate(db, { migrationsFolder: MIGRATIONS_DIR });
+    // Existing databases predate columns added after their tables were created;
+    // add any that are missing (CREATE TABLE / old migrations never alter them).
+    backfillColumns();
     return 'drizzle';
   }
   // Fallback: idempotent table creation straight from the schema.
   getConnection().sqlite.exec(BOOTSTRAP_SQL);
+  // `CREATE TABLE IF NOT EXISTS` leaves an already-existing table untouched, so a
+  // DB first created by an earlier build is missing later columns — add them.
+  backfillColumns();
   return 'bootstrap';
 }
