@@ -576,18 +576,19 @@ export const useProjectStore = create<ProjectState>((set) => ({
         demandFactor: 1,
         feedsPanelId: childId,
       };
-      return {
-        ...withHistory(s, (project) => ({
-          ...project,
-          panels: [
-            ...project.panels.map((p) =>
-              p.id === parentPanelId ? { ...p, circuits: [...p.circuits, feeder] } : p,
-            ),
-            child,
-          ],
-        })),
-        activePanelId: childId,
-      };
+      // Stay on the parent: the new feeder way appears in the parent's own
+      // single-line (the MCB that feeds the sub-panel), so the user sees the
+      // connection in place instead of being thrown into the empty child build.
+      // Drill into the child by double-clicking its feeder way.
+      return withHistory(s, (project) => ({
+        ...project,
+        panels: [
+          ...project.panels.map((p) =>
+            p.id === parentPanelId ? { ...p, circuits: [...p.circuits, feeder] } : p,
+          ),
+          child,
+        ],
+      }));
     }),
 
   connectPanelAsFeeder: (parentPanelId, childPanelId) =>

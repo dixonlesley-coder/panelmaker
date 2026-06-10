@@ -238,6 +238,7 @@ describe('projectStore', () => {
     const parentId = useProjectStore.getState().project.panels[0]!.id;
     const startPanels = useProjectStore.getState().project.panels.length;
     const startCircuits = useProjectStore.getState().project.panels[0]!.circuits.length;
+    const activeBefore = useProjectStore.getState().activePanelId;
 
     useProjectStore.getState().addSubPanel(parentId);
 
@@ -251,8 +252,10 @@ describe('projectStore', () => {
     expect(feeder.feedsPanelId).toBe(child.id);
     expect(child.fedByCircuitId).toBe(feeder.id);
     expect(child.sourceType).toBe('feeder');
-    // The child becomes the active panel; one undo reverts both edits.
-    expect(useProjectStore.getState().activePanelId).toBe(child.id);
+    // The view STAYS on the current panel — the sub-panel is added in place (its
+    // feeder way appears in the parent's single-line), not opened. One undo
+    // reverts both edits.
+    expect(useProjectStore.getState().activePanelId).toBe(activeBefore);
     useProjectStore.getState().undo();
     expect(useProjectStore.getState().project.panels.length).toBe(startPanels);
     expect(useProjectStore.getState().project.panels.find((p) => p.id === parentId)!.circuits.length).toBe(

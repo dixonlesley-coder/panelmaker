@@ -304,6 +304,7 @@ function buildGraph(
   onOverride: (circuitId: string, kind: 'breaker' | 'cable', value: number) => void,
   enabledSources: SourceKind[],
   sizedSources: SourcesResult | undefined,
+  feederChild: (childPanelId: string) => { childName: string; childIncomerA?: string } | undefined,
   t: TFn,
 ): { nodes: Node[]; edges: Edge[] } {
   const sections = result.busbarSections;
@@ -405,6 +406,7 @@ function buildGraph(
             ? Math.round((c.designCurrentA / c.cable.deratedIzA) * 100)
             : undefined,
         issues: circuitIssues(result.warnings, cid),
+        feeder: input?.feedsPanelId ? feederChild(input.feedsPanelId) : undefined,
         onDropOverride: (kind, value) => onOverride(cid, kind, value),
       };
       // Branch nodes are draggable so the user can reorder ways left-to-right
@@ -534,6 +536,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
+  const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const allPanels = useProjectStore((s) => s.project.panels);
   const orphanPanels = useMemo(
     () => availableChildPanels(allPanels, panel.id),
@@ -553,7 +556,18 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const isRoot = panel.sourceType === 'utility';
   const sourcesConfig = useProjectStore((s) => s.project.sources);
   const updateSources = useProjectStore((s) => s.updateSources);
-  const sizedSources = useSystemResult().sources;
+  const system = useSystemResult();
+  const sizedSources = system.sources;
+  /** Label + incomer current for a sub-panel a feeder way points at. */
+  const feederChild = (childPanelId: string): { childName: string; childIncomerA?: string } | undefined => {
+    const child = allPanels.find((p) => p.id === childPanelId);
+    if (!child) return undefined;
+    const childRes = system.panels[childPanelId];
+    return {
+      childName: child.tag ? `${child.tag} — ${child.name}` : child.name,
+      childIncomerA: childRes ? formatAmps(childRes.totalDemandCurrentA) : undefined,
+    };
+  };
   const enabledSources = useMemo<SourceKind[]>(() => {
     if (!isRoot) return [];
     const out: SourceKind[] = [];
@@ -601,7 +615,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   }, [result, panel.id]);
 
   const graph = useMemo(
-    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources, t),
+    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources, feederChild, t),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [panel, result, changes, enabledSources, sizedSources, t],
   );
@@ -878,8 +892,13 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
               // default zoom-on-double-click would otherwise swallow it.
               zoomOnDoubleClick={false}
               onNodeDoubleClick={(_, node) => {
-                if (node.type === 'branch') setEditing({ circuitId: node.id, focus: 'device' });
-                else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
+                if (node.type === 'branch') {
+                  // A feeder way represents a sub-panel — drill into it instead
+                  // of editing the feeder circuit (its MCB shows on the node).
+                  const circ = panel.circuits.find((c) => c.id === node.id);
+                  if (circ?.feedsPanelId) setActivePanel(circ.feedsPanelId);
+                  else setEditing({ circuitId: node.id, focus: 'device' });
+                } else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
                 else if (node.type === 'source') {
                   setEditingSource((node.data as { kind: SourceKind }).kind);
                 }
