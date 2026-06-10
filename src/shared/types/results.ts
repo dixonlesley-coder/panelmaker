@@ -71,6 +71,8 @@ export interface BreakerResult {
   ratingA: number;
   deviceClass: BreakerClass;
   curve: BreakerCurve;
+  /** True when the rating came from a manual user override (not auto-sized). */
+  overridden?: boolean;
 }
 
 export interface CableResult {
@@ -85,6 +87,8 @@ export interface CableResult {
    * compliant by construction, the surcharge in copper is just made visible).
    */
   vdDriven?: boolean;
+  /** True when a manual user minimum (cableOverrideMm2) is pinned on this run. */
+  overridden?: boolean;
 }
 
 export interface VoltageDropResult {

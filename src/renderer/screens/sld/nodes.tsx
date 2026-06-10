@@ -28,8 +28,17 @@ export interface BranchNodeData {
   warn?: boolean;
   /** Human notes of what the last edit re-sized here (builder change marking). */
   changed?: string[];
+  /** True when the breaker rating is a manual user override (violet). */
+  breakerOverridden?: boolean;
+  /** True when a manual cable minimum is pinned (violet). */
+  cableOverridden?: boolean;
+  /** Builder only: receive a dropped override card targeted at this circuit. */
+  onDropOverride?: (kind: 'breaker' | 'cable', value: number) => void;
   [key: string]: unknown;
 }
+
+/** MIME for override cards dragged from the builder palette onto a node. */
+export const OVERRIDE_MIME = 'application/x-panelmaker-override';
 
 export interface PanelNodeData {
   name: string;
@@ -91,20 +100,52 @@ export function BusbarNode({ data }: NodeProps) {
 export function BranchNode({ data }: NodeProps) {
   const d = data as BranchNodeData;
   const changed = d.changed && d.changed.length > 0;
+  const overridden = d.breakerOverridden || d.cableOverridden;
   return (
     <Paper
       withBorder
       radius="md"
       p="xs"
       shadow={changed ? 'md' : 'xs'}
+      onDragOver={
+        d.onDropOverride
+          ? (e) => {
+              if (e.dataTransfer.types.includes(OVERRIDE_MIME)) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+              }
+            }
+          : undefined
+      }
+      onDrop={
+        d.onDropOverride
+          ? (e) => {
+              const raw = e.dataTransfer.getData(OVERRIDE_MIME);
+              if (!raw) return;
+              e.preventDefault();
+              e.stopPropagation();
+              try {
+                const { kind, value } = JSON.parse(raw) as { kind: 'breaker' | 'cable'; value: number };
+                if ((kind === 'breaker' || kind === 'cable') && Number.isFinite(value)) {
+                  d.onDropOverride!(kind, value);
+                }
+              } catch {
+                /* malformed payload — ignore */
+              }
+            }
+          : undefined
+      }
       style={{
         width: 160,
         borderColor: d.warn
           ? 'var(--mantine-color-red-5)'
           : changed
             ? 'var(--mantine-color-teal-5)'
-            : undefined,
-        borderWidth: changed ? 2 : undefined,
+            : overridden
+              ? 'var(--mantine-color-violet-5)'
+              : undefined,
+        borderWidth: changed || overridden ? 2 : undefined,
       }}
     >
       <Handle type="target" position={Position.Top} />
@@ -119,14 +160,26 @@ export function BranchNode({ data }: NodeProps) {
         )}
       </Group>
       <Group gap={4} mb={2}>
-        <IconBolt size={12} />
-        <Text size="xs" c="dimmed">
+        <IconBolt size={12} color={d.breakerOverridden ? 'var(--mantine-color-violet-6)' : undefined} />
+        <Text size="xs" c={d.breakerOverridden ? 'violet.6' : 'dimmed'} fw={d.breakerOverridden ? 600 : undefined}>
           {d.breaker}
         </Text>
+        {d.breakerOverridden && (
+          <Badge size="xs" variant="light" color="violet">
+            manual
+          </Badge>
+        )}
       </Group>
-      <Text size="xs" c="dimmed">
-        {d.cable}
-      </Text>
+      <Group gap={4}>
+        <Text size="xs" c={d.cableOverridden ? 'violet.6' : 'dimmed'} fw={d.cableOverridden ? 600 : undefined}>
+          {d.cable}
+        </Text>
+        {d.cableOverridden && (
+          <Badge size="xs" variant="light" color="violet">
+            manual
+          </Badge>
+        )}
+      </Group>
       {d.starter && (
         <Group gap={4} mt={4}>
           <IconCpu size={12} color="var(--mantine-color-grape-5)" />

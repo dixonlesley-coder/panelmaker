@@ -24,6 +24,24 @@ export function circuitWarnings(result: CircuitResult, ctx: CircuitWarningContex
     });
   }
 
+  // A manual breaker override below the design current cannot hold the load —
+  // it nuisance-trips. The engine honors the override and flags it instead of
+  // silently auto-correcting (overrides are the user's explicit decision).
+  if (breaker.overridden && breaker.ratingA + 1e-9 < result.designCurrentA) {
+    out.push({
+      code: 'breaker-override-undersized',
+      severity: 'error',
+      message: `${name}: manual breaker ${breaker.ratingA} A is below the ${result.designCurrentA} A design current — it will nuisance-trip. Raise the override or clear it to auto-size.`,
+      fixes: [
+        {
+          description: 'Clear the override and auto-size the breaker',
+          action: { type: 'clear-breaker-override', payload: {} },
+        },
+      ],
+      ...base,
+    });
+  }
+
   if (breaker.ratingA > cable.deratedIzA + 1e-9) {
     const fix = suggestCableUpsize(cable.csaMm2, breaker.ratingA, ctx.deratingFactor, ctx.minSectionMm2);
     out.push({

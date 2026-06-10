@@ -202,12 +202,20 @@ function ResultRow({ circuit }: { circuit: CircuitResult }) {
         </Table.Td>
         <Table.Td>{formatAmps(circuit.designCurrentA)}</Table.Td>
         <Table.Td>
-          <Badge variant="light" color="indigo" size="sm">
+          <Badge
+            variant="light"
+            color={circuit.breaker.overridden ? 'violet' : 'indigo'}
+            size="sm"
+            title={circuit.breaker.overridden ? 'Manual override' : undefined}
+          >
             {circuit.breaker.deviceClass} {circuit.breaker.ratingA}A · {circuit.breaker.curve}
+            {circuit.breaker.overridden ? ' ✱' : ''}
           </Badge>
         </Table.Td>
         <Table.Td>
-          {circuit.cable.csaMm2} mm²
+          <Text span c={circuit.cable.overridden ? 'violet.6' : undefined} fw={circuit.cable.overridden ? 600 : undefined}>
+            {circuit.cable.csaMm2} mm²{circuit.cable.overridden ? ' ✱' : ''}
+          </Text>
           <Text span c="dimmed" fz="xs">
             {' '}
             (Iz {formatAmps(circuit.cable.deratedIzA)})

@@ -126,6 +126,8 @@ export const circuits = sqliteTable('circuits', {
   sensing: text('sensing'),
 
   cableOverrideMm2: real('cable_override_mm2'),
+  /** Manual breaker rating override (A). */
+  breakerOverrideA: real('breaker_override_a'),
   // Daily operating window (absent = continuous) for the load profile.
   scheduleStartHour: integer('schedule_start_hour'),
   scheduleEndHour: integer('schedule_end_hour'),

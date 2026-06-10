@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Background,
@@ -8,7 +8,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
 } from '@xyflow/react';
-import { Badge, Box, Card, Group, Paper, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Box, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconAirConditioning,
@@ -25,7 +25,9 @@ import {
   IconSparkles,
 } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, PanelInput, PanelResult } from '@shared/types';
-import { NODE_TYPES, type BranchNodeData } from '@renderer/screens/sld/nodes';
+import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
+import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
+import { NODE_TYPES, OVERRIDE_MIME, type BranchNodeData } from '@renderer/screens/sld/nodes';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps } from '@renderer/lib/format';
 
@@ -243,6 +245,7 @@ function buildGraph(
   panel: PanelInput,
   result: PanelResult,
   changes: Map<string, string[]>,
+  onOverride: (circuitId: string, kind: 'breaker' | 'cable', value: number) => void,
 ): { nodes: Node[]; edges: Edge[] } {
   const branches = result.circuits;
   const totalWidth = Math.max(branches.length, 1) * (BRANCH_W + BRANCH_GAP) - BRANCH_GAP;
@@ -277,6 +280,7 @@ function buildGraph(
 
   branches.forEach((c, i) => {
     const x = i * (BRANCH_W + BRANCH_GAP);
+    const input = panel.circuits.find((ci) => ci.id === c.circuitId);
     const data: BranchNodeData = {
       name: c.name,
       breaker: `${c.breaker.deviceClass} ${c.breaker.ratingA}A/${c.breaker.curve}`,
@@ -284,6 +288,9 @@ function buildGraph(
       starter: c.control?.starterType.replace('_', '-'),
       warn: !c.voltageDrop.withinLimit,
       changed: changes.get(c.circuitId),
+      breakerOverridden: c.breaker.overridden === true,
+      cableOverridden: input?.cableOverrideMm2 !== undefined,
+      onDropOverride: (kind, value) => onOverride(c.circuitId, kind, value),
     };
     nodes.push({ id: c.circuitId, type: 'branch', position: { x, y: BRANCH_Y }, data, draggable: false });
     edges.push({
@@ -331,6 +338,65 @@ function PaletteCard({ item }: { item: PaletteItem }) {
   );
 }
 
+/**
+ * Draggable override card: pick a rating/section on the card, then drag it onto
+ * a SPECIFIC circuit node to pin that value manually (shown violet). Dropping
+ * on empty canvas does nothing except a hint — overrides need a target.
+ */
+function OverrideCard({
+  kind,
+  labelKey,
+  options,
+  unit,
+}: {
+  kind: 'breaker' | 'cable';
+  labelKey: string;
+  options: number[];
+  unit: string;
+}) {
+  const { t } = useTranslation();
+  const [value, setValue] = useState<string>(String(options[0] ?? 16));
+  return (
+    <Paper
+      withBorder
+      radius="md"
+      p={6}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(OVERRIDE_MIME, JSON.stringify({ kind, value: Number(value) }));
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
+      style={{
+        cursor: 'grab',
+        userSelect: 'none',
+        borderColor: 'var(--mantine-color-violet-4)',
+      }}
+    >
+      <Group gap={6} wrap="nowrap" justify="space-between">
+        <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+          <ThemeIcon size="sm" variant="light" color="violet">
+            <IconBolt size={14} />
+          </ThemeIcon>
+          <Text size="xs" fw={500} lineClamp={1}>
+            {t(labelKey)}
+          </Text>
+        </Group>
+        <Select
+          size="xs"
+          w={86}
+          data={options.map((o) => ({ value: String(o), label: `${o} ${unit}` }))}
+          value={value}
+          allowDeselect={false}
+          comboboxProps={{ withinPortal: true }}
+          onChange={(v) => v && setValue(v)}
+          // Keep the select usable inside a draggable card.
+          onPointerDown={(e) => e.stopPropagation()}
+        />
+      </Group>
+    </Paper>
+  );
+}
+
 /* ------------------------------ visual builder ----------------------------- */
 
 /**
@@ -346,6 +412,22 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const updatePanel = useProjectStore((s) => s.updatePanel);
+  const updateCircuit = useProjectStore((s) => s.updateCircuit);
+
+  /** Pin a manual breaker rating / cable minimum onto a specific circuit. */
+  const applyOverride = (circuitId: string, kind: 'breaker' | 'cable', value: number) => {
+    updateCircuit(
+      panel.id,
+      circuitId,
+      kind === 'breaker' ? { breakerOverrideA: value } : { cableOverrideMm2: value },
+    );
+    notifications.show({
+      message: t('vbuilder.overrideApplied', {
+        value: kind === 'breaker' ? `${value} A` : `${value} mm²`,
+      }),
+      color: 'violet',
+    });
+  };
 
   // Change marking: diff this result against the previous one for this panel.
   const prevRef = useRef<{ panelId: string; fp: PanelFingerprint } | null>(null);
@@ -358,11 +440,18 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   }, [result, panel.id]);
 
   const { nodes, edges } = useMemo(
-    () => buildGraph(panel, result, changes),
+    () => buildGraph(panel, result, changes, applyOverride),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [panel, result, changes],
   );
 
   const onDrop = (e: React.DragEvent) => {
+    // An override card needs a circuit target — landing on empty canvas just hints.
+    if (e.dataTransfer.types.includes(OVERRIDE_MIME)) {
+      e.preventDefault();
+      notifications.show({ message: t('vbuilder.dropOnCircuit'), color: 'yellow' });
+      return;
+    }
     const raw = e.dataTransfer.getData(DND_MIME);
     if (!raw) return;
     e.preventDefault();
@@ -445,6 +534,28 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
                 </SimpleGrid>
               </div>
             ))}
+            <div>
+              <Text size="xs" c="dimmed" fw={600} tt="uppercase" mb={6} style={{ letterSpacing: '0.04em' }}>
+                {t('vbuilder.groupOverrides')}
+              </Text>
+              <SimpleGrid cols={1} spacing={6}>
+                <OverrideCard
+                  kind="breaker"
+                  labelKey="vbuilder.breakerOverride"
+                  options={[...STANDARD_BREAKER_RATINGS_A]}
+                  unit="A"
+                />
+                <OverrideCard
+                  kind="cable"
+                  labelKey="vbuilder.cableOverride"
+                  options={[...STANDARD_SECTIONS_MM2]}
+                  unit="mm²"
+                />
+              </SimpleGrid>
+              <Text size="xs" c="dimmed" mt={6}>
+                {t('vbuilder.overrideHint')}
+              </Text>
+            </div>
           </Stack>
         </Card>
 
@@ -458,7 +569,10 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
             borderRadius: 'var(--mantine-radius-lg)',
           }}
           onDragOver={(e) => {
-            if (e.dataTransfer.types.includes(DND_MIME)) {
+            if (
+              e.dataTransfer.types.includes(DND_MIME) ||
+              e.dataTransfer.types.includes(OVERRIDE_MIME)
+            ) {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'copy';
             }

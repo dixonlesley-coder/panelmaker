@@ -7,8 +7,10 @@ import {
   Group,
   NumberInput,
   Paper,
+  Popover,
   SegmentedControl,
   Select,
+  Stack,
   Table,
   Text,
   TextInput,
@@ -16,6 +18,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import {
+  IconAdjustmentsAlt,
   IconBulb,
   IconClipboard,
   IconCopy,
@@ -26,7 +29,8 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
-import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor } from '@shared/standards';
+import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor, STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
+import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { derivedPointsLoadW } from '@shared/engine/fixtures';
 import { selectHasClipboard, useProjectStore } from '@renderer/state/projectStore';
 import { CircuitWizard } from '@renderer/features/builder/CircuitWizard';
@@ -34,6 +38,16 @@ import { PointsEditor } from '@renderer/features/builder/PointsEditor';
 
 /** Load-kind options for the editable Select (full catalog). */
 const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
+
+/** Manual-override pick lists: Auto + the standard ladders. */
+const BREAKER_OVERRIDE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  ...STANDARD_BREAKER_RATINGS_A.map((r) => ({ value: String(r), label: `${r} A` })),
+];
+const CABLE_OVERRIDE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  ...STANDARD_SECTIONS_MM2.map((s) => ({ value: String(s), label: `${s} mm²` })),
+];
 
 /** Daily-usage schedule presets. */
 const SCHEDULE_OPTIONS = SCHEDULE_PRESETS.map((p) => ({ value: p.key, label: p.label }));
@@ -74,6 +88,7 @@ function CircuitRow({ panelId, circuit, selected, detailed, onToggle }: RowProps
   // Final circuits (lighting/socket) can model their points; the connected load
   // is then derived from the points and the flat kW input becomes read-only.
   const pointsCapable = circuit.loadKind === 'lighting' || circuit.loadKind === 'socket';
+  const hasOverride = circuit.breakerOverrideA !== undefined || circuit.cableOverrideMm2 !== undefined;
   const derivedW = derivedPointsLoadW(circuit);
   const pointCount =
     (circuit.fixtures ?? []).reduce((n, f) => n + f.qty, 0) +
@@ -244,6 +259,58 @@ function CircuitRow({ panelId, circuit, selected, detailed, onToggle }: RowProps
               onClose={points.close}
             />
           )}
+          <Popover width={240} position="bottom-end" withinPortal shadow="md">
+            <Popover.Target>
+              <Tooltip label={t('builder.overrides')}>
+                <ActionIcon
+                  variant={hasOverride ? 'light' : 'subtle'}
+                  color={hasOverride ? 'violet' : 'gray'}
+                  aria-label={t('builder.overrides')}
+                >
+                  <IconAdjustmentsAlt size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="xs">
+                <Text size="xs" c="dimmed">
+                  {t('builder.overridesHint')}
+                </Text>
+                <Select
+                  label={t('builder.overrideBreaker')}
+                  size="xs"
+                  data={BREAKER_OVERRIDE_OPTIONS}
+                  value={circuit.breakerOverrideA !== undefined ? String(circuit.breakerOverrideA) : 'auto'}
+                  allowDeselect={false}
+                  comboboxProps={{ withinPortal: true }}
+                  styles={
+                    circuit.breakerOverrideA !== undefined
+                      ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                      : undefined
+                  }
+                  onChange={(v) =>
+                    patch({ breakerOverrideA: v && v !== 'auto' ? Number(v) : undefined })
+                  }
+                />
+                <Select
+                  label={t('builder.overrideCable')}
+                  size="xs"
+                  data={CABLE_OVERRIDE_OPTIONS}
+                  value={circuit.cableOverrideMm2 !== undefined ? String(circuit.cableOverrideMm2) : 'auto'}
+                  allowDeselect={false}
+                  comboboxProps={{ withinPortal: true }}
+                  styles={
+                    circuit.cableOverrideMm2 !== undefined
+                      ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                      : undefined
+                  }
+                  onChange={(v) =>
+                    patch({ cableOverrideMm2: v && v !== 'auto' ? Number(v) : undefined })
+                  }
+                />
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
           <Tooltip label={t('builder.duplicateCircuit')}>
             <ActionIcon
               variant="subtle"

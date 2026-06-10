@@ -70,6 +70,8 @@ function buildGraph(panel: PanelInput, result: PanelResult): { nodes: Node[]; ed
       cable: `${c.cable.csaMm2} mm²`,
       starter: c.control?.starterType.replace('_', '-'),
       warn: !c.voltageDrop.withinLimit,
+      breakerOverridden: c.breaker.overridden === true,
+      cableOverridden: c.cable.overridden === true,
     };
     nodes.push({
       id: c.circuitId,

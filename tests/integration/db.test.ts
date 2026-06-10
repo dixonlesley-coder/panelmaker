@@ -57,6 +57,9 @@ describe('SQLite persistence', () => {
       { id: 'so-1', name: 'Wall east', qty: 4 },
       { id: 'so-2', name: 'Oven', qty: 1, type: 'dedicated', vaPerPoint: 2200 },
     ];
+    // Manual overrides must round-trip too.
+    lighting.breakerOverrideA = 20;
+    lighting.cableOverrideMm2 = 4;
     project.meta = {
       client: 'PT Contoh',
       location: 'Jakarta',
@@ -115,6 +118,8 @@ describe('SQLite persistence', () => {
     const loadedLighting = lpdb.circuits.find((c) => c.loadKind === 'lighting')!;
     expect(loadedLighting.fixtures).toEqual(lighting.fixtures);
     expect(loadedLighting.switchGroups).toEqual(lighting.switchGroups);
+    expect(loadedLighting.breakerOverrideA).toBe(20);
+    expect(loadedLighting.cableOverrideMm2).toBe(4);
     const loadedSocketHost = lpdb.circuits.find((c) => (c.sockets ?? []).length > 0)!;
     expect(loadedSocketHost.sockets).toEqual(socketHost.sockets);
     // a circuit without point detail keeps the fields absent (no empty arrays)

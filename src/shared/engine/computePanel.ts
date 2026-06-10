@@ -100,7 +100,11 @@ function computeCircuit(
     : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
   const designCurrentA = round(ib, 1);
 
-  const breaker = selectBreaker({ designCurrentA: ib, loadKind: c.loadKind });
+  const breaker = selectBreaker({
+    designCurrentA: ib,
+    loadKind: c.loadKind,
+    overrideA: c.breakerOverrideA,
+  });
   const isTrunk = c.role === 'incomer' || isFeeder;
   const baseMinSection = isTrunk ? 4 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
@@ -120,6 +124,8 @@ function computeCircuit(
       isLighting: c.isLighting,
     },
   });
+  // Mark a manually pinned cable minimum so the UI can color it as an override.
+  if (c.cableOverrideMm2 !== undefined) cable.overridden = true;
   const vd = voltageDrop({
     currentA: ib,
     lengthM: c.lengthM,

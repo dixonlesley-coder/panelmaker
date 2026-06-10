@@ -585,14 +585,27 @@ export const useProjectStore = create<ProjectState>((set) => ({
   applyFix: (panelId, circuitId, fix) =>
     set((s) => {
       const action = fix.action;
-      if (!action || action.type !== 'set-cable') return s;
-      const csaMm2 = action.payload.csaMm2;
-      if (typeof csaMm2 !== 'number') return s;
-      return withHistory(s, (project) =>
-        mapPanel(project, panelId, (panel) =>
-          mapCircuit(panel, circuitId, (c) => ({ ...c, cableOverrideMm2: csaMm2 })),
-        ),
-      );
+      if (!action) return s;
+      if (action.type === 'set-cable') {
+        const csaMm2 = action.payload.csaMm2;
+        if (typeof csaMm2 !== 'number') return s;
+        return withHistory(s, (project) =>
+          mapPanel(project, panelId, (panel) =>
+            mapCircuit(panel, circuitId, (c) => ({ ...c, cableOverrideMm2: csaMm2 })),
+          ),
+        );
+      }
+      if (action.type === 'clear-breaker-override') {
+        return withHistory(s, (project) =>
+          mapPanel(project, panelId, (panel) =>
+            mapCircuit(panel, circuitId, (c) => {
+              const { breakerOverrideA: _drop, ...rest } = c;
+              return rest;
+            }),
+          ),
+        );
+      }
+      return s;
     }),
 
   mergePrices: (prices) => set((s) => ({ prices: { ...s.prices, ...prices } })),

@@ -51,6 +51,13 @@ export interface CircuitInput {
 
   /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
   cableOverrideMm2?: number;
+  /**
+   * Manual breaker rating override (A). When set, the engine uses this rating
+   * instead of auto-sizing from the load — and FLAGS non-compliance (an
+   * undersized override nuisance-trips) rather than silently correcting it.
+   * The cable still auto-sizes to cover the override (Iz ≥ In coordination).
+   */
+  breakerOverrideA?: number;
 
   /** Daily operating window; absent = continuous (24 h). Drives the load profile. */
   schedule?: LoadSchedule;

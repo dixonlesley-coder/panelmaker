@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   control_mode TEXT,
   sensing TEXT,
   cable_override_mm2 REAL,
+  breaker_override_a REAL,
   schedule_start_hour INTEGER,
   schedule_end_hour INTEGER,
   feeds_panel_id TEXT,
@@ -208,6 +209,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'panels', column: 'occupancy', ddl: 'ALTER TABLE panels ADD COLUMN occupancy TEXT' },
   // Point-level fixtures / switch groups / sockets.
   { table: 'circuits', column: 'points_json', ddl: 'ALTER TABLE circuits ADD COLUMN points_json TEXT' },
+  // Manual breaker rating override.
+  { table: 'circuits', column: 'breaker_override_a', ddl: 'ALTER TABLE circuits ADD COLUMN breaker_override_a REAL' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

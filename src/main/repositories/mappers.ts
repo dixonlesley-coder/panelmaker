@@ -97,6 +97,7 @@ export function circuitToRow(
     controlMode: undefToNull(c.controlMode),
     sensing: undefToNull(c.sensing),
     cableOverrideMm2: undefToNull(c.cableOverrideMm2),
+    breakerOverrideA: undefToNull(c.breakerOverrideA),
     scheduleStartHour: c.schedule ? c.schedule.startHour : null,
     scheduleEndHour: c.schedule ? c.schedule.endHour : null,
     feedsPanelId: undefToNull(c.feedsPanelId),
@@ -146,6 +147,8 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   if (sensing !== undefined) c.sensing = sensing as CircuitInput['sensing'];
   const cableOverrideMm2 = nullToUndef(r.cableOverrideMm2);
   if (cableOverrideMm2 !== undefined) c.cableOverrideMm2 = cableOverrideMm2;
+  const breakerOverrideA = nullToUndef(r.breakerOverrideA);
+  if (breakerOverrideA !== undefined) c.breakerOverrideA = breakerOverrideA;
   const ssh = nullToUndef(r.scheduleStartHour);
   const seh = nullToUndef(r.scheduleEndHour);
   if (ssh !== undefined && seh !== undefined) c.schedule = { startHour: ssh, endHour: seh };
