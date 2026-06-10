@@ -28,7 +28,9 @@
  */
 
 import {
+  BUSBAR_PHASE_SPACING_MM,
   BUSBAR_SHORT_TIME_DENSITY_A_PER_MM2,
+  COPPER_BENDING_STRESS_N_MM2,
   peakFactor,
 } from '../standards/busbarFault';
 import { round } from './util';
@@ -59,6 +61,19 @@ export interface BusbarWithstandResult {
   peakFactor: number;
   /** Whether the bar's thermal withstand (Icw) covers the prospective fault. */
   adequate: boolean;
+  /**
+   * Electromagnetic force per metre between adjacent phase bars at Ipk (N/m),
+   * F/l = (μ0/2π)·Ipk²/d — present when the bar geometry is known.
+   */
+  forceNPerM?: number;
+  /**
+   * Maximum bar support (insulator) spacing so the bending stress at Ipk stays
+   * within the copper design limit (mm). Conservative: weak-axis section
+   * modulus, simply-supported span. Present when bar geometry is known.
+   */
+  maxSupportSpacingMm?: number;
+  /** Assumed phase-to-phase bar spacing the force was computed at (mm). */
+  phaseSpacingMm?: number;
   /** Human-readable summary, including the out-of-scope mechanical caveat. */
   note: string;
   /** Governing standard clause(s). */
@@ -98,6 +113,8 @@ export function checkBusbarWithstand(
   csaMm2: number,
   faultKa: number,
   durationS = 1,
+  /** Bar geometry — enables the mechanical support-spacing estimate. */
+  bar?: { widthMm: number; thicknessMm: number },
 ): BusbarWithstandResult {
   // Guard against a non-positive duration that would divide by zero / go
   // imaginary; clamp to the standard 1-second basis.
@@ -112,14 +129,34 @@ export function checkBusbarWithstand(
 
   const adequate = icwKa + TOLERANCE_KA >= faultKa;
 
+  // Mechanical: force between adjacent bars at the peak, F/l = (μ0/2π)·Ipk²/d,
+  // then the max simply-supported span keeping copper bending stress within the
+  // design limit: σ = (F/l)·L²/(8·Z) ≤ σ_allow with the WEAK-axis section
+  // modulus Z = w·t²/6 (conservative for either mounting orientation).
+  let forceNPerM: number | undefined;
+  let maxSupportSpacingMm: number | undefined;
+  if (bar && bar.widthMm > 0 && bar.thicknessMm > 0 && ipkKa > 0) {
+    const ipkA = ipkKa * 1000;
+    const dM = BUSBAR_PHASE_SPACING_MM / 1000;
+    forceNPerM = (2e-7 * ipkA * ipkA) / dM;
+    const zMm3 = (bar.widthMm * bar.thicknessMm * bar.thicknessMm) / 6;
+    // L² = 8·σ·Z / (F/l); N/mm² · mm³ / (N/m = N/1000mm) → mm².
+    const l2Mm2 = (8 * COPPER_BENDING_STRESS_N_MM2 * zMm3) / (forceNPerM / 1000);
+    maxSupportSpacingMm = Math.floor(Math.sqrt(l2Mm2) / 10) * 10; // round down to 10 mm
+  }
+
+  const mechanical =
+    maxSupportSpacingMm !== undefined
+      ? `Support the bars every ≤ ${maxSupportSpacingMm} mm (force ${round(forceNPerM ?? 0, 0)} N/m at Ipk, ${BUSBAR_PHASE_SPACING_MM} mm phase spacing).`
+      : 'verify bar supports/spacing for the mechanical peak — out of scope here.';
+
   const note = adequate
     ? `Busbar thermal withstand Icw ${round(icwKa, 1)} kA (${round(t, 2)} s) covers the ` +
       `${round(faultKa, 1)} kA prospective fault. Peak withstand Ipk = ${round(ipkKa, 1)} kA ` +
-      `(n = ${n}); verify bar supports/spacing for the mechanical peak — out of scope here.`
+      `(n = ${n}). ${mechanical}`
     : `Busbar thermal withstand Icw ${round(icwKa, 1)} kA (${round(t, 2)} s) is below the ` +
       `${round(faultKa, 1)} kA prospective fault — increase the bar cross-section or reduce the ` +
-      `clearing time. Peak withstand Ipk = ${round(ipkKa, 1)} kA (n = ${n}); also verify bar ` +
-      `supports/spacing for the mechanical peak — out of scope here.`;
+      `clearing time. Peak withstand Ipk = ${round(ipkKa, 1)} kA (n = ${n}). ${mechanical}`;
 
   return {
     csaMm2: round(csaMm2, 1),
@@ -129,6 +166,10 @@ export function checkBusbarWithstand(
     ipkKa: round(ipkKa, 2),
     peakFactor: n,
     adequate,
+    ...(forceNPerM !== undefined ? { forceNPerM: round(forceNPerM, 0) } : {}),
+    ...(maxSupportSpacingMm !== undefined
+      ? { maxSupportSpacingMm, phaseSpacingMm: BUSBAR_PHASE_SPACING_MM }
+      : {}),
     note,
     clause: CLAUSE,
   };

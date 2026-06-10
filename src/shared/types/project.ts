@@ -73,6 +73,20 @@ export interface CircuitInput {
    */
   busbarBreakBefore?: boolean;
 
+  /**
+   * Pin a single-phase circuit to a specific line. Auto-balancing re-shuffles
+   * phases as loads change; an as-built schedule needs stable, locked phases.
+   * Ignored for three-phase circuits.
+   */
+  phaseOverride?: 'L1' | 'L2' | 'L3';
+
+  /**
+   * Per-circuit grouping count override (cables bunched on THIS route),
+   * replacing the panel-wide `groupingCount` in the derating product — grouping
+   * is a property of the containment route, not of the board.
+   */
+  groupingCountOverride?: number;
+
   /** Daily operating window; absent = continuous (24 h). Drives the load profile. */
   schedule?: LoadSchedule;
 

@@ -277,14 +277,28 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   });
 
   const branches = panel.circuits.filter((c) => c.role === 'branch');
-  const comps = branches.map((c) => computeCircuit(c, panel, df, opts));
+  // Grouping is a property of the containment route — a circuit may override
+  // the panel-wide count, getting its own derating factor.
+  const dfFor = (c: CircuitInput): number =>
+    c.groupingCountOverride !== undefined
+      ? deratingFactor({
+          ambientC: panel.ambientTempC,
+          groupingCount: c.groupingCountOverride,
+          installMethod: panel.installMethod,
+          insulation: panel.insulation,
+          soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
+        })
+      : df;
+  const comps = branches.map((c) => computeCircuit(c, panel, dfFor(c), opts));
 
-  // distribute single-phase circuits across phases and report imbalance
+  // distribute single-phase circuits across phases and report imbalance —
+  // user-pinned phases are honored verbatim and excluded from balancing
   const balance = balancePhases(
-    comps.map((cm) => ({
+    comps.map((cm, idx) => ({
       id: cm.result.circuitId,
       threePhase: cm.threePhase,
       currentA: cm.result.designCurrentA,
+      pinned: branches[idx]?.phaseOverride,
     })),
     panel.system,
   );
@@ -370,7 +384,13 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   // main bus passes — warn per inadequate section.
   if (opts.faultLevelA !== undefined) {
     const faultKa = round(opts.faultLevelA / 1000, 1);
-    const incomerKa = checkBreakerKa(incomerBreaker, faultKa);
+    let incomerKa = checkBreakerKa(incomerBreaker, faultKa);
+    // An MCB-class incomer tops out at ~10 kA Icu; at a stiffer origin the
+    // incoming device must be an MCCB frame of the same rating.
+    if (!incomerKa.adequate && incomerBreaker.deviceClass === 'MCB') {
+      incomer.breaker = { ...incomerBreaker, deviceClass: 'MCCB' };
+      incomerKa = checkBreakerKa(incomer.breaker, faultKa);
+    }
     incomer.breakerKa = incomerKa.breakerKa;
     incomer.kaAdequate = incomerKa.adequate;
     if (!incomerKa.adequate) {
@@ -381,9 +401,15 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
         panelId: panel.id,
       });
     }
-    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, faultKa);
+    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, faultKa, undefined, {
+      widthMm: busbar.widthMm,
+      thicknessMm: busbar.thicknessMm,
+    });
     for (const section of busbarSections) {
-      section.busbar.withstand = checkBusbarWithstand(section.busbar.csaMm2, faultKa);
+      section.busbar.withstand = checkBusbarWithstand(section.busbar.csaMm2, faultKa, undefined, {
+        widthMm: section.busbar.widthMm,
+        thicknessMm: section.busbar.thicknessMm,
+      });
       if (!section.busbar.withstand.adequate) {
         const where =
           busbarSections.length > 1 ? `${panel.name} busbar section ${section.index}` : panel.name;

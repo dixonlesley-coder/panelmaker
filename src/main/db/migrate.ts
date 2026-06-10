@@ -99,6 +99,8 @@ CREATE TABLE IF NOT EXISTS circuits (
   cable_override_mm2 REAL,
   breaker_override_a REAL,
   busbar_break_before INTEGER,
+  phase_override TEXT,
+  grouping_override INTEGER,
   schedule_start_hour INTEGER,
   schedule_end_hour INTEGER,
   feeds_panel_id TEXT,
@@ -217,6 +219,9 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'busbar_break_before', ddl: 'ALTER TABLE circuits ADD COLUMN busbar_break_before INTEGER' },
   // Cable insulation family (PVC / XLPE).
   { table: 'panels', column: 'insulation', ddl: 'ALTER TABLE panels ADD COLUMN insulation TEXT' },
+  // Pinned phase + per-route grouping override.
+  { table: 'circuits', column: 'phase_override', ddl: 'ALTER TABLE circuits ADD COLUMN phase_override TEXT' },
+  { table: 'circuits', column: 'grouping_override', ddl: 'ALTER TABLE circuits ADD COLUMN grouping_override INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

@@ -467,6 +467,15 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
                 v={`${bus.withstand.ipkKa} kA (n=${bus.withstand.peakFactor})`}
               />
             )}
+            {bus.withstand?.maxSupportSpacingMm !== undefined && (
+              <KeyVal
+                k={t('results.busbarSupports')}
+                v={t('results.busbarSupportsValue', {
+                  mm: bus.withstand.maxSupportSpacingMm,
+                  force: bus.withstand.forceNPerM,
+                })}
+              />
+            )}
             {result.spare && (
               <KeyVal
                 k={t('results.spareCapacity')}

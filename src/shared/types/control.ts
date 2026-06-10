@@ -115,5 +115,18 @@ export interface ControlAssembly {
     sensing: LevelSensing;
     requiredSensors: string[];
   };
+  /**
+   * The IEC 60947-4-1 TYPE-2 verified combination covering this motor (DOL
+   * basis): breaker + contactor + overload range from manufacturer-style
+   * coordination tables. `contactorMatches` flags whether the engine's own
+   * contactor pick is at/above the verified set's.
+   */
+  coordination?: {
+    breakerA: number;
+    contactorAc3A: number;
+    olRangeA: readonly [number, number];
+    contactorMatches: boolean;
+    note: string;
+  };
   warnings: string[];
 }

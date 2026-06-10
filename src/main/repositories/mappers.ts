@@ -99,6 +99,8 @@ export function circuitToRow(
     cableOverrideMm2: undefToNull(c.cableOverrideMm2),
     breakerOverrideA: undefToNull(c.breakerOverrideA),
     busbarBreakBefore: c.busbarBreakBefore === true ? true : null,
+    phaseOverride: undefToNull(c.phaseOverride),
+    groupingOverride: undefToNull(c.groupingCountOverride),
     scheduleStartHour: c.schedule ? c.schedule.startHour : null,
     scheduleEndHour: c.schedule ? c.schedule.endHour : null,
     feedsPanelId: undefToNull(c.feedsPanelId),
@@ -151,6 +153,10 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   const breakerOverrideA = nullToUndef(r.breakerOverrideA);
   if (breakerOverrideA !== undefined) c.breakerOverrideA = breakerOverrideA;
   if (r.busbarBreakBefore) c.busbarBreakBefore = true;
+  const phaseOverride = nullToUndef(r.phaseOverride);
+  if (phaseOverride !== undefined) c.phaseOverride = phaseOverride as CircuitInput['phaseOverride'];
+  const groupingOverride = nullToUndef(r.groupingOverride);
+  if (groupingOverride !== undefined) c.groupingCountOverride = groupingOverride;
   const ssh = nullToUndef(r.scheduleStartHour);
   const seh = nullToUndef(r.scheduleEndHour);
   if (ssh !== undefined && seh !== undefined) c.schedule = { startHour: ssh, endHour: seh };

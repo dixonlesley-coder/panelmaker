@@ -249,6 +249,44 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             onChange={(v) => patch({ breakerOverrideA: v && v !== 'auto' ? Number(v) : undefined })}
           />
         </SimpleGrid>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <Select
+            label={t('circuitEditor.phasePin')}
+            description={t('circuitEditor.phasePinHint')}
+            data={[
+              { value: 'auto', label: t('circuitEditor.phaseAuto') },
+              { value: 'L1', label: 'L1' },
+              { value: 'L2', label: 'L2' },
+              { value: 'L3', label: 'L3' },
+            ]}
+            value={circuit.phaseOverride ?? 'auto'}
+            allowDeselect={false}
+            disabled={result?.phase === '3ph'}
+            comboboxProps={{ withinPortal: true }}
+            styles={
+              circuit.phaseOverride !== undefined
+                ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                : undefined
+            }
+            onChange={(v) =>
+              patch({
+                phaseOverride:
+                  v && v !== 'auto' ? (v as CircuitInput['phaseOverride']) : undefined,
+              })
+            }
+          />
+          <NumberInput
+            label={t('circuitEditor.groupingOverride')}
+            description={t('circuitEditor.groupingOverrideHint')}
+            value={circuit.groupingCountOverride ?? ''}
+            placeholder={t('circuitEditor.groupingPanelDefault')}
+            min={1}
+            max={20}
+            onChange={(v) =>
+              patch({ groupingCountOverride: typeof v === 'number' ? v : undefined })
+            }
+          />
+        </SimpleGrid>
         {result && (
           <Text size="xs" c="dimmed">
             {t('circuitEditor.makeup', {

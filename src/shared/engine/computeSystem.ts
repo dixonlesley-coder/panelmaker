@@ -8,6 +8,7 @@ import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
+import { computeMetering } from './metering';
 import { recommendSpd } from './spd';
 import {
   type Impedance,
@@ -343,6 +344,9 @@ export function computeSystem(project: ProjectInput): SystemResult {
   );
   const powerFactor = computePowerFactor(project, project.meta?.targetPf, harmonicRich);
 
+  // PLN service step + revenue metering at the origin (direct vs CT-operated).
+  const metering = computeMetering(totalDemandKva, lvVoltageV, roots[0]?.system ?? '3ph');
+
   // Surge-protection recommendation at the service origin (Type 1 under a
   // lightning/overhead exposure, else Type 2), keyed to the earthing system.
   const spd = recommendSpd({
@@ -360,6 +364,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
     earthing,
     powerFactor,
     spd,
+    metering,
     ...(sources ? { sources } : {}),
     ...(generatorFaultKa !== undefined ? { generatorFaultKa } : {}),
     ...(selectivity.length > 0 ? { selectivity } : {}),

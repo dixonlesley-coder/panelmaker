@@ -9,6 +9,7 @@ import type { SourcesResult } from './sources';
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
 import type { SpdResult } from '../engine/spd';
 import type { ElectrodeResult } from '../engine/electrode';
+import type { MeteringResult } from '../engine/metering';
 import type { BusbarWithstandResult } from '../engine/busbarFault';
 import type { EnclosureThermalResult } from '../engine/enclosureThermal';
 import type { FinalCircuitResult } from '../engine/fixtures';
@@ -478,6 +479,8 @@ export interface SystemResult {
   powerFactor: CapacitorBankResult;
   /** Surge-protection (SPD) recommendation at the service origin. */
   spd?: SpdResult;
+  /** PLN service step + revenue metering (direct / CT) at the origin. */
+  metering?: MeteringResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
   /**
