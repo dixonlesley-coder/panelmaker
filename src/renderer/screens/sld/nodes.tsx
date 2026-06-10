@@ -24,6 +24,8 @@ export interface BranchNodeData {
   name: string;
   breaker: string;
   cable: string;
+  /** Cable loading: design current as a percent of the cable's derated Iz. */
+  utilPct?: number;
   starter?: string;
   warn?: boolean;
   /** Human notes of what the last edit re-sized here (builder change marking). */
@@ -39,6 +41,13 @@ export interface BranchNodeData {
 
 /** MIME for override cards dragged from the builder palette onto a node. */
 export const OVERRIDE_MIME = 'application/x-panelmaker-override';
+
+/** Color a cable-utilisation figure: calm under 80%, warm 80–100%, hot ≥100%. */
+function utilColor(pct: number): string {
+  if (pct >= 100) return 'red.6';
+  if (pct >= 80) return 'orange.6';
+  return 'dimmed';
+}
 
 export interface PanelNodeData {
   name: string;
@@ -170,7 +179,7 @@ export function BranchNode({ data }: NodeProps) {
           </Badge>
         )}
       </Group>
-      <Group gap={4}>
+      <Group gap={4} wrap="nowrap">
         <Text size="xs" c={d.cableOverridden ? 'violet.6' : 'dimmed'} fw={d.cableOverridden ? 600 : undefined}>
           {d.cable}
         </Text>
@@ -178,6 +187,11 @@ export function BranchNode({ data }: NodeProps) {
           <Badge size="xs" variant="light" color="violet">
             manual
           </Badge>
+        )}
+        {d.utilPct !== undefined && (
+          <Text size="xs" c={utilColor(d.utilPct)} title="Cable loading (design current / Iz)">
+            · {d.utilPct}% Iz
+          </Text>
         )}
       </Group>
       {d.starter && (
