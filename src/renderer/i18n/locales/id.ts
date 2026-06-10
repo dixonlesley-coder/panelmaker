@@ -266,6 +266,8 @@ export const id: TranslationKeys = {
   },
 
   panel: {
+    nameLabel: 'Nama panel',
+    namePlaceholder: 'mis. LP-1 — Penerangan lantai dasar',
     eyebrow: 'Editor panel',
     title: 'Editor panel',
     activePanel: 'Panel aktif',

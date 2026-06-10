@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, Title } from '@mantine/core';
+import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconBulb,
@@ -30,6 +30,7 @@ export function PanelEditor() {
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
+  const updatePanel = useProjectStore((s) => s.updatePanel);
 
   // Compute the whole system so feeder loads aggregate correctly, then pick this panel.
   const system = useSystemResult();
@@ -64,7 +65,24 @@ export function PanelEditor() {
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
             {t('panel.eyebrow')}
           </Text>
-          <Title order={3}>{panel.name}</Title>
+          {/* The panel name is its label everywhere (SLD, schedules, PDF, drawings) — edit it inline. */}
+          <TextInput
+            variant="unstyled"
+            size="md"
+            value={panel.name}
+            aria-label={t('panel.nameLabel')}
+            placeholder={t('panel.namePlaceholder')}
+            onChange={(e) => updatePanel(panel.id, { name: e.currentTarget.value })}
+            styles={{
+              input: {
+                fontWeight: 700,
+                fontSize: 'var(--mantine-font-size-xl)',
+                lineHeight: 1.2,
+                height: 'auto',
+                minHeight: 'unset',
+              },
+            }}
+          />
         </div>
         <Group gap="sm" align="flex-end">
           <Select

@@ -5,6 +5,7 @@ import {
   finalCircuitWarnings,
   computePanel,
   buildPanelBom,
+  laborHoursForBom,
 } from '@shared/engine';
 import {
   MAX_POINTS_PER_LIGHTING_CIRCUIT,
@@ -12,6 +13,7 @@ import {
   MAX_W_PER_SMART_CHANNEL,
   VA_PER_SOCKET_POINT,
 } from '@shared/standards/fixtures';
+import { assemblyHoursForCategory } from '@shared/standards/labor';
 import type { CircuitInput, PanelInput, Part } from '@shared/types';
 
 function circuit(partial: Partial<CircuitInput> & { id: string; name: string }): CircuitInput {
@@ -193,5 +195,38 @@ describe('computePanel integration', () => {
     expect(switchLine?.qty).toBe(1);
     expect(switchLine?.matched).toBe(true); // matched against the catalog switch
     expect(socketLine?.qty).toBe(6);
+  });
+
+  it('point-install labor flows into the quotation labor hours', () => {
+    const r = computePanel(
+      panel([
+        circuit({
+          id: 'lit',
+          name: 'Lit',
+          fixtures: [{ id: 'f1', name: 'DL', wattsPerFitting: 12, qty: 8, switchGroupId: 'sw1' }],
+          switchGroups: [{ id: 'sw1', label: 'SW1', kind: 'smart', protocol: 'wifi' }],
+        }),
+        circuit({
+          id: 'soc',
+          name: 'Soc',
+          loadKind: 'socket',
+          isLighting: false,
+          sockets: [{ id: 's1', name: 'Wall', qty: 6 }],
+        }),
+      ]),
+    );
+    const bom = buildPanelBom(r, []);
+    // 8 fittings + 1 smart switch + 6 outlets each carry their own install labor.
+    const pointHours =
+      8 * assemblyHoursForCategory('light_fixture') +
+      1 * assemblyHoursForCategory('smart_switch') +
+      6 * assemblyHoursForCategory('socket_outlet');
+    expect(laborHoursForBom(bom)).toBeGreaterThanOrEqual(pointHours - 1e-9);
+    // The new categories are explicitly costed (not the generic 0.25 fallback),
+    // and a smart module takes more labor than a conventional switch.
+    expect(assemblyHoursForCategory('smart_switch')).toBeGreaterThan(
+      assemblyHoursForCategory('switch'),
+    );
+    expect(assemblyHoursForCategory('light_fixture')).not.toBe(0.25);
   });
 });

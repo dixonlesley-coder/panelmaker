@@ -263,6 +263,8 @@ export const en = {
   },
 
   panel: {
+    nameLabel: 'Panel name',
+    namePlaceholder: 'e.g. LP-1 — Ground floor lighting',
     eyebrow: 'Panel editor',
     title: 'Panel editor',
     activePanel: 'Active panel',

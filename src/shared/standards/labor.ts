@@ -26,6 +26,13 @@ export const ASSEMBLY_HOURS_PER_UNIT: Readonly<Record<string, number>> = {
   busbar: 1.0, // cut/drill/insulate a busbar set + torque the joints
   enclosure: 4.0, // prep, drill, mount gland plates, back-plate fit-out
   accessory: 0.1, // minor accessory (din-rail end, marker, etc.)
+  // Final-circuit points — field/point installation, not shop panel build.
+  // Counted per unit, so a fixture/socket row's qty drives the total install
+  // labor: mount the point, run/terminate its drop, lamp/plate it and test.
+  light_fixture: 0.4, // per fitting: mount, terminate, lamp, test
+  switch: 0.3, // per conventional switch: back box, wire, fit plate, test
+  smart_switch: 0.6, // per smart module: mount, wire (incl. neutral), pair/commission
+  socket_outlet: 0.35, // per outlet: back box, wire, fit, test
   // Control gear ----------------------------------------------------------
   contactor: 0.6, // power + control wiring of a contactor
   overload_relay: 0.3, // clip to contactor, set, wire trip contacts
