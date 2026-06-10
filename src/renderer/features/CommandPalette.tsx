@@ -128,7 +128,7 @@ export function CommandPalette() {
       keywords: 'panel',
       run: () => {
         setActivePanel(p.id);
-        setScreen('panel');
+        setScreen('system');
         close();
       },
     }));
@@ -141,7 +141,7 @@ export function CommandPalette() {
         run: () => {
           if (activePanelId) {
             addCircuit(activePanelId);
-            setScreen('panel');
+            setScreen('system');
           }
           close();
         },

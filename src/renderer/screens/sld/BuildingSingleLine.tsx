@@ -11,9 +11,11 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react';
-import { Badge, Box, Card, Drawer, Group, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Box, Card, Drawer, Group, Menu, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
+import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
+import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import {
   IconAirConditioning,
   IconBolt,
@@ -136,6 +138,8 @@ interface UnifiedPanelData {
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
   onEditCircuit?: (circuitId: string) => void;
+  /** Right-click a component → replacement-parts menu at the cursor. */
+  onContextCircuit?: (circuitId: string, x: number, y: number) => void;
   /** Add a way / sub-panel here (palette card dropped on this panel). */
   onAddItem?: (action: SldAdd) => void;
   [key: string]: unknown;
@@ -489,6 +493,12 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
               e.stopPropagation();
               d.onEditCircuit?.(w.id);
             }}
+            onContextMenu={(e) => {
+              // Right-click → appropriate replacement parts at the cursor.
+              e.preventDefault();
+              e.stopPropagation();
+              d.onContextCircuit?.(w.id, e.clientX, e.clientY);
+            }}
           >
             <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''} — double-click to edit`}</title>
             {taps.map((k, j) => {
@@ -652,6 +662,7 @@ function buildUnified(
   system: SystemResult,
   onEditCircuit: (panelId: string, circuitId: string) => void,
   onAddItem: (panelId: string, action: SldAdd) => void,
+  onContextCircuit: (panelId: string, circuitId: string, x: number, y: number) => void,
 ): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
@@ -778,6 +789,7 @@ function buildUnified(
         feederIds: ways.filter((wy) => wy.feeds).map((wy) => wy.id),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
+        onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
         onAddItem: (action) => onAddItem(id, action),
       };
       nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, draggable: false });
@@ -816,14 +828,22 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
+  const updateCircuit = useProjectStore((s) => s.updateCircuit);
+  const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
+  const removeCircuit = useProjectStore((s) => s.removeCircuit);
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
   const [editing, setEditing] = useState<{ panelId: string; circuitId: string } | null>(null);
   const [inspectPanelId, setInspectPanelId] = useState<string | null>(null);
+  // Right-click → replacement-parts menu anchored at the cursor.
+  const [ctx, setCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
 
   const openCircuit = useCallback((panelId: string, circuitId: string) => {
     setEditing({ panelId, circuitId });
+  }, []);
+  const openContext = useCallback((panelId: string, circuitId: string, x: number, y: number) => {
+    setCtx({ panelId, circuitId, x, y });
   }, []);
   const openInspector = useCallback(
     (panelId: string) => {
@@ -860,8 +880,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   );
 
   const { nodes, edges } = useMemo(
-    () => buildUnified(project, system, openCircuit, addItem),
-    [project, system, openCircuit, addItem],
+    () => buildUnified(project, system, openCircuit, addItem, openContext),
+    [project, system, openCircuit, addItem, openContext],
   );
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
@@ -869,6 +889,24 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const editingResult = editing
     ? system.panels[editing.panelId]?.circuits.find((c) => c.circuitId === editing.circuitId)
     : undefined;
+
+  // Replacement-parts options for the right-clicked circuit: standard breaker
+  // ratings ≥ its design current and cable sections ≥ its present size (the
+  // "appropriate" parts), plus its current values for reference.
+  const ctxResult = ctx
+    ? system.panels[ctx.panelId]?.circuits.find((c) => c.circuitId === ctx.circuitId)
+    : undefined;
+  const ctxName = ctxResult?.name;
+  const breakerOptions = ctxResult
+    ? STANDARD_BREAKER_RATINGS_A.filter((r) => r >= ctxResult.designCurrentA).slice(0, 6)
+    : [];
+  const cableOptions = ctxResult
+    ? STANDARD_SECTIONS_MM2.filter((s) => s >= ctxResult.cable.csaMm2).slice(0, 6)
+    : [];
+  const applyAndClose = (patch: Parameters<typeof updateCircuit>[2]) => {
+    if (ctx) updateCircuit(ctx.panelId, ctx.circuitId, patch);
+    setCtx(null);
+  };
 
   return (
     <Group align="stretch" gap="sm" wrap="nowrap" h={560}>
@@ -953,6 +991,60 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       >
         {inspectPanelId !== null && <PanelEditor />}
       </Drawer>
+
+      {/* Right-click replacement-parts menu, anchored at the cursor. */}
+      <Menu opened={ctx !== null} onClose={() => setCtx(null)} position="right-start" width={216} shadow="md" withinPortal>
+        <Menu.Target>
+          <div style={{ position: 'fixed', left: ctx?.x ?? 0, top: ctx?.y ?? 0, width: 1, height: 1 }} />
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>{ctxName ?? t('sldMenu.circuit')}</Menu.Label>
+          <Menu.Item
+            onClick={() => {
+              if (ctx) openCircuit(ctx.panelId, ctx.circuitId);
+              setCtx(null);
+            }}
+          >
+            {t('sldMenu.edit')}
+          </Menu.Item>
+          {ctxResult && (
+            <>
+              <Menu.Divider />
+              <Menu.Label>{t('sldMenu.breaker', { rating: ctxResult.breaker.ratingA })}</Menu.Label>
+              {breakerOptions.map((r) => (
+                <Menu.Item key={r} onClick={() => applyAndClose({ breakerOverrideA: r })}>
+                  {r} A{r === ctxResult.breaker.ratingA ? ` · ${t('sldMenu.current')}` : ''}
+                </Menu.Item>
+              ))}
+              <Menu.Divider />
+              <Menu.Label>{t('sldMenu.cable', { size: ctxResult.cable.csaMm2 })}</Menu.Label>
+              {cableOptions.map((s) => (
+                <Menu.Item key={s} onClick={() => applyAndClose({ cableOverrideMm2: s })}>
+                  {s} mm²{s === ctxResult.cable.csaMm2 ? ` · ${t('sldMenu.current')}` : ''}
+                </Menu.Item>
+              ))}
+            </>
+          )}
+          <Menu.Divider />
+          <Menu.Item
+            onClick={() => {
+              if (ctx) duplicateCircuit(ctx.panelId, ctx.circuitId);
+              setCtx(null);
+            }}
+          >
+            {t('sldMenu.duplicate')}
+          </Menu.Item>
+          <Menu.Item
+            color="red"
+            onClick={() => {
+              if (ctx) removeCircuit(ctx.panelId, ctx.circuitId);
+              setCtx(null);
+            }}
+          >
+            {t('sldMenu.delete')}
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
     </Group>
   );
 }

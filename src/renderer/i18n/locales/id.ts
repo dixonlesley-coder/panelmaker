@@ -513,6 +513,15 @@ export const id: TranslationKeys = {
       'Perkiraan teknis — verifikasi terhadap PUIL 2011 / IEC 60364 sebelum konstruksi.',
   },
 
+  sldMenu: {
+    circuit: 'Sirkuit',
+    edit: 'Edit sirkuit…',
+    breaker: 'Ganti pemutus (sekarang {{rating}} A)',
+    cable: 'Ganti kabel (sekarang {{size}} mm²)',
+    current: 'saat ini',
+    duplicate: 'Duplikat jalur',
+    delete: 'Hapus jalur',
+  },
   system: {
     eyebrow: 'Ikhtisar bangunan',
     title: 'Sistem seluruh bangunan',

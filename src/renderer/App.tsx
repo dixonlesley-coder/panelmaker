@@ -8,7 +8,6 @@ import {
   IconFolder,
   IconSitemap,
   IconGauge,
-  IconAdjustmentsBolt,
   IconChartLine,
   IconBox,
   IconReceipt,
@@ -33,7 +32,6 @@ import {
 import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
 import { Dashboard } from '@renderer/screens/Dashboard';
-import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { Coordination } from '@renderer/screens/Coordination';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
@@ -65,7 +63,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
       { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
-      { screen: 'panel', labelKey: 'nav.panel', icon: <IconAdjustmentsBolt size={18} /> },
       { screen: 'coordination', labelKey: 'nav.coordination', icon: <IconChartLine size={18} /> },
       { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
     ],
@@ -193,7 +190,10 @@ function ActiveScreen({ screen }: { screen: Screen }) {
     case 'dashboard':
       return <Dashboard />;
     case 'panel':
-      return <PanelEditor />;
+      // The standalone Panel Editor was retired — editing now happens on the
+      // single-line (double-click a component / drag the palette / the panel
+      // inspector). Any leftover navigation to 'panel' lands there.
+      return <SystemView />;
     case 'coordination':
       return <Coordination />;
     case 'parts':

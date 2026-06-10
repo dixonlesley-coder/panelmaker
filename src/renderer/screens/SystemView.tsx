@@ -176,7 +176,7 @@ export function SystemView() {
 
   const openPanel = (panelId: string) => {
     setActivePanel(panelId);
-    setScreen('panel');
+    setScreen('system');
   };
 
   /** Pick a CSV load list, parse it leniently, and append its panels (undoable). */
