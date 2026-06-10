@@ -509,6 +509,15 @@ export const en = {
     estimateNote: 'Engineering estimate — verify against PUIL 2011 / IEC 60364 before construction.',
   },
 
+  sldMenu: {
+    circuit: 'Circuit',
+    edit: 'Edit circuit…',
+    breaker: 'Replace breaker (now {{rating}} A)',
+    cable: 'Replace cable (now {{size}} mm²)',
+    current: 'current',
+    duplicate: 'Duplicate way',
+    delete: 'Delete way',
+  },
   system: {
     eyebrow: 'Building overview',
     title: 'Whole-building system',

@@ -560,7 +560,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return {
         ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
         activePanelId: newPanel.id,
-        activeScreen: 'panel',
+        activeScreen: 'system',
       };
     }),
 
@@ -668,7 +668,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return {
         ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
         activePanelId: newPanel.id,
-        activeScreen: 'panel',
+        activeScreen: 'system',
       };
     }),
 

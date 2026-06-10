@@ -146,7 +146,7 @@ export function PowerOneline({ system }: { system: SystemResult }) {
       const root = panels.find((p) => p.sourceType === 'utility') ?? panels[0];
       if (root) {
         setActivePanel(root.id);
-        setScreen('panel');
+        setScreen('system');
       }
     } else if (
       kind === 'generator' ||

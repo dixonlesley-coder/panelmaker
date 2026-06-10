@@ -558,9 +558,10 @@ describe('projectStore', () => {
       expect(project.panels.length).toBe(startPanels + 1);
       const added = project.panels[project.panels.length - 1]!;
       expect(added.circuits.length).toBe(expectedCircuits);
-      // the new panel becomes active and opens the editor
+      // the new panel becomes active and lands on the single-line (the Panel
+      // Editor screen was retired — editing happens there now).
       expect(useProjectStore.getState().activePanelId).toBe(added.id);
-      expect(useProjectStore.getState().activeScreen).toBe('panel');
+      expect(useProjectStore.getState().activeScreen).toBe('system');
 
       // every panel id and circuit id in the project is unique
       const allIds = [
