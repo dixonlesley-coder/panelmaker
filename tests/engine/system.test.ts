@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computePanel, computeSystem } from '@shared/engine';
+import { panelLabel } from '@shared/labels';
+import { cableScheduleCsv } from '@shared/io/scheduleExport';
 import type { PanelInput, ProjectInput, CircuitInput } from '@shared/types';
 
 function branch(partial: Partial<CircuitInput> & { id: string; name: string }): CircuitInput {
@@ -66,6 +68,49 @@ describe('computePanel', () => {
     expect(c.designCurrentA).toBeCloseTo(68, 0);
     expect(c.control?.starterType).toBe('STAR_DELTA');
     expect(c.control?.devices.some((d) => d.category === 'control_transformer')).toBe(true);
+  });
+});
+
+describe('panel tag / designation', () => {
+  it('formats the panel label as "TAG — Name" (or just the name when untagged)', () => {
+    expect(panelLabel({ tag: 'LP-1', name: 'Lighting' })).toBe('LP-1 — Lighting');
+    expect(panelLabel({ name: 'Lighting' })).toBe('Lighting');
+    expect(panelLabel({ tag: '   ', name: 'Lighting' })).toBe('Lighting'); // blank tag ignored
+  });
+
+  it('carries the tag onto the result and into the cable schedule', () => {
+    const project: ProjectInput = {
+      id: 'TG',
+      name: 'Tagged',
+      panels: [
+        panel({
+          id: 'P1',
+          name: 'Ground floor',
+          tag: 'LP-1',
+          circuits: [branch({ id: 'c1', name: 'Lights', loadW: 2000, loadKind: 'lighting', isLighting: true })],
+        }),
+      ],
+    };
+    const sys = computeSystem(project);
+    expect(sys.panels['P1']!.tag).toBe('LP-1');
+
+    const header = cableScheduleCsv(sys).split('\r\n')[0]!;
+    expect(header.split(',')).toEqual([
+      'Panel',
+      'Tag',
+      'Circuit',
+      'Design A',
+      'Phase',
+      'Breaker A',
+      'Cable mm²',
+      'Cores',
+      'Cable spec',
+      'Vd %',
+      'Cumulative Vd %',
+    ]);
+    // The data row carries the tag in the second column.
+    const firstData = cableScheduleCsv(sys).split('\r\n')[1]!;
+    expect(firstData.split(',')[1]).toBe('LP-1');
   });
 });
 

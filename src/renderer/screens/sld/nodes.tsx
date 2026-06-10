@@ -31,6 +31,7 @@ export interface BranchNodeData {
 
 export interface PanelNodeData {
   name: string;
+  tag?: string;
   loadKw: string;
   incomerA: string;
   source: 'utility' | 'feeder';
@@ -140,10 +141,17 @@ export function PanelNode({ data }: NodeProps) {
       }}
     >
       <Handle type="target" position={Position.Top} />
-      <Group justify="space-between" mb={4} wrap="nowrap">
-        <Text size="sm" fw={700} lineClamp={1} title={d.name}>
-          {d.name}
-        </Text>
+      <Group justify="space-between" mb={4} wrap="nowrap" gap={6}>
+        <Box style={{ minWidth: 0 }}>
+          {d.tag && (
+            <Text size="xs" fw={700} c="indigo.6" ff="monospace" lineClamp={1}>
+              {d.tag}
+            </Text>
+          )}
+          <Text size="sm" fw={700} lineClamp={1} title={d.name}>
+            {d.name}
+          </Text>
+        </Box>
         <Badge size="xs" variant="light" color={d.source === 'utility' ? 'indigo' : 'gray'}>
           {d.source}
         </Badge>

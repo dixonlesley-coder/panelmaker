@@ -14,6 +14,7 @@ import { toCsv } from './csv';
 /** Column headers for the cable schedule, in output order. */
 const CABLE_SCHEDULE_HEADER: readonly string[] = [
   'Panel',
+  'Tag',
   'Circuit',
   'Design A',
   'Phase',
@@ -29,6 +30,7 @@ const CABLE_SCHEDULE_HEADER: readonly string[] = [
 function cableRow(panel: PanelResult, c: CircuitResult): (string | number)[] {
   return [
     panel.name ?? '',
+    panel.tag ?? '',
     c.name ?? '',
     c.designCurrentA ?? '',
     c.phase ?? '',

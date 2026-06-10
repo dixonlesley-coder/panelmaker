@@ -15,6 +15,7 @@ import type { PanelResult } from '../types/results';
 import type { LightFixture, SwitchGroup } from '../types/fixtures';
 import { VA_PER_SOCKET_POINT } from '../standards/fixtures';
 import { derivedPointsLoadW } from '../engine/fixtures';
+import { panelLabel } from '../labels';
 import type { Drawing, Prim } from './geometry';
 import { drawingToSvg, type TitleStrip } from './svg';
 import { drawingToDxf } from './dxf';
@@ -280,7 +281,7 @@ export function pointsDrawing(panel: PanelInput, result: PanelResult): Drawing {
     type: 'text',
     x: 0,
     y: 8,
-    text: `${panel.name} — lighting & small-power points`,
+    text: `${panelLabel(panel)} — lighting & small-power points`,
     size: FONT + 1,
   });
   let y = 20;
@@ -325,7 +326,7 @@ export function panelPointsSvg(
   result: PanelResult,
   titleStrip?: TitleStrip,
 ): string {
-  return drawingToSvg(pointsDrawing(panel, result), `${panel.name} points & switching`, titleStrip);
+  return drawingToSvg(pointsDrawing(panel, result), `${panelLabel(panel)} points & switching`, titleStrip);
 }
 
 /** Minimal AutoCAD R12 ASCII DXF of the points & switching diagram. */

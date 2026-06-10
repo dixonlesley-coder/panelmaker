@@ -105,14 +105,15 @@ describe('scheduleExport', () => {
     const rows = parseCsv(csv);
 
     expect(rows[0]).toContain('Panel');
+    expect(rows[0]).toContain('Tag');
     expect(rows[0]).toContain('Cumulative Vd %');
 
     const circuitCount = Object.values(system.panels).reduce((n, p) => n + p.circuits.length, 0);
     expect(rows.length).toBe(circuitCount + 1); // header + one row per circuit
     expect(circuitCount).toBe(2);
 
-    // Spot-check a data cell carries the circuit name.
-    expect(rows.slice(1).some((r) => r[1] === 'Lighting')).toBe(true);
+    // Spot-check a data cell carries the circuit name (column 2, after Panel + Tag).
+    expect(rows.slice(1).some((r) => r[2] === 'Lighting')).toBe(true);
 
     // panelScheduleCsv for the same panel matches its circuit count + header.
     const panelId = Object.keys(system.panels)[0]!;

@@ -12,6 +12,7 @@ import {
 } from '@tabler/icons-react';
 import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
 import type { OccupancyType } from '@shared/types';
+import { panelLabel } from '@shared/labels';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
@@ -38,7 +39,7 @@ export function PanelEditor() {
   const panel = project.panels.find((p) => p.id === activePanelId);
   const result = panel ? system.panels[panel.id] : undefined;
 
-  const panelOptions = project.panels.map((p) => ({ value: p.id, label: p.name }));
+  const panelOptions = project.panels.map((p) => ({ value: p.id, label: panelLabel(p) }));
   const occupancyOptions = OCCUPANCY_TYPES.map((o) => ({
     value: o,
     label: OCCUPANCY_PRESETS[o].label,
@@ -65,24 +66,37 @@ export function PanelEditor() {
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
             {t('panel.eyebrow')}
           </Text>
-          {/* The panel name is its label everywhere (SLD, schedules, PDF, drawings) — edit it inline. */}
-          <TextInput
-            variant="unstyled"
-            size="md"
-            value={panel.name}
-            aria-label={t('panel.nameLabel')}
-            placeholder={t('panel.namePlaceholder')}
-            onChange={(e) => updatePanel(panel.id, { name: e.currentTarget.value })}
-            styles={{
-              input: {
-                fontWeight: 700,
-                fontSize: 'var(--mantine-font-size-xl)',
-                lineHeight: 1.2,
-                height: 'auto',
-                minHeight: 'unset',
-              },
-            }}
-          />
+          {/* Tag (short designation, e.g. LP-1) + descriptive name — both label the
+              panel everywhere (SLD, schedules, PDF, drawings). Edit inline. */}
+          <Group gap="xs" align="center" wrap="nowrap">
+            <TextInput
+              variant="filled"
+              size="xs"
+              w={92}
+              value={panel.tag ?? ''}
+              aria-label={t('panel.tagLabel')}
+              placeholder={t('panel.tagPlaceholder')}
+              onChange={(e) => updatePanel(panel.id, { tag: e.currentTarget.value || undefined })}
+              styles={{ input: { fontWeight: 700, fontFamily: 'var(--mantine-font-family-monospace)' } }}
+            />
+            <TextInput
+              variant="unstyled"
+              size="md"
+              value={panel.name}
+              aria-label={t('panel.nameLabel')}
+              placeholder={t('panel.namePlaceholder')}
+              onChange={(e) => updatePanel(panel.id, { name: e.currentTarget.value })}
+              styles={{
+                input: {
+                  fontWeight: 700,
+                  fontSize: 'var(--mantine-font-size-xl)',
+                  lineHeight: 1.2,
+                  height: 'auto',
+                  minHeight: 'unset',
+                },
+              }}
+            />
+          </Group>
         </div>
         <Group gap="sm" align="flex-end">
           <Select

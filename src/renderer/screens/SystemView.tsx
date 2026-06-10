@@ -51,6 +51,7 @@ import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
 import { downloadCsv } from '@renderer/lib/download';
 import { cableScheduleCsv } from '@shared/io/scheduleExport';
 import { parseLoadList } from '@shared/io/loadListImport';
+import { panelLabel } from '@shared/labels';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -111,6 +112,7 @@ function buildGraph(
       if (!panel || !result) return;
       const data: PanelNodeData = {
         name: result.name,
+        ...(panel.tag ? { tag: panel.tag } : {}),
         loadKw: formatKw(result.totalConnectedLoadW),
         incomerA: formatAmps(result.totalDemandCurrentA),
         source: panel.sourceType,
@@ -658,7 +660,7 @@ function FaultLevelsCard({ system }: { system: SystemResult }) {
           return (
             <Group key={p.panelId} justify="space-between" wrap="nowrap" gap="xs">
               <Text size="sm" truncate>
-                {p.name}
+                {panelLabel(p)}
               </Text>
               <Badge variant={inadequate ? 'filled' : 'light'} color={inadequate ? 'red' : 'gray'}>
                 {p.faultLevelKa} kA

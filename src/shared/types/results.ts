@@ -321,6 +321,8 @@ export interface QuotationResult {
 export interface PanelResult {
   panelId: string;
   name: string;
+  /** Short panel designation / tag (e.g. "LP-1"), when set on the input. */
+  tag?: string;
   circuits: CircuitResult[];
   busbar: BusbarResult;
   enclosure: EnclosureResult;

@@ -29,6 +29,7 @@ import type {
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
 import { panelGaSvg, panelPointsSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
+import { panelLabel } from '@shared/labels';
 import {
   buildSystemBom,
   consolidateBom,
@@ -383,7 +384,7 @@ function panelDocDefinition(
     pageMargins: [36, 36, 36, 48],
     content: [
       ...titleBlock(project, 'Panel Report'),
-      heading(`Panel: ${panel.name}`),
+      heading(`Panel: ${panelLabel(panel)}`),
       panelSpecTable(panel),
       heading('Circuit Schedule'),
       circuitScheduleTable(panel),
@@ -428,7 +429,7 @@ function systemDocDefinition(
   for (const panelId of system.order) {
     const panel = system.panels[panelId];
     if (!panel) continue;
-    content.push(heading(`Panel: ${panel.name}`));
+    content.push(heading(`Panel: ${panelLabel(panel)}`));
     content.push(panelSpecTable(panel));
     content.push({ text: 'Circuit Schedule', style: 'h2', margin: [0, 6, 0, 4] });
     content.push(circuitScheduleTable(panel));

@@ -264,6 +264,8 @@ export const en = {
 
   panel: {
     nameLabel: 'Panel name',
+    tagLabel: 'Panel tag',
+    tagPlaceholder: 'LP-1',
     namePlaceholder: 'e.g. LP-1 — Ground floor lighting',
     eyebrow: 'Panel editor',
     title: 'Panel editor',

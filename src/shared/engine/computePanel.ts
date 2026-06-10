@@ -384,6 +384,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   return {
     panelId: panel.id,
     name: panel.name,
+    ...(panel.tag ? { tag: panel.tag } : {}),
     circuits,
     busbar,
     enclosure,

@@ -61,7 +61,14 @@ export interface CircuitInput {
 
 export interface PanelInput {
   id: string;
+  /** Descriptive name, e.g. "Ground-floor lighting & power". */
   name: string;
+  /**
+   * Short panel designation / tag, e.g. "LP-1", "MDP", "MCC-2". Optional; when
+   * set it labels the panel alongside the descriptive name in schedules, the
+   * SLD, the drawings and the PDF.
+   */
+  tag?: string;
   system: SystemType;
   voltageV: number;
   ambientTempC: number;
