@@ -1,10 +1,134 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge, Card, Group, Stack, Table, Text, TextInput, Title } from '@mantine/core';
-import { IconSearch } from '@tabler/icons-react';
+import {
+  Badge,
+  Card,
+  Group,
+  NumberInput,
+  Select,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { IconListSearch, IconSearch } from '@tabler/icons-react';
 import type { Part } from '@shared/types';
+import { matchCatalog } from '@shared/engine/catalogMatch';
+import type { CatalogDeviceKind } from '@shared/data/manufacturers/types';
 import { formatIdr } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
+
+/** Device kinds offered by the manufacturer-family finder. */
+const FINDER_KINDS: { value: CatalogDeviceKind; label: string }[] = [
+  { value: 'mcb', label: 'MCB' },
+  { value: 'mccb', label: 'MCCB' },
+  { value: 'contactor', label: 'Contactor (AC-3)' },
+  { value: 'overload_relay', label: 'Overload relay' },
+  { value: 'rccb', label: 'RCCB' },
+  { value: 'spd', label: 'SPD' },
+];
+
+/**
+ * Manufacturer product-family finder: pick a device kind + required rating and
+ * see which Schneider / ABB / Chint / LS series covers it. Representative data —
+ * exact catalogue numbers and prices must be verified against the datasheet.
+ */
+function FamilyFinder() {
+  const { t } = useTranslation();
+  const [kind, setKind] = useState<CatalogDeviceKind>('mcb');
+  const [ratingA, setRatingA] = useState<number | string>(32);
+  const [minKa, setMinKa] = useState<number | string>('');
+
+  const matches = useMemo(() => {
+    if (typeof ratingA !== 'number' || ratingA <= 0) return [];
+    return matchCatalog(kind, ratingA, {
+      minBreakingKa: typeof minKa === 'number' && minKa > 0 ? minKa : undefined,
+    });
+  }, [kind, ratingA, minKa]);
+
+  return (
+    <Card withBorder radius="md" padding="md">
+      <Group gap="xs" mb="xs">
+        <IconListSearch size={18} color="var(--mantine-color-indigo-6)" />
+        <Text fw={600}>{t('parts.finderTitle')}</Text>
+      </Group>
+      <Text size="xs" c="dimmed" mb="sm">
+        {t('parts.finderHint')}
+      </Text>
+      <Group gap="md" align="flex-end" mb="sm" wrap="wrap">
+        <Select
+          label={t('parts.finderKind')}
+          data={FINDER_KINDS}
+          value={kind}
+          allowDeselect={false}
+          onChange={(v) => v && setKind(v as CatalogDeviceKind)}
+          w={180}
+        />
+        <NumberInput
+          label={t('parts.finderRating')}
+          value={ratingA}
+          onChange={setRatingA}
+          min={1}
+          suffix=" A"
+          w={140}
+        />
+        <NumberInput
+          label={t('parts.finderMinKa')}
+          value={minKa}
+          onChange={setMinKa}
+          min={0}
+          suffix=" kA"
+          w={140}
+          placeholder="—"
+        />
+      </Group>
+      {matches.length === 0 ? (
+        <Text size="sm" c="dimmed">
+          {t('parts.finderNoMatch')}
+        </Text>
+      ) : (
+        <Table.ScrollContainer minWidth={640}>
+          <Table verticalSpacing="xs" highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('parts.manufacturer')}</Table.Th>
+                <Table.Th>{t('parts.finderSeries')}</Table.Th>
+                <Table.Th>{t('parts.finderPick')}</Table.Th>
+                <Table.Th>{t('parts.finderBreaking')}</Table.Th>
+                <Table.Th>{t('parts.orderCode')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {matches.map((m) => (
+                <Table.Tr key={`${m.family.manufacturer}:${m.family.series}`}>
+                  <Table.Td>{m.family.manufacturer}</Table.Td>
+                  <Table.Td>
+                    <Text size="sm" fw={500}>
+                      {m.family.series}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>{m.ratingA} A</Table.Td>
+                  <Table.Td>
+                    {m.family.breakingKa !== undefined ? `${m.family.breakingKa} kA` : '—'}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" ff="monospace" c="dimmed">
+                      {m.family.orderCodeHint ?? '—'}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      )}
+      <Text size="xs" c="dimmed" mt="xs">
+        {t('parts.finderDisclaimer')}
+      </Text>
+    </Card>
+  );
+}
 
 /** The order code / SKU of a part, when it carries one. */
 function skuOf(part: Part): string | undefined {
@@ -73,6 +197,8 @@ export function PartsCatalog() {
           w={320}
         />
       </Group>
+
+      <FamilyFinder />
 
       {grouped.size === 0 && (
         <Text c="dimmed" ta="center" py="xl">

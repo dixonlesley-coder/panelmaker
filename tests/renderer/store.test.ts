@@ -155,6 +155,97 @@ describe('projectStore', () => {
     expect(useProjectStore.getState().past.length).toBe(2);
   });
 
+  describe('importPanels (load-list import)', () => {
+    it('appends panels with remapped ids and fixed-up feeder references (undoable)', () => {
+      const start = useProjectStore.getState().project.panels.length;
+      useProjectStore.getState().importPanels([
+        {
+          id: 'panel-1',
+          name: 'Imported main',
+          system: '3ph',
+          voltageV: 400,
+          ambientTempC: 30,
+          installMethod: 'conduit',
+          groupingCount: 1,
+          diversityFactor: 0.8,
+          sourceType: 'utility',
+          circuits: [
+            {
+              id: 'c-1',
+              name: 'Feeder to sub',
+              role: 'branch',
+              loadW: 0,
+              cosPhi: 0.85,
+              lengthM: 20,
+              loadKind: 'feeder',
+              isLighting: false,
+              demandFactor: 1,
+              feedsPanelId: 'panel-2',
+            },
+          ],
+        },
+        {
+          id: 'panel-2',
+          name: 'Imported sub',
+          system: '3ph',
+          voltageV: 400,
+          ambientTempC: 30,
+          installMethod: 'conduit',
+          groupingCount: 1,
+          diversityFactor: 0.8,
+          sourceType: 'feeder',
+          fedByCircuitId: 'c-1',
+          circuits: [
+            {
+              id: 'c-2',
+              name: 'Load A',
+              role: 'branch',
+              loadW: 5000,
+              cosPhi: 0.85,
+              lengthM: 15,
+              loadKind: 'general',
+              isLighting: false,
+              demandFactor: 1,
+            },
+          ],
+        },
+      ]);
+
+      const project = useProjectStore.getState().project;
+      expect(project.panels.length).toBe(start + 2);
+      const main = project.panels[project.panels.length - 2]!;
+      const sub = project.panels[project.panels.length - 1]!;
+      // ids are remapped away from the generated panel-N/c-N values...
+      expect(main.id).not.toBe('panel-1');
+      expect(sub.id).not.toBe('panel-2');
+      expect(main.circuits[0]!.id).not.toBe('c-1');
+      // ...and the feeder cross-references follow the remap consistently.
+      expect(main.circuits[0]!.feedsPanelId).toBe(sub.id);
+      expect(sub.fedByCircuitId).toBe(main.circuits[0]!.id);
+      // every id in the project stays unique
+      const allIds = [
+        ...project.panels.map((p) => p.id),
+        ...project.panels.flatMap((p) => p.circuits.map((c) => c.id)),
+      ];
+      expect(new Set(allIds).size).toBe(allIds.length);
+
+      useProjectStore.getState().undo();
+      expect(useProjectStore.getState().project.panels.length).toBe(start);
+    });
+  });
+
+  it('setSiteConditions merges patches and is undoable', () => {
+    useProjectStore.getState().setSiteConditions({ externalLps: true });
+    expect(useProjectStore.getState().project.site?.externalLps).toBe(true);
+    useProjectStore.getState().setSiteConditions({ soilResistivityOhmM: 500 });
+    expect(useProjectStore.getState().project.site).toEqual({
+      externalLps: true,
+      soilResistivityOhmM: 500,
+    });
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.site?.soilResistivityOhmM).toBeUndefined();
+  });
+
   describe('undo / redo', () => {
     it('undo restores the previous project; redo re-applies the edit', () => {
       const { project, updatePanel } = useProjectStore.getState();

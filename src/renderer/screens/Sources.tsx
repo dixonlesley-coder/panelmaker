@@ -140,6 +140,27 @@ export function Sources() {
                 ]}
               />
             )}
+            {res?.gensetStart && res.gensetStart.startingKva > 0 && (
+              <ResultBlock
+                note={res.gensetStart.note}
+                stats={[
+                  [
+                    t('sources.startDip'),
+                    `${res.gensetStart.estimatedDipPct}% ${
+                      res.gensetStart.acceptable
+                        ? t('sources.startDipOk')
+                        : t('sources.startDipHigh')
+                    }`,
+                  ],
+                  [t('sources.startKva'), `${res.gensetStart.startingKva} kVA`],
+                  [
+                    t('sources.limitingMotor'),
+                    res.gensetStart.limitingMotorName ?? '—',
+                  ],
+                  [t('sources.minGensetForStart'), `${res.gensetStart.recommendedMinGensetKva} kVA`],
+                ]}
+              />
+            )}
           </>
         )}
       </Card>

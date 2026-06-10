@@ -38,6 +38,8 @@ import {
   IconSitemap,
   IconSolarPanel,
   IconStack2,
+  IconTableExport,
+  IconTableImport,
   IconTags,
 } from '@tabler/icons-react';
 import type { CostResult, ProjectInput, SystemResult } from '@shared/types';
@@ -46,6 +48,9 @@ import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
 import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
+import { downloadCsv } from '@renderer/lib/download';
+import { cableScheduleCsv } from '@shared/io/scheduleExport';
+import { parseLoadList } from '@shared/io/loadListImport';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -148,6 +153,7 @@ export function SystemView() {
   const setScreen = useProjectStore((s) => s.setScreen);
   const addPanel = useProjectStore((s) => s.addPanel);
   const addPanelFromTemplate = useProjectStore((s) => s.addPanelFromTemplate);
+  const importPanels = useProjectStore((s) => s.importPanels);
 
   const system = useSystemResult();
   const { nodes, edges } = useMemo(() => buildGraph(project, system), [project, system]);
@@ -167,6 +173,43 @@ export function SystemView() {
     setActivePanel(panelId);
     setScreen('panel');
   };
+
+  /** Pick a CSV load list, parse it leniently, and append its panels (undoable). */
+  function onImportLoadList() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.style.display = 'none';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return;
+      void file.text().then((text) => {
+        const { panels, warnings } = parseLoadList(text);
+        if (panels.length === 0) {
+          notifications.show({ message: t('system.loadListEmpty'), color: 'red' });
+          return;
+        }
+        importPanels(panels);
+        const circuitCount = panels.reduce((n, p) => n + p.circuits.length, 0);
+        notifications.show({
+          message: t('system.loadListImported', { panels: panels.length, circuits: circuitCount }),
+          color: 'teal',
+        });
+        for (const w of warnings.slice(0, 5)) {
+          notifications.show({ message: w, color: 'yellow' });
+        }
+        if (warnings.length > 5) {
+          notifications.show({
+            message: t('system.loadListMoreWarnings', { count: warnings.length - 5 }),
+            color: 'yellow',
+          });
+        }
+      });
+    });
+    document.body.appendChild(input);
+    input.click();
+  }
 
   const notify = (res: { ok: boolean; reason?: string; message: string }) =>
     notifications.show({
@@ -243,6 +286,25 @@ export function SystemView() {
             onClick={async () => notify(await exportLabelsPdf(project))}
           >
             {t('system.exportLabels')}
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconTableExport size={14} />}
+            onClick={() => {
+              downloadCsv(`${project.name} - cable schedule.csv`, cableScheduleCsv(system));
+              notifications.show({ message: t('system.cableScheduleExported'), color: 'teal' });
+            }}
+          >
+            {t('system.exportCableSchedule')}
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconTableImport size={14} />}
+            onClick={onImportLoadList}
+          >
+            {t('system.importLoadList')}
           </Button>
         </Group>
       </Group>

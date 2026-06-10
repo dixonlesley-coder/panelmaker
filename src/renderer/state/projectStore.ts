@@ -12,6 +12,7 @@ import type {
   SchematicRung,
   SchematicSymbol,
   SchematicSymbolType,
+  SiteConditions,
   SourcesConfig,
   SuggestedFix,
 } from '@shared/types';
@@ -31,6 +32,7 @@ export type Screen =
   | 'system'
   | 'dashboard'
   | 'panel'
+  | 'coordination'
   | 'parts'
   | 'pricelist'
   | 'quotation'
@@ -138,6 +140,19 @@ export interface ProjectState {
   // earthing
   /** Set the installation earthing system. */
   setEarthingSystem: (system: EarthingSystem) => void;
+
+  // site conditions (lightning exposure / soil) — drive SPD + electrode design
+  /** Merge a partial site-conditions patch into the project. */
+  setSiteConditions: (patch: Partial<SiteConditions>) => void;
+
+  // load-list import
+  /**
+   * Append imported panels (e.g. from a CSV load list) to the project as one
+   * undoable step. Panel/circuit ids are remapped to fresh runtime ids so a
+   * re-import (or generated `panel-1`-style ids) can never collide with
+   * existing ones.
+   */
+  importPanels: (panels: PanelInput[]) => void;
 
   // branding / title-block metadata
   /** Merge a partial branding/title-block metadata patch into the project. */
@@ -542,6 +557,49 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setEarthingSystem: (system) =>
     set((s) => withHistory(s, (project) => ({ ...project, earthingSystem: system }))),
+
+  setSiteConditions: (patch) =>
+    set((s) =>
+      withHistory(
+        s,
+        (project) => ({ ...project, site: { ...project.site, ...patch } }),
+        `site:${Object.keys(patch).sort().join('+')}`,
+      ),
+    ),
+
+  importPanels: (panels) =>
+    set((s) => {
+      if (panels.length === 0) return s;
+      // Remap every panel/circuit id to a fresh runtime id, fixing up the
+      // feeder cross-references (feedsPanelId / fedByCircuitId) consistently.
+      const panelIdMap = new Map(panels.map((p) => [p.id, nextId('P')]));
+      const circuitIdMap = new Map(
+        panels.flatMap((p) => p.circuits.map((c) => [c.id, nextId('c')] as const)),
+      );
+      const remapped = panels.map((p) => ({
+        ...p,
+        id: panelIdMap.get(p.id)!,
+        fedByCircuitId:
+          p.fedByCircuitId !== undefined
+            ? (circuitIdMap.get(p.fedByCircuitId) ?? p.fedByCircuitId)
+            : undefined,
+        circuits: p.circuits.map((c) => ({
+          ...c,
+          id: circuitIdMap.get(c.id)!,
+          feedsPanelId:
+            c.feedsPanelId !== undefined
+              ? (panelIdMap.get(c.feedsPanelId) ?? c.feedsPanelId)
+              : undefined,
+        })),
+      }));
+      return {
+        ...withHistory(s, (project) => ({
+          ...project,
+          panels: [...project.panels, ...remapped],
+        })),
+        activePanelId: remapped[0]!.id,
+      };
+    }),
 
   setProjectMeta: (patch) =>
     set((s) =>

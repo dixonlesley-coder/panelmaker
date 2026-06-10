@@ -8,6 +8,7 @@ import {
   IconSitemap,
   IconGauge,
   IconAdjustmentsBolt,
+  IconChartLine,
   IconBox,
   IconReceipt,
   IconReceipt2,
@@ -32,6 +33,7 @@ import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
 import { Dashboard } from '@renderer/screens/Dashboard';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
+import { Coordination } from '@renderer/screens/Coordination';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
 import { Quotation } from '@renderer/screens/Quotation';
@@ -53,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
   { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
   { screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> },
   { screen: 'panel', labelKey: 'nav.panel', icon: <IconAdjustmentsBolt size={18} /> },
+  { screen: 'coordination', labelKey: 'nav.coordination', icon: <IconChartLine size={18} /> },
   { screen: 'parts', labelKey: 'nav.parts', icon: <IconBox size={18} /> },
   { screen: 'pricelist', labelKey: 'nav.pricelist', icon: <IconReceipt size={18} /> },
   { screen: 'quotation', labelKey: 'nav.quotation', icon: <IconReceipt2 size={18} /> },
@@ -166,6 +169,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
       return <Dashboard />;
     case 'panel':
       return <PanelEditor />;
+    case 'coordination':
+      return <Coordination />;
     case 'parts':
       return <PartsCatalog />;
     case 'pricelist':

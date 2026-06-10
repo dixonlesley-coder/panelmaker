@@ -3,12 +3,14 @@ import {
   Alert,
   Button,
   Card,
+  Divider,
   Group,
   Image,
   NumberInput,
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   Title,
@@ -25,6 +27,7 @@ import {
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { EARTHING_SYSTEMS } from '@shared/standards';
+import { SOIL_TYPES } from '@shared/standards/soil';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
@@ -61,6 +64,7 @@ export function Settings() {
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const setEarthingSystem = useProjectStore((s) => s.setEarthingSystem);
   const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
+  const setSiteConditions = useProjectStore((s) => s.setSiteConditions);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
   const meta = project.meta ?? {};
@@ -339,6 +343,86 @@ export function Settings() {
         <Text size="xs" c="dimmed">
           {earthing.note}
         </Text>
+
+        {/* Site conditions: lightning exposure + soil — drive the SPD + electrode design. */}
+        <Divider my="md" label={t('settings.siteConditions')} labelPosition="left" />
+        <Group gap="lg" mb="sm" align="flex-end" wrap="wrap">
+          <Switch
+            label={t('settings.externalLps')}
+            description={t('settings.externalLpsHint')}
+            checked={project.site?.externalLps ?? false}
+            onChange={(e) => setSiteConditions({ externalLps: e.currentTarget.checked })}
+          />
+          <Switch
+            label={t('settings.overheadSupply')}
+            description={t('settings.overheadSupplyHint')}
+            checked={project.site?.overheadSupply ?? false}
+            onChange={(e) => setSiteConditions({ overheadSupply: e.currentTarget.checked })}
+          />
+          <Select
+            label={t('settings.soilType')}
+            description={t('settings.soilTypeHint')}
+            data={SOIL_TYPES.map((s) => ({
+              value: String(s.resistivityOhmM),
+              label: `${s.label} (${s.resistivityOhmM} Ω·m)`,
+            }))}
+            value={String(project.site?.soilResistivityOhmM ?? 100)}
+            allowDeselect={false}
+            onChange={(v) => v && setSiteConditions({ soilResistivityOhmM: Number(v) })}
+            maw={320}
+          />
+        </Group>
+
+        {system.spd && (
+          <>
+            <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
+              <KeyStat k={t('settings.spdType')} v={system.spd.type} />
+              <KeyStat k={t('settings.spdUc')} v={`Uc ${system.spd.ucV} V`} />
+              <KeyStat
+                k={t('settings.spdRating')}
+                v={
+                  system.spd.iimpKa !== undefined
+                    ? `Iimp ${system.spd.iimpKa} kA (10/350)`
+                    : `In ${system.spd.inKa ?? '—'} kA / Imax ${system.spd.imaxKa ?? '—'} kA`
+                }
+              />
+              <KeyStat k={t('settings.spdUp')} v={`Up ≤ ${system.spd.upKvMax} kV`} />
+            </SimpleGrid>
+            <Text size="xs" c="dimmed" mb="xs">
+              {system.spd.note}
+            </Text>
+          </>
+        )}
+
+        {earthing.electrode && (
+          <>
+            <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
+              <KeyStat
+                k={t('settings.electrodeRods')}
+                v={`${earthing.electrode.rodCount} × ${earthing.electrode.rodLengthM} m`}
+              />
+              <KeyStat
+                k={t('settings.electrodeAchieved')}
+                v={`${earthing.electrode.achievedOhm.toFixed(1)} Ω`}
+              />
+              <KeyStat
+                k={t('settings.electrodeSoil')}
+                v={`${earthing.electrode.soilResistivityOhmM} Ω·m`}
+              />
+              <KeyStat
+                k={t('settings.electrodeStatus')}
+                v={
+                  earthing.electrode.meetsTarget
+                    ? t('settings.electrodeOk')
+                    : t('settings.electrodeShort')
+                }
+              />
+            </SimpleGrid>
+            <Text size="xs" c="dimmed">
+              {earthing.electrode.note}
+            </Text>
+          </>
+        )}
       </Card>
 
       {isDesktop() && license && (

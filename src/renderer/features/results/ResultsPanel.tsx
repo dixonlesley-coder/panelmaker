@@ -420,9 +420,16 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
-          <Text fw={600} size="sm" mb="xs">
-            {t('results.busbar')}
-          </Text>
+          <Group justify="space-between" mb="xs">
+            <Text fw={600} size="sm">
+              {t('results.busbar')}
+            </Text>
+            {bus.withstand && (
+              <Badge size="sm" variant="light" color={bus.withstand.adequate ? 'teal' : 'red'}>
+                {t('results.busbarIcw', { icw: bus.withstand.icwKa, fault: bus.withstand.faultKa })}
+              </Badge>
+            )}
+          </Group>
           <Stack gap={4}>
             <KeyVal
               k={t('results.busbarSection')}
@@ -430,13 +437,44 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
             />
             <KeyVal k={t('results.busbarAmpacity')} v={formatAmps(bus.ampacityA)} />
             <KeyVal k={t('results.busbarTotalCurrent')} v={formatAmps(bus.totalCurrentA)} />
+            {bus.withstand && (
+              <KeyVal
+                k={t('results.busbarPeak')}
+                v={`${bus.withstand.ipkKa} kA (n=${bus.withstand.peakFactor})`}
+              />
+            )}
+            {result.spare && (
+              <KeyVal
+                k={t('results.spareCapacity')}
+                v={t('results.spareValue', {
+                  pct: result.spare.busbarHeadroomPct,
+                  ways: result.spare.recommendedSpareWays,
+                })}
+              />
+            )}
           </Stack>
         </Card>
 
         <Card withBorder radius="md" padding="md">
-          <Text fw={600} size="sm" mb="xs">
-            {t('results.enclosure')}
-          </Text>
+          <Group justify="space-between" mb="xs">
+            <Text fw={600} size="sm">
+              {t('results.enclosure')}
+            </Text>
+            {enc.thermal && (
+              <Group gap={4}>
+                <Badge
+                  size="sm"
+                  variant="light"
+                  color={enc.thermal.withinLimit ? 'teal' : 'orange'}
+                >
+                  {t('results.encRise', { k: enc.thermal.tempRiseK })}
+                </Badge>
+                <Badge size="sm" variant="light" color="gray">
+                  {enc.thermal.ip.code}
+                </Badge>
+              </Group>
+            )}
+          </Group>
           <Stack gap={4}>
             <KeyVal
               k={t('results.encDimensions')}
@@ -448,6 +486,14 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
               k={t('results.encCooling')}
               v={`${enc.ventilation} · ${enc.totalHeatW.toFixed(0)} W`}
             />
+            {enc.thermal && (
+              <KeyVal
+                k={t('results.encInternalTemp')}
+                v={`≈ ${enc.thermal.internalTempC} °C${
+                  enc.thermal.ventilationRecommended ? ` — ${t('results.encVentRecommended')}` : ''
+                }`}
+              />
+            )}
           </Stack>
         </Card>
       </SimpleGrid>
