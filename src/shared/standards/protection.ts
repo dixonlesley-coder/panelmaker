@@ -50,6 +50,21 @@ export function recommendedCurve(loadKind: 'lighting' | 'general' | 'motor'): Br
  */
 export const COPPER_CURRENT_DENSITY_A_PER_MM2 = 1.3;
 
+/**
+ * Maximum number of outgoing ways tapped off a single busbar section before the
+ * panel bus is split into another section (another busbar line). A practical
+ * way-count limit for a distribution-board bus riser / section block, after which
+ * gear is split onto a second bar rather than crowding one.
+ */
+export const MAX_WAYS_PER_BUSBAR = 12;
+
+/**
+ * Maximum continuous current one busbar section carries before it is split into
+ * another section (A). Keeps a single bar within a sensible thermal/mechanical
+ * envelope; beyond it the load is divided across additional sections/risers.
+ */
+export const MAX_BUSBAR_SECTION_CURRENT_A = 800;
+
 export interface BusbarSize {
   /** Bar width (mm). */
   widthMm: number;

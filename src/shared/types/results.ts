@@ -170,6 +170,25 @@ export interface BusbarResult {
   withstand?: BusbarWithstandResult;
 }
 
+/**
+ * One section of a panel's busbar. A panel bus is divided into capacity-bounded
+ * sections (max ways / max current per {@link MAX_WAYS_PER_BUSBAR}); each section
+ * is a separate bar carrying a bounded group of outgoing ways. Renderers draw one
+ * bar per section instead of a single giant bus.
+ */
+export interface BusbarSectionResult {
+  /** 1-based section number within the panel. */
+  index: number;
+  /** Circuit ids tapped off this section, in panel order. */
+  circuitIds: string[];
+  /** Number of outgoing ways on this section. */
+  ways: number;
+  /** Worst-phase line current this section carries (A). */
+  sectionCurrentA: number;
+  /** The bar sized for this section's current. */
+  busbar: BusbarResult;
+}
+
 /** Future-expansion headroom on a panel's busbar and ways. */
 export interface SpareCapacityResult {
   /** Busbar continuous-current headroom over the present demand (%). */
@@ -329,6 +348,12 @@ export interface PanelResult {
   tag?: string;
   circuits: CircuitResult[];
   busbar: BusbarResult;
+  /**
+   * The panel bus split into capacity-bounded sections (always ≥ 1). With few
+   * ways this is a single section equal to {@link busbar}; once a section hits the
+   * way / current cap the engine starts another, so renderers draw extra bars.
+   */
+  busbarSections: BusbarSectionResult[];
   enclosure: EnclosureResult;
   totalConnectedLoadW: number;
   totalDemandCurrentA: number;

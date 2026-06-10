@@ -434,6 +434,8 @@ export const en = {
     busbarSection: 'Section',
     busbarAmpacity: 'Ampacity',
     busbarTotalCurrent: 'Total current',
+    busbarSplit: 'Bus sections',
+    busbarSplitValue: '{{count}} sections · ≤{{ways}} ways each',
     enclosure: 'Enclosure',
     encDimensions: 'Dimensions',
     encSheet: 'Sheet',
@@ -795,6 +797,9 @@ export const en = {
     overrideApplied: 'Manual {{value}} pinned — shown violet; compliance is checked, not auto-corrected.',
     dropOnCircuit: 'Drop the override onto a specific circuit card.',
     overrideHint: 'Drag onto a circuit to pin it (shown violet).',
+    busbar: 'Busbar',
+    busbarSection: 'Busbar §{{index}}',
+    waysCount: '{{count}} ways',
   },
   circuitEditor: {
     design: 'Design current',

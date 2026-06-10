@@ -17,6 +17,12 @@ export interface IncomerNodeData {
 export interface BusbarNodeData {
   label: string;
   ampacity: string;
+  /** Bar width in px (defaults to a single full-width bar). */
+  widthPx?: number;
+  /** Pre-localised "N ways" label, shown when the bus is split into sections. */
+  waysLabel?: string;
+  /** True when this section's bar fails the short-circuit withstand check. */
+  inadequate?: boolean;
   [key: string]: unknown;
 }
 
@@ -81,27 +87,38 @@ export function IncomerNode({ data }: NodeProps) {
   );
 }
 
-/** Busbar: a wide bar all branches hang off. */
+/** Busbar: a wide bar all branches in its section hang off. */
 export function BusbarNode({ data }: NodeProps) {
   const d = data as BusbarNodeData;
   return (
     <Box
       style={{
-        width: 620,
-        background: 'var(--mantine-color-indigo-6)',
+        width: d.widthPx ?? 620,
+        background: d.inadequate ? 'var(--mantine-color-red-7)' : 'var(--mantine-color-indigo-6)',
         color: 'white',
         borderRadius: 4,
         padding: '4px 10px',
       }}
     >
-      <Group justify="space-between">
-        <Text size="xs" fw={700}>
+      <Group justify="space-between" wrap="nowrap" gap={8}>
+        <Text size="xs" fw={700} lineClamp={1}>
           {d.label}
         </Text>
-        <Text size="xs">{d.ampacity}</Text>
+        <Group gap={8} wrap="nowrap">
+          {d.waysLabel && (
+            <Text size="xs" style={{ opacity: 0.85 }}>
+              {d.waysLabel}
+            </Text>
+          )}
+          <Text size="xs">{d.ampacity}</Text>
+        </Group>
       </Group>
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      {/* Top: fed from the incomer (section 0). Left: chained from the previous
+          section's bar (the bus riser). Bottom: down to this section's branches. */}
+      <Handle type="target" position={Position.Top} id="top" />
+      <Handle type="target" position={Position.Left} id="lin" style={{ top: '35%' }} />
+      <Handle type="source" position={Position.Left} id="lout" style={{ top: '65%' }} />
+      <Handle type="source" position={Position.Bottom} id="bottom" />
     </Box>
   );
 }

@@ -237,7 +237,7 @@ function fingerprint(result: PanelResult): PanelFingerprint {
   }
   return {
     circuits,
-    busbar: `${result.busbar.csaMm2}|${result.busbar.ampacityA}`,
+    busbar: `${result.busbar.csaMm2}|${result.busbar.ampacityA}|${result.busbarSections.length}`,
     incomerA: result.totalDemandCurrentA,
   };
 }
@@ -275,6 +275,16 @@ const BRANCH_W = 160;
 const BRANCH_GAP = 24;
 const BUSBAR_Y = 110;
 const BRANCH_Y = 200;
+/** Vertical pitch between consecutive busbar sections (bar + its branch row). */
+const SECTION_DY = 270;
+
+/** Minimal translate signature buildGraph needs (avoids an i18next type import). */
+type TFn = (key: string, options?: Record<string, unknown>) => string;
+
+/** Width (px) a busbar bar spans for a section carrying `ways` branches. */
+function sectionWidthPx(ways: number): number {
+  return Math.max(ways, 1) * (BRANCH_W + BRANCH_GAP) - BRANCH_GAP;
+}
 
 function sourceNodeLines(kind: SourceKind, sized: SourcesResult | undefined): string[] {
   if (kind === 'solar' && sized?.solar) return [`${sized.solar.arrayKwp} kWp`, `Inv ${sized.solar.inverterKw} kW`];
@@ -292,11 +302,13 @@ function buildGraph(
   onOverride: (circuitId: string, kind: 'breaker' | 'cable', value: number) => void,
   enabledSources: SourceKind[],
   sizedSources: SourcesResult | undefined,
+  t: TFn,
 ): { nodes: Node[]; edges: Edge[] } {
-  const branches = result.circuits;
-  const totalWidth = Math.max(branches.length, 1) * (BRANCH_W + BRANCH_GAP) - BRANCH_GAP;
-  const busbarCenterX = totalWidth / 2;
-  const incomerX = busbarCenterX - 90;
+  const sections = result.busbarSections;
+  const multi = sections.length > 1;
+  const byId = new Map(result.circuits.map((c) => [c.circuitId, c] as const));
+  const widest = Math.max(...sections.map((s) => sectionWidthPx(s.ways)), BRANCH_W);
+  const incomerX = widest / 2 - 90;
 
   const nodes: Node[] = [
     {
@@ -309,21 +321,8 @@ function buildGraph(
       },
       draggable: false,
     },
-    {
-      id: 'busbar',
-      type: 'busbar',
-      position: { x: busbarCenterX - 310, y: BUSBAR_Y },
-      data: {
-        label: 'Busbar',
-        ampacity: `${formatAmps(result.busbar.ampacityA)} · ${result.busbar.widthMm}×${result.busbar.thicknessMm} mm`,
-      },
-      draggable: false,
-    },
   ];
-
-  const edges: Edge[] = [
-    { id: 'e-incomer-busbar', source: 'incomer', target: 'busbar', type: 'smoothstep' },
-  ];
+  const edges: Edge[] = [];
 
   // Distributed energy sources sit above the incomer and feed into it.
   const SRC_GAP = 168;
@@ -351,36 +350,81 @@ function buildGraph(
     });
   });
 
-  branches.forEach((c, i) => {
-    const x = i * (BRANCH_W + BRANCH_GAP);
-    const input = panel.circuits.find((ci) => ci.id === c.circuitId);
-    const data: BranchNodeData = {
-      name: c.name,
-      breaker: `${c.breaker.deviceClass} ${c.breaker.ratingA}A/${c.breaker.curve}`,
-      cable: `${c.cable.csaMm2} mm²`,
-      starter: c.control?.starterType.replace('_', '-'),
-      warn: !c.voltageDrop.withinLimit,
-      changed: changes.get(c.circuitId),
-      breakerOverridden: c.breaker.overridden === true,
-      cableOverridden: input?.cableOverrideMm2 !== undefined,
-      utilPct:
-        c.cable.deratedIzA > 0
-          ? Math.round((c.designCurrentA / c.cable.deratedIzA) * 100)
-          : undefined,
-      onDropOverride: (kind, value) => onOverride(c.circuitId, kind, value),
-    };
-    nodes.push({ id: c.circuitId, type: 'branch', position: { x, y: BRANCH_Y }, data, draggable: false });
-    edges.push({
-      id: `e-busbar-${c.circuitId}`,
-      source: 'busbar',
-      target: c.circuitId,
-      type: 'smoothstep',
-      animated: changes.has(c.circuitId),
-      style: data.warn
-        ? { stroke: 'var(--mantine-color-red-5)' }
-        : changes.has(c.circuitId)
-          ? { stroke: 'var(--mantine-color-teal-5)' }
-          : undefined,
+  // One busbar bar per section, stacked vertically, each carrying its own ways.
+  // The incomer feeds section 0; each later section is chained off the previous
+  // bar's left handle (the bus riser), so the split reads as extra busbar lines.
+  sections.forEach((section, k) => {
+    const busbarY = BUSBAR_Y + k * SECTION_DY;
+    const branchY = busbarY + (BRANCH_Y - BUSBAR_Y);
+    const busId = `busbar-${k}`;
+    const inadequate = section.busbar.withstand ? !section.busbar.withstand.adequate : false;
+    nodes.push({
+      id: busId,
+      type: 'busbar',
+      position: { x: -10, y: busbarY },
+      data: {
+        label: multi ? t('vbuilder.busbarSection', { index: section.index }) : t('vbuilder.busbar'),
+        ampacity: `${formatAmps(section.busbar.ampacityA)} · ${section.busbar.widthMm}×${section.busbar.thicknessMm} mm`,
+        widthPx: sectionWidthPx(section.ways) + 20,
+        waysLabel: multi ? t('vbuilder.waysCount', { count: section.ways }) : undefined,
+        inadequate,
+      },
+      draggable: false,
+    });
+    if (k === 0) {
+      edges.push({
+        id: 'e-incomer-busbar-0',
+        source: 'incomer',
+        target: busId,
+        targetHandle: 'top',
+        type: 'smoothstep',
+      });
+    } else {
+      edges.push({
+        id: `e-riser-${k}`,
+        source: `busbar-${k - 1}`,
+        sourceHandle: 'lout',
+        target: busId,
+        targetHandle: 'lin',
+        type: 'smoothstep',
+        style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
+      });
+    }
+
+    section.circuitIds.forEach((cid, j) => {
+      const c = byId.get(cid);
+      if (!c) return;
+      const x = j * (BRANCH_W + BRANCH_GAP);
+      const input = panel.circuits.find((ci) => ci.id === cid);
+      const data: BranchNodeData = {
+        name: c.name,
+        breaker: `${c.breaker.deviceClass} ${c.breaker.ratingA}A/${c.breaker.curve}`,
+        cable: `${c.cable.csaMm2} mm²`,
+        starter: c.control?.starterType.replace('_', '-'),
+        warn: !c.voltageDrop.withinLimit,
+        changed: changes.get(cid),
+        breakerOverridden: c.breaker.overridden === true,
+        cableOverridden: input?.cableOverrideMm2 !== undefined,
+        utilPct:
+          c.cable.deratedIzA > 0
+            ? Math.round((c.designCurrentA / c.cable.deratedIzA) * 100)
+            : undefined,
+        onDropOverride: (kind, value) => onOverride(cid, kind, value),
+      };
+      nodes.push({ id: cid, type: 'branch', position: { x, y: branchY }, data, draggable: false });
+      edges.push({
+        id: `e-busbar-${cid}`,
+        source: busId,
+        sourceHandle: 'bottom',
+        target: cid,
+        type: 'smoothstep',
+        animated: changes.has(cid),
+        style: data.warn
+          ? { stroke: 'var(--mantine-color-red-5)' }
+          : changes.has(cid)
+            ? { stroke: 'var(--mantine-color-teal-5)' }
+            : undefined,
+      });
     });
   });
 
@@ -558,9 +602,9 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   }, [result, panel.id]);
 
   const { nodes, edges } = useMemo(
-    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources),
+    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources, t),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panel, result, changes, enabledSources, sizedSources],
+    [panel, result, changes, enabledSources, sizedSources, t],
   );
 
   const onDrop = (e: React.DragEvent) => {
