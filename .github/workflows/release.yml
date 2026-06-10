@@ -98,6 +98,20 @@ jobs:
           # package.json "version"); otherwise just build.
           if [[ "${GITHUB_REF}" == refs/tags/v* || "${PUBLISH_INPUT:-}" == "true" ]]; then PUBLISH=always; else PUBLISH=never; fi
 
+          # A PUBLISHED release requires its tag to exist (GitHub 422s otherwise
+          # — drafts are the only tagless kind). On a manual publish, create and
+          # push the version tag here; pushes made with GITHUB_TOKEN do not
+          # re-trigger workflows, so this cannot recurse into the tag trigger.
+          if [[ "${PUBLISH}" == "always" && "${GITHUB_REF}" != refs/tags/* ]]; then
+            VERSION="$(node -p "require('./package.json').version")"
+            if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+              echo "Tag v${VERSION} already exists locally"
+            else
+              git tag "v${VERSION}"
+            fi
+            git push origin "v${VERSION}" || echo "Tag v${VERSION} already on remote"
+          fi
+
           # Code signing is OPTIONAL (internal-use deployment; certs need a paid
           # subscription). Unsigned publishing is allowed — but warn, because the
           # tradeoffs differ by platform:
