@@ -9,6 +9,7 @@
 import { app, type BrowserWindow } from 'electron';
 import electronUpdater from 'electron-updater';
 import { IPC, type UpdateStatus } from '@shared/ipc-contract';
+import { isBenignUpdateError } from './updaterErrors';
 
 const { autoUpdater } = electronUpdater;
 
@@ -59,9 +60,20 @@ export function initAutoUpdater(win: BrowserWindow): void {
   autoUpdater.on('update-downloaded', (info) =>
     send({ state: 'downloaded', version: info.version }),
   );
-  autoUpdater.on('error', (err) =>
-    send({ state: 'error', message: err == null ? 'unknown error' : err.message ?? String(err) }),
-  );
+  autoUpdater.on('error', (err) => {
+    const message = err == null ? 'unknown error' : (err.message ?? String(err));
+    // A failed background check (no release feed yet / offline / 404) is the
+    // expected state before a release is published — log it, don't alarm the user.
+    if (isBenignUpdateError(message)) {
+      // eslint-disable-next-line no-console
+      console.warn('[panelmaker] update check skipped (no release feed / offline):', message);
+      send({ state: 'not-available', version: app.getVersion() });
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.error('[panelmaker] update error:', message);
+    send({ state: 'error', message });
+  });
 
   // Initial check on launch, then every 6 hours.
   void autoUpdater.checkForUpdates().catch(() => undefined);
@@ -85,7 +97,13 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
     }
     return { state: 'not-available', version: app.getVersion() };
   } catch (e) {
-    return { state: 'error', message: (e as Error).message };
+    const message = (e as Error).message;
+    // No release feed / offline reads as "up to date" for a user-driven check,
+    // not a 404 stack trace.
+    if (isBenignUpdateError(message)) {
+      return { state: 'not-available', version: app.getVersion() };
+    }
+    return { state: 'error', message };
   }
 }
 

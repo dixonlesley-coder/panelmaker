@@ -430,7 +430,7 @@ export function SystemView() {
               minZoom={0.2}
               nodesConnectable={false}
               nodesDraggable={false}
-              onNodeClick={(_, node) => openPanel(node.id)}
+              onNodeDoubleClick={(_, node) => openPanel(node.id)}
             >
               <Background gap={18} />
               <Controls showInteractive={false} />

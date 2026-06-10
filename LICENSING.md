@@ -224,10 +224,18 @@ Recommended hardening:
 
 - **Code-sign** the application (Windows Authenticode, macOS notarization) so
   tampered binaries are detectable and SmartScreen/Gatekeeper warnings disappear.
-  The release workflow (`.github/workflows/release.yml`) wires this up and, for a
-  **published (tagged)** release, now **refuses to ship an unsigned Windows/macOS
-  installer** — because that artifact also feeds silent auto-update, where an
-  unverifiable binary would be applied to clients. Add the repo secrets to sign:
+  Signing is **optional** — for internal distribution the release workflow
+  (`.github/workflows/release.yml`) publishes **unsigned** and only **warns**.
+  Platform tradeoffs when unsigned:
+  - **Windows** — auto-update **works**; users get a one-time SmartScreen
+    "unknown publisher" prompt on first install. Fine for internal use.
+  - **macOS** — unsigned apps need a Gatekeeper right-click→Open, and
+    electron-updater **cannot auto-update** an unsigned/ad-hoc `.app`. Sign +
+    notarize if you distribute to Mac; otherwise prefer Windows/Linux artifacts.
+  - **Linux AppImage** — no signature gate regardless.
+  Updates only install on the user's explicit "Restart & update" click
+  (`autoInstallOnAppQuit = false`), so an unverified artifact is never auto-applied.
+  When you do have certs, add the repo secrets to sign:
   - Windows: `WINDOWS_CSC_LINK` (base64 of your `.pfx`) + `WINDOWS_CSC_KEY_PASSWORD`.
   - macOS signing: `MAC_CSC_LINK` (base64 of your Developer ID `.p12`) + `MAC_CSC_KEY_PASSWORD`.
   - macOS notarization: `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID`.

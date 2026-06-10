@@ -33,7 +33,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # Internal deployment is Windows-only. Add macos-latest / ubuntu-latest
+        # back here if you ever distribute to those platforms (sign macOS first).
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -85,14 +87,18 @@ jobs:
           # Publish to a GitHub Release only on a version tag; otherwise just build.
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then PUBLISH=always; else PUBLISH=never; fi
 
-          # A *published* Windows/macOS release feeds silent auto-update, where
-          # electron-updater enforces the code signature — so refuse to publish an
-          # unsigned installer on those platforms (it would update clients with an
-          # unverifiable binary). Add the WINDOWS_CSC_LINK / MAC_CSC_LINK secrets
-          # to sign. Linux AppImage has no signature gate; unsigned is expected.
+          # Code signing is OPTIONAL (internal-use deployment; certs need a paid
+          # subscription). Unsigned publishing is allowed — but warn, because the
+          # tradeoffs differ by platform:
+          #   - Windows (NSIS): unsigned auto-update WORKS; clients see a one-time
+          #     SmartScreen "unknown publisher" prompt on first install.
+          #   - macOS: unsigned apps need a Gatekeeper right-click→Open, and
+          #     electron-updater can't auto-update an unsigned/ad-hoc .app — so an
+          #     unsigned macOS release won't self-update. (Sign+notarize for mac.)
+          #   - Linux AppImage: no signature gate anyway.
+          # Add WINDOWS_CSC_LINK / MAC_CSC_LINK to sign when you do have certs.
           if [[ "${PUBLISH}" == "always" && ( "${RUNNER_OS}" == "Windows" || "${RUNNER_OS}" == "macOS" ) && -z "${SIGN_CSC_LINK}" ]]; then
-            echo "::error::Refusing to PUBLISH an unsigned ${RUNNER_OS} release — auto-update needs a signed installer. Add the signing cert secret (WINDOWS_CSC_LINK / MAC_CSC_LINK) or cut the release without a version tag." >&2
-            exit 1
+            echo "::warning::Publishing an UNSIGNED ${RUNNER_OS} release. Windows auto-update works (SmartScreen prompt on first run); an unsigned macOS build won't auto-update. This is fine for internal distribution." >&2
           fi
 
           # The demo account is opt-in and must never ship in a published release.

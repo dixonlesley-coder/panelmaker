@@ -127,6 +127,13 @@ export interface ProjectState {
    * undoable step. Returns nothing; the child becomes the active panel.
    */
   addSubPanel: (parentPanelId: string) => void;
+  /**
+   * Wire an EXISTING unassigned panel under a parent: adds a feeder circuit in
+   * the parent feeding the child and flips the child to feeder-fed (cross-wired),
+   * as one undoable step. No-op if it would create a feeder cycle or the child
+   * already has a parent.
+   */
+  connectPanelAsFeeder: (parentPanelId: string, childPanelId: string) => void;
   /** Set (or clear) a panel's building occupancy class. */
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
   /** Append a new panel built from a template (fresh ids) and select it. */
@@ -552,6 +559,53 @@ export const useProjectStore = create<ProjectState>((set) => ({
         })),
         activePanelId: childId,
       };
+    }),
+
+  connectPanelAsFeeder: (parentPanelId, childPanelId) =>
+    set((s) => {
+      if (parentPanelId === childPanelId) return s;
+      const parent = s.project.panels.find((p) => p.id === parentPanelId);
+      const child = s.project.panels.find((p) => p.id === childPanelId);
+      if (!parent || !child) return s;
+
+      // child -> its parent, to detect existing parents and cycles.
+      const parentOf = new Map<string, string>();
+      for (const p of s.project.panels) {
+        for (const c of p.circuits) if (c.feedsPanelId) parentOf.set(c.feedsPanelId, p.id);
+      }
+      if (parentOf.has(childPanelId)) return s; // already assigned — only adopt orphans
+      // Walk up from the parent; reaching the child means this would cycle.
+      let cur: string | undefined = parentPanelId;
+      const seen = new Set<string>();
+      while (cur !== undefined && !seen.has(cur)) {
+        if (cur === childPanelId) return s;
+        seen.add(cur);
+        cur = parentOf.get(cur);
+      }
+
+      const feederId = nextId('c');
+      const feeder: CircuitInput = {
+        id: feederId,
+        name: `Feeder → ${child.tag ?? child.name}`,
+        role: 'branch',
+        loadW: 0,
+        cosPhi: 0.85,
+        lengthM: 20,
+        loadKind: 'feeder',
+        isLighting: false,
+        demandFactor: 1,
+        feedsPanelId: childPanelId,
+      };
+      return withHistory(s, (project) => ({
+        ...project,
+        panels: project.panels.map((p) => {
+          if (p.id === parentPanelId) return { ...p, circuits: [...p.circuits, feeder] };
+          if (p.id === childPanelId) {
+            return { ...p, sourceType: 'feeder' as const, fedByCircuitId: feederId };
+          }
+          return p;
+        }),
+      }));
     }),
 
   addPanelFromTemplate: (templateId) =>

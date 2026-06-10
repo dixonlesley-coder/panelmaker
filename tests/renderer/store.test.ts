@@ -260,6 +260,47 @@ describe('projectStore', () => {
     );
   });
 
+  it('connectPanelAsFeeder adopts an existing orphan panel under a parent', () => {
+    const project = useProjectStore.getState().project;
+    const parentId = project.panels[0]!.id;
+    // Add a fresh, unassigned (utility) panel.
+    useProjectStore.getState().addPanel();
+    const orphan = useProjectStore.getState().project.panels.at(-1)!;
+    expect(orphan.sourceType).toBe('utility');
+    const parentCircuits = useProjectStore.getState().project.panels.find((p) => p.id === parentId)!
+      .circuits.length;
+
+    useProjectStore.getState().connectPanelAsFeeder(parentId, orphan.id);
+
+    const after = useProjectStore.getState().project;
+    const parent = after.panels.find((p) => p.id === parentId)!;
+    const child = after.panels.find((p) => p.id === orphan.id)!;
+    const feeder = parent.circuits.at(-1)!;
+    expect(parent.circuits.length).toBe(parentCircuits + 1);
+    expect(feeder.loadKind).toBe('feeder');
+    expect(feeder.feedsPanelId).toBe(child.id);
+    expect(child.sourceType).toBe('feeder');
+    expect(child.fedByCircuitId).toBe(feeder.id);
+
+    // A second connect of the now-assigned panel is a no-op (only adopts orphans).
+    const len = after.panels.find((p) => p.id === parentId)!.circuits.length;
+    useProjectStore.getState().connectPanelAsFeeder(parentId, orphan.id);
+    expect(
+      useProjectStore.getState().project.panels.find((p) => p.id === parentId)!.circuits.length,
+    ).toBe(len);
+  });
+
+  it('connectPanelAsFeeder refuses to create a feeder cycle', () => {
+    // A → B (A feeds B). Trying to make B feed A would cycle → no-op.
+    const a = useProjectStore.getState().project.panels[0]!.id;
+    useProjectStore.getState().addPanel();
+    const b = useProjectStore.getState().project.panels.at(-1)!.id;
+    useProjectStore.getState().connectPanelAsFeeder(a, b); // A feeds B
+    const before = JSON.stringify(useProjectStore.getState().project);
+    useProjectStore.getState().connectPanelAsFeeder(b, a); // would cycle
+    expect(JSON.stringify(useProjectStore.getState().project)).toBe(before);
+  });
+
   it('setSiteConditions merges patches and is undoable', () => {
     useProjectStore.getState().setSiteConditions({ externalLps: true });
     expect(useProjectStore.getState().project.site?.externalLps).toBe(true);
