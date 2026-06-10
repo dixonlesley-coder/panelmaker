@@ -26,6 +26,7 @@ import {
   IconTemperature,
 } from '@tabler/icons-react';
 import type { CircuitResult, PanelResult, Part, PhaseAssignment } from '@shared/types';
+import { MAX_WAYS_PER_BUSBAR } from '@shared/standards';
 import { Stat } from '@renderer/features/components/Stat';
 import { costPanel } from '@renderer/lib/bom';
 import { formatAmps, formatIdr, formatKw, formatPercent } from '@renderer/lib/format';
@@ -445,6 +446,15 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
             />
             <KeyVal k={t('results.busbarAmpacity')} v={formatAmps(bus.ampacityA)} />
             <KeyVal k={t('results.busbarTotalCurrent')} v={formatAmps(bus.totalCurrentA)} />
+            {result.busbarSections.length > 1 && (
+              <KeyVal
+                k={t('results.busbarSplit')}
+                v={t('results.busbarSplitValue', {
+                  count: result.busbarSections.length,
+                  ways: MAX_WAYS_PER_BUSBAR,
+                })}
+              />
+            )}
             {bus.withstand && (
               <KeyVal
                 k={t('results.busbarPeak')}

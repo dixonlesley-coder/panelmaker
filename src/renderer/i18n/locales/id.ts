@@ -437,6 +437,8 @@ export const id: TranslationKeys = {
     busbarSection: 'Penampang',
     busbarAmpacity: 'Ampasitas',
     busbarTotalCurrent: 'Arus total',
+    busbarSplit: 'Seksi busbar',
+    busbarSplitValue: '{{count}} seksi · ≤{{ways}} jalur tiap seksi',
     enclosure: 'Enclosure',
     encDimensions: 'Dimensi',
     encSheet: 'Pelat',
@@ -800,6 +802,9 @@ export const id: TranslationKeys = {
     overrideApplied: '{{value}} manual dikunci — tampil ungu; kesesuaian diperiksa, bukan dikoreksi otomatis.',
     dropOnCircuit: 'Letakkan override pada kartu sirkuit tertentu.',
     overrideHint: 'Seret ke sirkuit untuk menguncinya (tampil ungu).',
+    busbar: 'Busbar',
+    busbarSection: 'Busbar §{{index}}',
+    waysCount: '{{count}} jalur',
   },
   circuitEditor: {
     design: 'Arus desain',
@@ -812,6 +817,9 @@ export const id: TranslationKeys = {
     cableSection: 'Jalur kabel',
     motorKw: 'Daya motor',
     makeup: 'Susunan: {{spec}} · Iz {{iz}}',
+    busbarSection: 'Busbar',
+    busbarBreak: 'Mulai seksi busbar baru di sini',
+    busbarBreakHint: 'Paksa sirkuit ini ke jalur busbar baru, terlepas dari pemisahan otomatis.',
     done: 'Selesai',
   },
   panelSettings: {

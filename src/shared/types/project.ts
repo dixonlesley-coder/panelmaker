@@ -59,6 +59,13 @@ export interface CircuitInput {
    */
   breakerOverrideA?: number;
 
+  /**
+   * Force a busbar section break at this circuit: it starts a new busbar line in
+   * the panel regardless of the automatic way/current caps. Lets the user split
+   * the bus by hand (e.g. group a feeder bank onto its own section).
+   */
+  busbarBreakBefore?: boolean;
+
   /** Daily operating window; absent = continuous (24 h). Drives the load profile. */
   schedule?: LoadSchedule;
 

@@ -1,6 +1,7 @@
 import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
+import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
 import type { CircuitInput, PanelInput } from '../types/project';
 import type { SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
@@ -14,7 +15,7 @@ import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
-import { sizeBusbar } from './busbar';
+import { sizeBusbar, splitBusbarSections } from './busbar';
 import { checkBusbarWithstand } from './busbarFault';
 import { verifyEnclosureThermal } from './enclosureThermal';
 import { sizeCable } from './cableSizing';
@@ -305,17 +306,48 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     1,
   );
   const busbar = sizeBusbar(totalDemandCurrentA);
-  // Verify the busbar can withstand the panel's prospective short-circuit (Icw),
-  // not just carry the continuous load (when the fault level is known).
+  // Split the panel bus into capacity-bounded sections (max ways / max current),
+  // so a panel with many ways gets several busbar lines instead of one giant bar.
+  // Each section is sized for the worst-phase current of the ways it carries; the
+  // line current of a way follows its phase assignment (3-phase ways load all
+  // lines). The main `busbar` above stays the incoming bus (full panel demand).
+  const busbarSections = splitBusbarSections(
+    comps.map((cm, idx) => {
+      const assigned = balance.assignment[cm.result.circuitId];
+      return {
+        id: cm.result.circuitId,
+        designCurrentA: cm.result.designCurrentA,
+        threePhase: cm.threePhase,
+        phase: assigned === 'L2' || assigned === 'L3' ? assigned : 'L1',
+        breakBefore: branches[idx]?.busbarBreakBefore === true,
+      };
+    }),
+    {
+      maxWays: MAX_WAYS_PER_BUSBAR,
+      maxSectionCurrentA: MAX_BUSBAR_SECTION_CURRENT_A,
+      system: panel.system,
+    },
+  );
+
+  // Verify each bar can withstand the panel's prospective short-circuit (Icw), not
+  // just carry the continuous load (when the fault level is known). A section bar
+  // is sized for its own (smaller) load, so it can fail withstand even when the
+  // main bus passes — warn per inadequate section.
   if (opts.faultLevelA !== undefined) {
-    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, round(opts.faultLevelA / 1000, 1));
-    if (!busbar.withstand.adequate) {
-      warnings.push({
-        code: 'busbar-withstand-inadequate',
-        severity: 'error',
-        message: `${panel.name}: busbar ${busbar.csaMm2} mm² short-circuit withstand Icw ${busbar.withstand.icwKa} kA is below the ${busbar.withstand.faultKa} kA prospective fault — increase the bar section, brace it, or use parallel bars.`,
-        panelId: panel.id,
-      });
+    const faultKa = round(opts.faultLevelA / 1000, 1);
+    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, faultKa);
+    for (const section of busbarSections) {
+      section.busbar.withstand = checkBusbarWithstand(section.busbar.csaMm2, faultKa);
+      if (!section.busbar.withstand.adequate) {
+        const where =
+          busbarSections.length > 1 ? `${panel.name} busbar section ${section.index}` : panel.name;
+        warnings.push({
+          code: 'busbar-withstand-inadequate',
+          severity: 'error',
+          message: `${where}: busbar ${section.busbar.csaMm2} mm² short-circuit withstand Icw ${section.busbar.withstand.icwKa} kA is below the ${section.busbar.withstand.faultKa} kA prospective fault — increase the bar section, brace it, or use parallel bars.`,
+          panelId: panel.id,
+        });
+      }
     }
   }
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
@@ -393,6 +425,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     ...(panel.tag ? { tag: panel.tag } : {}),
     circuits,
     busbar,
+    busbarSections,
     enclosure,
     totalConnectedLoadW: round(totalConnectedLoadW, 0),
     totalDemandCurrentA,

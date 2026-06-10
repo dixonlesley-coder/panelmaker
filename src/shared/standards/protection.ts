@@ -50,6 +50,14 @@ export function recommendedCurve(loadKind: 'lighting' | 'general' | 'motor'): Br
  */
 export const COPPER_CURRENT_DENSITY_A_PER_MM2 = 1.3;
 
+/**
+ * Maximum number of outgoing ways tapped off a single busbar section before the
+ * panel bus is split into another section (another busbar line). A practical
+ * way-count limit for a distribution-board bus riser / section block, after which
+ * gear is split onto a second bar rather than crowding one.
+ */
+export const MAX_WAYS_PER_BUSBAR = 12;
+
 export interface BusbarSize {
   /** Bar width (mm). */
   widthMm: number;
@@ -81,3 +89,14 @@ export const COPPER_BUSBAR_TABLE: readonly BusbarSize[] = [
   { widthMm: 80, thicknessMm: 10, csaMm2: 800, ampacityA: 1180 },
   { widthMm: 100, thicknessMm: 10, csaMm2: 1000, ampacityA: 1430 },
 ];
+
+/**
+ * Continuous current at which one busbar section is "too big" for a single bar
+ * and the panel bus auto-splits into another section — the largest practical
+ * standard copper bar's rating ({@link COPPER_BUSBAR_TABLE}). A section's load is
+ * driven by the kW it carries (kW → current), so a panel whose demand outgrows
+ * one feasible bar is divided across sections rather than calling for an
+ * impractically large or paralleled bar.
+ */
+export const MAX_BUSBAR_SECTION_CURRENT_A =
+  COPPER_BUSBAR_TABLE[COPPER_BUSBAR_TABLE.length - 1]?.ampacityA ?? 1430;
