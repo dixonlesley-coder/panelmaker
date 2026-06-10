@@ -302,14 +302,15 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
                 {w.starter.replace('_', '-')}
               </text>
             )}
-            {/* load symbol */}
+            {/* cable marker on the run + load symbol */}
+            <line x1={cx - 3} y1={loadTop - 3} x2={cx + 3} y2={loadTop - 9} stroke={FG} strokeWidth={1} />
             {loadSymbol(cx, loadTop, w, threePhase)}
-            {/* outgoing cable make-up */}
-            <text x={cx} y={cableY} fontSize={7.5} textAnchor="middle" fill={DIM}>
+            {/* outgoing cable size — clearly shown */}
+            <text x={cx} y={cableY} fontSize={9} fontWeight={700} textAnchor="middle" fill={FG}>
               {w.cable}
             </text>
             {w.feeds && (
-              <text x={cx} y={cableY + 9} fontSize={7.5} fontWeight={700} textAnchor="middle" fill={PHASE_COLOR.L3}>
+              <text x={cx} y={cableY + 10} fontSize={8} fontWeight={700} textAnchor="middle" fill={PHASE_COLOR.L3}>
                 → {w.feeds}
               </text>
             )}
@@ -390,10 +391,9 @@ function UnifiedPanelNode({ data }: NodeProps) {
 
 const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode };
 
-/** Compact outgoing-cable make-up, e.g. "2×(4C×95)". */
+/** Outgoing-cable size, e.g. "4×16 mm²" or "2×(4×95) mm²" for parallel runs. */
 function cableLabel(csaMm2: number, cores: number, runs?: number): string {
-  const core = `${cores}C×${csaMm2}`;
-  return runs && runs > 1 ? `${runs}×(${core})` : core;
+  return runs && runs > 1 ? `${runs}×(${cores}×${csaMm2}) mm²` : `${cores}×${csaMm2} mm²`;
 }
 
 function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Node[]; edges: Edge[] } {
@@ -494,6 +494,9 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
     const parentId = parentOf.get(childId);
     if (!parentId || !system.panels[childId] || !system.panels[parentId]) continue;
     const feederWay = system.panels[parentId]?.circuits.find((c) => c.circuitId === circuitId);
+    const feederLabel = feederWay
+      ? `${feederWay.breaker.ratingA}A · ${cableLabel(feederWay.cable.csaMm2, feederWay.grounding.cores, feederWay.cable.runsPerPhase)}`
+      : undefined;
     edges.push({
       id: `feed-${circuitId}`,
       source: parentId,
@@ -501,7 +504,7 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
       target: childId,
       targetHandle: 'in',
       type: 'smoothstep',
-      label: feederWay ? `${feederWay.breaker.ratingA}A` : undefined,
+      label: feederLabel,
       labelStyle: { fontSize: 10, fontWeight: 700 },
       labelBgStyle: { fill: 'var(--mantine-color-body)' },
       style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
