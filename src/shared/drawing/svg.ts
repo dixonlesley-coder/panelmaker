@@ -12,6 +12,7 @@
 
 import type { PanelInput } from '../types/project';
 import type { PanelResult } from '../types/results';
+import { panelLabel } from '../labels';
 import {
   GUTTER_MM,
   layoutGa,
@@ -250,7 +251,7 @@ export function gaDrawing(panel: PanelInput, result: PanelResult): Drawing {
  * filling left-to-right and wrapping to the next rail.
  */
 export function panelGaSvg(panel: PanelInput, result: PanelResult, titleStrip?: TitleStrip): string {
-  return drawingToSvg(gaDrawing(panel, result), `${panel.name} general arrangement`, titleStrip);
+  return drawingToSvg(gaDrawing(panel, result), `${panelLabel(panel)} general arrangement`, titleStrip);
 }
 
 /* -------------------------------- SLD view -------------------------------- */
@@ -261,5 +262,5 @@ export function panelGaSvg(panel: PanelInput, result: PanelResult, titleStrip?: 
  * cable spec, load name). A clean vertical-bus schematic.
  */
 export function panelSldSvg(panel: PanelInput, result: PanelResult, titleStrip?: TitleStrip): string {
-  return drawingToSvg(layoutSld(panel, result), `${panel.name} single-line diagram`, titleStrip);
+  return drawingToSvg(layoutSld(panel, result), `${panelLabel(panel)} single-line diagram`, titleStrip);
 }

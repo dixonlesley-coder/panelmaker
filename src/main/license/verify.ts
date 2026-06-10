@@ -55,6 +55,11 @@ export interface VerifyIdTokenOptions {
   allowedHd: string;
   /** Override the wall clock (ms) for testing; defaults to `Date.now()`. */
   nowMs?: number;
+  /**
+   * The OIDC `nonce` sent in the authorization request. Set on the interactive
+   * sign-in path (the token must echo it); omit for refresh re-verification.
+   */
+  expectedNonce?: string;
 }
 
 /**
@@ -89,6 +94,7 @@ export async function verifyIdToken(
     clientId,
     allowedHd,
     nowMs,
+    expectedNonce: options.expectedNonce,
   });
   if (!policy.ok) return { ok: false, reason: policy.reason ?? 'policy-rejected' };
 

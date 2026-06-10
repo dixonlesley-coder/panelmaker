@@ -15,10 +15,11 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCash, IconDownload, IconReceipt2 } from '@tabler/icons-react';
-import { computeSystem, computeQuotation } from '@shared/engine';
+import { computeQuotation } from '@shared/engine';
 import { costSystemConsolidated } from '@renderer/lib/bom';
 import { formatIdr } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 import { exportQuotationPdf } from '@renderer/api';
 
 export function Quotation() {
@@ -31,7 +32,7 @@ export function Quotation() {
   const quotation = project.meta?.quotation ?? {};
 
   // Consolidated, priced project BOM → quotation (labor + mark-ups).
-  const system = useMemo(() => computeSystem(project), [project]);
+  const system = useSystemResult();
   const cost = useMemo(() => {
     const priceMap = new Map<string, number>(Object.entries(prices));
     return costSystemConsolidated(system, parts, priceMap);

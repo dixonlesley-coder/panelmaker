@@ -10,15 +10,15 @@ import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { computeSystem } from '@shared/engine';
 import type { Warning } from '@shared/types';
 
-/** Find the first voltage-drop warning across all panels in the project. */
-function findVoltageDropWarning() {
+/** Find the first auto-upsized-for-voltage-drop circuit across all panels. */
+function findVoltageDropUpsize() {
   const { project } = useProjectStore.getState();
   const result = computeSystem(project);
   for (const panelId of Object.keys(result.panels)) {
     const w = result.panels[panelId]!.warnings.find(
-      (x: Warning) => x.code === 'voltage-drop-exceeded' && (x.fixes?.length ?? 0) > 0,
+      (x: Warning) => x.code === 'voltage-drop-upsized',
     );
-    if (w) return { panelId, warning: w };
+    if (w?.circuitId) return { panelId, circuitId: w.circuitId, result, warning: w };
   }
   return undefined;
 }
@@ -56,25 +56,40 @@ describe('projectStore', () => {
     expect(after.designCurrentA).toBeGreaterThan(before.designCurrentA);
   });
 
-  it('applyFix resolves the seeded voltage-drop violation end-to-end', () => {
-    const found = findVoltageDropWarning();
-    expect(found, 'sample project should contain a voltage-drop warning').toBeDefined();
-    const { panelId, warning } = found!;
-    const circuitId = warning.circuitId!;
-    const fix = warning.fixes![0]!;
+  it('auto-upsizes a long run for voltage drop and notes it (no manual fix needed)', () => {
+    const found = findVoltageDropUpsize();
+    expect(found, 'sample project should auto-upsize a long run for voltage drop').toBeDefined();
+    const { panelId, circuitId, result, warning } = found!;
 
-    // before: the circuit is flagged
-    const before = computeSystem(useProjectStore.getState().project)
-      .panels[panelId]!.warnings.filter((w: Warning) => w.circuitId === circuitId);
-    expect(before.some((w) => w.code === 'voltage-drop-exceeded')).toBe(true);
+    // the note is purely informational — the circuit is already within limit
+    expect(warning.severity).toBe('info');
+    const before = result.panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!;
+    expect(before.voltageDrop.withinLimit).toBe(true);
+    expect(before.cable.vdDriven).toBe(true);
+  });
 
-    // apply the suggested cable upsize
-    useProjectStore.getState().applyFix(panelId, circuitId, fix);
+  it('applyFix forces an explicit cable override end-to-end (undoable)', () => {
+    const found = findVoltageDropUpsize();
+    expect(found).toBeDefined();
+    const { panelId, circuitId, result } = found!;
+    const baseCsa = result.panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!.cable
+      .csaMm2;
 
-    // after: the voltage-drop warning is gone for that circuit
+    // force a larger conductor than the engine chose; the override rounds up to
+    // the next standard section and the cable grows.
+    useProjectStore.getState().applyFix(panelId, circuitId, {
+      description: 'force larger cable',
+      action: { type: 'set-cable', payload: { csaMm2: baseCsa + 1 } },
+    });
     const after = computeSystem(useProjectStore.getState().project)
-      .panels[panelId]!.warnings.filter((w: Warning) => w.circuitId === circuitId);
-    expect(after.some((w) => w.code === 'voltage-drop-exceeded')).toBe(false);
+      .panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!;
+    expect(after.cable.csaMm2).toBeGreaterThan(baseCsa);
+
+    // the override is undoable
+    useProjectStore.getState().undo();
+    const reverted = computeSystem(useProjectStore.getState().project)
+      .panels[panelId]!.circuits.find((c) => c.circuitId === circuitId)!;
+    expect(reverted.cable.csaMm2).toBe(baseCsa);
   });
 
   it('addCircuit and removeCircuit mutate the active panel', () => {
@@ -97,6 +112,164 @@ describe('projectStore', () => {
     useProjectStore.getState().replaceProject(restored);
     expect(useProjectStore.getState().project.id).toBe('RESTORED');
     expect(useProjectStore.getState().activePanelId).toBe(restored.panels[0]!.id);
+  });
+
+  it('generates collision-resistant runtime ids (no counter reuse across "relaunches")', () => {
+    // Session 1: add a circuit and capture its id.
+    const panelId = useProjectStore.getState().project.panels[0]!.id;
+    useProjectStore.getState().addCircuit(panelId);
+    const s1 = useProjectStore.getState().project.panels[0]!;
+    const firstId = s1.circuits[s1.circuits.length - 1]!.id;
+
+    // "Relaunch": restore the same project (as autosave does) — module counters
+    // would reset here; UUID-backed ids must still never collide.
+    const persisted = JSON.parse(JSON.stringify(useProjectStore.getState().project));
+    useProjectStore.getState().replaceProject(persisted);
+    useProjectStore.getState().addCircuit(panelId);
+
+    const s2 = useProjectStore.getState().project.panels[0]!;
+    const secondId = s2.circuits[s2.circuits.length - 1]!.id;
+    expect(secondId).not.toBe(firstId);
+    const ids = s2.circuits.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('coalesces rapid same-field edits into one undo step', () => {
+    const panelId = useProjectStore.getState().project.panels[0]!.id;
+    const original = useProjectStore.getState().project.panels[0]!.name;
+
+    // Simulate typing "ABC" — three onChange commits within the coalesce window.
+    useProjectStore.getState().updatePanel(panelId, { name: 'A' });
+    useProjectStore.getState().updatePanel(panelId, { name: 'AB' });
+    useProjectStore.getState().updatePanel(panelId, { name: 'ABC' });
+
+    expect(useProjectStore.getState().project.panels[0]!.name).toBe('ABC');
+    // One undo restores the pre-typing name, not "AB".
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.panels[0]!.name).toBe(original);
+    expect(selectCanUndo(useProjectStore.getState())).toBe(false);
+
+    // A different field does NOT coalesce with the name edits.
+    useProjectStore.getState().updatePanel(panelId, { name: 'X' });
+    useProjectStore.getState().updatePanel(panelId, { voltageV: 380 });
+    expect(useProjectStore.getState().past.length).toBe(2);
+  });
+
+  describe('importPanels (load-list import)', () => {
+    it('appends panels with remapped ids and fixed-up feeder references (undoable)', () => {
+      const start = useProjectStore.getState().project.panels.length;
+      useProjectStore.getState().importPanels([
+        {
+          id: 'panel-1',
+          name: 'Imported main',
+          system: '3ph',
+          voltageV: 400,
+          ambientTempC: 30,
+          installMethod: 'conduit',
+          groupingCount: 1,
+          diversityFactor: 0.8,
+          sourceType: 'utility',
+          circuits: [
+            {
+              id: 'c-1',
+              name: 'Feeder to sub',
+              role: 'branch',
+              loadW: 0,
+              cosPhi: 0.85,
+              lengthM: 20,
+              loadKind: 'feeder',
+              isLighting: false,
+              demandFactor: 1,
+              feedsPanelId: 'panel-2',
+            },
+          ],
+        },
+        {
+          id: 'panel-2',
+          name: 'Imported sub',
+          system: '3ph',
+          voltageV: 400,
+          ambientTempC: 30,
+          installMethod: 'conduit',
+          groupingCount: 1,
+          diversityFactor: 0.8,
+          sourceType: 'feeder',
+          fedByCircuitId: 'c-1',
+          circuits: [
+            {
+              id: 'c-2',
+              name: 'Load A',
+              role: 'branch',
+              loadW: 5000,
+              cosPhi: 0.85,
+              lengthM: 15,
+              loadKind: 'general',
+              isLighting: false,
+              demandFactor: 1,
+            },
+          ],
+        },
+      ]);
+
+      const project = useProjectStore.getState().project;
+      expect(project.panels.length).toBe(start + 2);
+      const main = project.panels[project.panels.length - 2]!;
+      const sub = project.panels[project.panels.length - 1]!;
+      // ids are remapped away from the generated panel-N/c-N values...
+      expect(main.id).not.toBe('panel-1');
+      expect(sub.id).not.toBe('panel-2');
+      expect(main.circuits[0]!.id).not.toBe('c-1');
+      // ...and the feeder cross-references follow the remap consistently.
+      expect(main.circuits[0]!.feedsPanelId).toBe(sub.id);
+      expect(sub.fedByCircuitId).toBe(main.circuits[0]!.id);
+      // every id in the project stays unique
+      const allIds = [
+        ...project.panels.map((p) => p.id),
+        ...project.panels.flatMap((p) => p.circuits.map((c) => c.id)),
+      ];
+      expect(new Set(allIds).size).toBe(allIds.length);
+
+      useProjectStore.getState().undo();
+      expect(useProjectStore.getState().project.panels.length).toBe(start);
+    });
+  });
+
+  it('addSubPanel creates a cross-wired child panel + feeder in one undo step', () => {
+    const parentId = useProjectStore.getState().project.panels[0]!.id;
+    const startPanels = useProjectStore.getState().project.panels.length;
+    const startCircuits = useProjectStore.getState().project.panels[0]!.circuits.length;
+
+    useProjectStore.getState().addSubPanel(parentId);
+
+    const project = useProjectStore.getState().project;
+    expect(project.panels.length).toBe(startPanels + 1);
+    const child = project.panels[project.panels.length - 1]!;
+    const parent = project.panels.find((p) => p.id === parentId)!;
+    const feeder = parent.circuits[parent.circuits.length - 1]!;
+    // Cross-wiring: feeder feeds the child; the child knows its feeder.
+    expect(feeder.loadKind).toBe('feeder');
+    expect(feeder.feedsPanelId).toBe(child.id);
+    expect(child.fedByCircuitId).toBe(feeder.id);
+    expect(child.sourceType).toBe('feeder');
+    // The child becomes the active panel; one undo reverts both edits.
+    expect(useProjectStore.getState().activePanelId).toBe(child.id);
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.panels.length).toBe(startPanels);
+    expect(useProjectStore.getState().project.panels.find((p) => p.id === parentId)!.circuits.length).toBe(
+      startCircuits,
+    );
+  });
+
+  it('setSiteConditions merges patches and is undoable', () => {
+    useProjectStore.getState().setSiteConditions({ externalLps: true });
+    expect(useProjectStore.getState().project.site?.externalLps).toBe(true);
+    useProjectStore.getState().setSiteConditions({ soilResistivityOhmM: 500 });
+    expect(useProjectStore.getState().project.site).toEqual({
+      externalLps: true,
+      soilResistivityOhmM: 500,
+    });
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.site?.soilResistivityOhmM).toBeUndefined();
   });
 
   describe('undo / redo', () => {

@@ -30,7 +30,7 @@ export interface LicenseDecision {
   licensed: boolean;
   /**
    * Machine-readable reason, e.g. 'unenforced' | 'verified-online' |
-   * 'offline-grace' | 'no-session' | 'revoked' | 'grace-expired'.
+   * 'offline-grace' | 'no-session' | 'machine-mismatch' | 'grace-expired'.
    */
   reason: string;
   /** The signed-in email when a session exists. */
@@ -72,10 +72,14 @@ async function reverifyOnline(session: LicenseSession): Promise<boolean> {
  *   1. If the gate is not enforced (unconfigured / dev bypass / unpackaged) →
  *      licensed (fail-open).
  *   2. Otherwise load the stored session. None → not licensed (needs sign-in).
+ *      A session whose machine id differs from this machine's (a copied
+ *      `license.json`) → not licensed.
  *   3. Try a silent online re-verification (refresh → verify). On success,
  *      stamp `lastVerifiedAtMs = now` and persist → licensed.
  *   4. If online re-verification fails (offline, or the token was revoked) but
- *      the last verification is within the 7-day grace window → licensed.
+ *      the last verification is within the 7-day grace window — judged against
+ *      the persisted clock high-water mark, so rolling the system clock back
+ *      does not re-enter the window → licensed.
  *   5. Otherwise → not licensed (grace expired / revoked).
  */
 export async function ensureLicensed(nowMs: number = Date.now()): Promise<LicenseDecision> {
@@ -88,6 +92,16 @@ export async function ensureLicensed(nowMs: number = Date.now()): Promise<Licens
     return { licensed: false, reason: 'no-session' };
   }
 
+  // A session established on another machine (copied license.json) is rejected.
+  // With safeStorage the copied blob fails decryption anyway; this also covers
+  // the plaintext fallback used when no OS keychain is available.
+  if (session.machineId !== getMachineId()) {
+    return { licensed: false, reason: 'machine-mismatch', email: session.email };
+  }
+
+  // Advance the monotonic clock high-water mark with the largest time observed.
+  const clockHwmMs = Math.max(session.clockHwmMs ?? 0, nowMs);
+
   // A demo/test session bypasses Google entirely; it stays valid while the demo
   // account is enabled (disabling it locks demo sessions out on next launch).
   if (session.demo) {
@@ -99,11 +113,17 @@ export async function ensureLicensed(nowMs: number = Date.now()): Promise<Licens
 
   const online = await reverifyOnline(session);
   if (online) {
-    saveSession({ ...session, lastVerifiedAtMs: nowMs });
+    saveSession({ ...session, lastVerifiedAtMs: nowMs, clockHwmMs });
     return { licensed: true, reason: 'verified-online', email: session.email };
   }
 
-  if (withinOfflineGrace(session.lastVerifiedAtMs, nowMs)) {
+  // Persist the advanced high-water mark even when offline, so the time this
+  // launch observed cannot be "un-seen" by a later clock rollback.
+  if (clockHwmMs !== session.clockHwmMs) {
+    saveSession({ ...session, clockHwmMs });
+  }
+
+  if (withinOfflineGrace(session.lastVerifiedAtMs, nowMs, session.clockHwmMs)) {
     return { licensed: true, reason: 'offline-grace', email: session.email };
   }
 
@@ -128,6 +148,7 @@ export async function runSignIn(nowMs: number = Date.now()): Promise<LicenseDeci
     clientId: cfg.clientId,
     allowedHd: cfg.allowedHd,
     nowMs,
+    expectedNonce: tokens.nonce,
   });
   if (!result.ok) {
     return { licensed: false, reason: result.reason };
@@ -142,6 +163,7 @@ export async function runSignIn(nowMs: number = Date.now()): Promise<LicenseDeci
     machineId: getMachineId(),
     refreshToken: tokens.refreshToken,
     lastVerifiedAtMs: nowMs,
+    clockHwmMs: nowMs,
   };
   saveSession(session);
   return { licensed: true, reason: 'verified-online', email: result.email };
@@ -167,6 +189,7 @@ export function runDemoSignIn(password: string, nowMs: number = Date.now()): Lic
     machineId: getMachineId(),
     refreshToken: '',
     lastVerifiedAtMs: nowMs,
+    clockHwmMs: nowMs,
     demo: true,
   };
   saveSession(session);
@@ -204,7 +227,10 @@ export function getStatus(): LicenseStatus {
       lastVerifiedAtMs: session.lastVerifiedAtMs,
     };
   }
-  const licensed = withinOfflineGrace(session.lastVerifiedAtMs, Date.now());
+  if (session.machineId !== getMachineId()) {
+    return { enforced: true, licensed: false, reason: 'machine-mismatch', email: session.email };
+  }
+  const licensed = withinOfflineGrace(session.lastVerifiedAtMs, Date.now(), session.clockHwmMs);
   return {
     enforced: true,
     licensed,

@@ -2,10 +2,11 @@
  * Cable-containment reference data — standard conduit bores and cable-tray
  * widths, plus the conductor-fill limits. Stamped with STANDARDS_VERSION.
  *
- * Fill limits follow IEC 60364-5-52 / NEC Ch. 9 Table 1: one cable 53%, two
- * cables 31%, three-or-more 40% of the conduit bore. Cable outer-diameter
- * estimates (in `engine/containment`) and the resulting sizes are first-pass
- * approximations — verify against manufacturer cable data before construction.
+ * The engine sizes one cable per conduit, so the single-cable 53%-of-bore fill
+ * limit (IEC 60364-5-52 / NEC Ch. 9 Table 1) is the one that applies. Cable
+ * outer-diameter estimates (in `engine/containment`) and the resulting sizes are
+ * first-pass approximations — verify against manufacturer cable data before
+ * construction.
  */
 
 import { STANDARDS_VERSION } from './version';
@@ -35,10 +36,8 @@ export function conduitInternalAreaMm2(c: ConduitSize): number {
   return (Math.PI / 4) * c.internalDiaMm * c.internalDiaMm;
 }
 
-/** Conductor-fill limits (fraction of conduit bore), IEC 60364-5-52 / NEC. */
+/** Single-cable conductor-fill limit (fraction of conduit bore), IEC 60364-5-52 / NEC. */
 export const CONDUIT_FILL_SINGLE = 0.53;
-export const CONDUIT_FILL_TWO = 0.31;
-export const CONDUIT_FILL_MANY = 0.4;
 
 /** Standard cable-tray (ladder / perforated) widths (mm), ascending. */
 export const CABLE_TRAY_WIDTHS_MM = [50, 75, 100, 150, 200, 300, 450, 600] as const;

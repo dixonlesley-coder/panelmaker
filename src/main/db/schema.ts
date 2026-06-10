@@ -63,6 +63,8 @@ export const projects = sqliteTable('projects', {
   sourcesJson: text('sources_json'),
   /** Project branding / title-block metadata (ProjectMeta) as JSON. */
   metaJson: text('meta_json'),
+  /** Site conditions (lightning exposure / soil resistivity) as JSON. */
+  siteJson: text('site_json'),
 });
 
 export const panels = sqliteTable('panels', {
@@ -71,6 +73,10 @@ export const panels = sqliteTable('panels', {
     .notNull()
     .references(() => projects.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  /** Short panel designation, e.g. "LP-1". */
+  tag: text('tag'),
+  /** Building occupancy class (OccupancyType). */
+  occupancy: text('occupancy'),
   /** SystemType: '1ph' | '3ph'. */
   system: text('system').notNull(),
   voltageV: real('voltage_v').notNull(),
@@ -120,6 +126,8 @@ export const circuits = sqliteTable('circuits', {
   sensing: text('sensing'),
 
   cableOverrideMm2: real('cable_override_mm2'),
+  /** Manual breaker rating override (A). */
+  breakerOverrideA: real('breaker_override_a'),
   // Daily operating window (absent = continuous) for the load profile.
   scheduleStartHour: integer('schedule_start_hour'),
   scheduleEndHour: integer('schedule_end_hour'),
@@ -136,6 +144,8 @@ export const circuits = sqliteTable('circuits', {
 
   /** Cached engine CircuitResult as JSON (optional, recomputable). */
   computedJson: text('computed_json'),
+  /** Point-level detail ({fixtures, switchGroups, sockets}) as JSON. */
+  pointsJson: text('points_json'),
 });
 
 /* -------------------------------------------------------------------------- */

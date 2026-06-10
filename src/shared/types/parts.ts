@@ -7,6 +7,11 @@ export type PartCategory =
   | 'busbar'
   | 'enclosure'
   | 'accessory'
+  // final-circuit points & switching
+  | 'light_fixture'
+  | 'switch'
+  | 'smart_switch'
+  | 'socket_outlet'
   // control
   | 'contactor'
   | 'overload_relay'

@@ -24,6 +24,24 @@ export function circuitWarnings(result: CircuitResult, ctx: CircuitWarningContex
     });
   }
 
+  // A manual breaker override below the design current cannot hold the load —
+  // it nuisance-trips. The engine honors the override and flags it instead of
+  // silently auto-correcting (overrides are the user's explicit decision).
+  if (breaker.overridden && breaker.ratingA + 1e-9 < result.designCurrentA) {
+    out.push({
+      code: 'breaker-override-undersized',
+      severity: 'error',
+      message: `${name}: manual breaker ${breaker.ratingA} A is below the ${result.designCurrentA} A design current — it will nuisance-trip. Raise the override or clear it to auto-size.`,
+      fixes: [
+        {
+          description: 'Clear the override and auto-size the breaker',
+          action: { type: 'clear-breaker-override', payload: {} },
+        },
+      ],
+      ...base,
+    });
+  }
+
   if (breaker.ratingA > cable.deratedIzA + 1e-9) {
     const fix = suggestCableUpsize(cable.csaMm2, breaker.ratingA, ctx.deratingFactor, ctx.minSectionMm2);
     out.push({
@@ -36,12 +54,25 @@ export function circuitWarnings(result: CircuitResult, ctx: CircuitWarningContex
   }
 
   if (!vd.withinLimit) {
+    // Cables are auto-upsized for voltage drop, so this only fires when even the
+    // largest standard section can't hold the drop — no cable upsize can help.
     const fix = suggestCableForVoltageDrop(cable.csaMm2, vd.dropPercent, vd.limitPercent);
     out.push({
       code: 'voltage-drop-exceeded',
       severity: 'warning',
-      message: `${name}: voltage drop ${vd.dropPercent}% exceeds ${vd.limitPercent}% limit.`,
+      message: fix
+        ? `${name}: voltage drop ${vd.dropPercent}% exceeds ${vd.limitPercent}% limit.`
+        : `${name}: voltage drop ${vd.dropPercent}% exceeds ${vd.limitPercent}% limit even at the largest cable — shorten the run or parallel conductors.`,
       fixes: fix ? [fix] : undefined,
+      ...base,
+    });
+  } else if (cable.vdDriven) {
+    // The cable was enlarged beyond its ampacity minimum to keep the drop in
+    // limit — surface it so the engineer sees the upsize (and the extra copper).
+    out.push({
+      code: 'voltage-drop-upsized',
+      severity: 'info',
+      message: `${name}: cable upsized to ${cable.csaMm2} mm² to keep voltage drop within ${vd.limitPercent}% (now ${vd.dropPercent}%).`,
       ...base,
     });
   }
@@ -92,6 +123,20 @@ export function protectionWarnings(result: CircuitResult, ctx: ProtectionWarning
       code: 'zs-too-high',
       severity: 'warning',
       message: `${result.name}: earth-fault loop Zs ${result.zsOhm} Ω exceeds ${result.zsMaxOhm} Ω — automatic disconnection not guaranteed; reduce run length or increase CSA.`,
+      ...base,
+    });
+  }
+
+  // Adiabatic thermal withstand of the PE conductor (TN; IEC 60364-5-54 §543.1.2).
+  if (
+    ctx.earthingSystem !== 'TT' &&
+    result.peAdiabaticOk === false &&
+    result.peMinAdiabaticMm2 !== undefined
+  ) {
+    out.push({
+      code: 'pe-undersized-adiabatic',
+      severity: 'error',
+      message: `${result.name}: PE conductor ${result.grounding.peCsaMm2} mm² is below the ${result.peMinAdiabaticMm2} mm² adiabatic minimum for the ${result.earthFaultA} A earth fault — increase the PE cross-section.`,
       ...base,
     });
   }

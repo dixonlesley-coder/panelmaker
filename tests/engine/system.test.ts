@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computePanel, computeSystem } from '@shared/engine';
+import { panelLabel } from '@shared/labels';
+import { cableScheduleCsv } from '@shared/io/scheduleExport';
 import type { PanelInput, ProjectInput, CircuitInput } from '@shared/types';
 
 function branch(partial: Partial<CircuitInput> & { id: string; name: string }): CircuitInput {
@@ -63,9 +65,52 @@ describe('computePanel', () => {
     });
     const r = computePanel(p);
     const c = r.circuits[0]!;
-    expect(c.designCurrentA).toBeCloseTo(102, 0);
+    expect(c.designCurrentA).toBeCloseTo(68, 0);
     expect(c.control?.starterType).toBe('STAR_DELTA');
     expect(c.control?.devices.some((d) => d.category === 'control_transformer')).toBe(true);
+  });
+});
+
+describe('panel tag / designation', () => {
+  it('formats the panel label as "TAG — Name" (or just the name when untagged)', () => {
+    expect(panelLabel({ tag: 'LP-1', name: 'Lighting' })).toBe('LP-1 — Lighting');
+    expect(panelLabel({ name: 'Lighting' })).toBe('Lighting');
+    expect(panelLabel({ tag: '   ', name: 'Lighting' })).toBe('Lighting'); // blank tag ignored
+  });
+
+  it('carries the tag onto the result and into the cable schedule', () => {
+    const project: ProjectInput = {
+      id: 'TG',
+      name: 'Tagged',
+      panels: [
+        panel({
+          id: 'P1',
+          name: 'Ground floor',
+          tag: 'LP-1',
+          circuits: [branch({ id: 'c1', name: 'Lights', loadW: 2000, loadKind: 'lighting', isLighting: true })],
+        }),
+      ],
+    };
+    const sys = computeSystem(project);
+    expect(sys.panels['P1']!.tag).toBe('LP-1');
+
+    const header = cableScheduleCsv(sys).split('\r\n')[0]!;
+    expect(header.split(',')).toEqual([
+      'Panel',
+      'Tag',
+      'Circuit',
+      'Design A',
+      'Phase',
+      'Breaker A',
+      'Cable mm²',
+      'Cores',
+      'Cable spec',
+      'Vd %',
+      'Cumulative Vd %',
+    ]);
+    // The data row carries the tag in the second column.
+    const firstData = cableScheduleCsv(sys).split('\r\n')[1]!;
+    expect(firstData.split(',')[1]).toBe('LP-1');
   });
 });
 
@@ -162,5 +207,50 @@ describe('computeSystem (building tree aggregation)', () => {
     };
     const r = computeSystem(project);
     expect(r.warnings.some((w) => w.code === 'feeder-cycle')).toBe(true);
+  });
+
+  it('accumulates voltage drop from the origin down the feeder tree', () => {
+    const project: ProjectInput = {
+      id: 'VD',
+      name: 'Deep tree',
+      panels: [
+        panel({
+          id: 'MAIN',
+          name: 'Main',
+          circuits: [branch({ id: 'f1', name: 'F1', loadKind: 'feeder', feedsPanelId: 'SDB', lengthM: 120 })],
+        }),
+        panel({
+          id: 'SDB',
+          name: 'SDB',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f1',
+          circuits: [branch({ id: 'f2', name: 'F2', loadKind: 'feeder', feedsPanelId: 'SSDB', lengthM: 120 })],
+        }),
+        panel({
+          id: 'SSDB',
+          name: 'SSDB',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f2',
+          circuits: [branch({ id: 'b', name: 'Far load', loadW: 8000, lengthM: 80 })],
+        }),
+      ],
+    };
+    const r = computeSystem(project);
+    const f1 = r.panels['MAIN']!.circuits.find((c) => c.circuitId === 'f1')!;
+    const f2 = r.panels['SDB']!.circuits.find((c) => c.circuitId === 'f2')!;
+    const b = r.panels['SSDB']!.circuits.find((c) => c.circuitId === 'b')!;
+
+    expect(b.cumulativeDropPercent).toBeDefined();
+    // Cumulative ≈ each upstream feeder segment + the branch's own run.
+    const expected = f1.voltageDrop.dropPercent + f2.voltageDrop.dropPercent + b.voltageDrop.dropPercent;
+    expect(b.cumulativeDropPercent!).toBeCloseTo(expected, 1);
+    // Strictly larger than its own segment (there IS upstream drop).
+    expect(b.cumulativeDropPercent!).toBeGreaterThan(b.voltageDrop.dropPercent);
+    // When the origin-to-load total breaches the limit, it is flagged.
+    if (b.cumulativeDropPercent! > b.voltageDrop.limitPercent + 1e-9) {
+      expect(
+        r.warnings.some((w) => w.code === 'cumulative-voltage-drop-exceeded' && w.circuitId === 'b'),
+      ).toBe(true);
+    }
   });
 });

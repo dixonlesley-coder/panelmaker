@@ -21,11 +21,12 @@ import {
   IconSun,
   IconTrendingDown,
 } from '@tabler/icons-react';
-import { computeLoadProfile, computeSystem } from '@shared/engine';
+import { computeLoadProfile } from '@shared/engine';
 import { computeEnergyEconomics } from '@shared/engine/energy';
 import { Stat } from '@renderer/features/components/Stat';
 import { formatIdr, formatKw } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 
 const PALETTE = ['indigo.6', 'teal.6', 'grape.6', 'orange.6', 'blue.6', 'lime.6', 'pink.6', 'cyan.6'];
 
@@ -36,7 +37,7 @@ export function Dashboard() {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const profile = useMemo(() => computeLoadProfile(project), [project]);
-  const system = useMemo(() => computeSystem(project), [project]);
+  const system = useSystemResult();
   const energy = useMemo(() => computeEnergyEconomics(project, system), [project, system]);
 
   const data = useMemo(

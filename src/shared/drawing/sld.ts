@@ -11,6 +11,7 @@
 
 import type { PanelInput } from '../types/project';
 import type { PanelResult } from '../types/results';
+import { panelLabel } from '../labels';
 import type { Drawing, Prim } from './geometry';
 
 /** Horizontal pitch between branch drops (user units). */
@@ -65,7 +66,7 @@ export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
     type: 'text',
     x: busMidX + BREAKER_W / 2 + 6,
     y: INCOMER_Y + BREAKER_H / 2 + FONT / 3,
-    text: `${panel.name} · ${result.totalDemandCurrentA.toFixed(0)} A`,
+    text: `${panelLabel(panel)} · ${result.totalDemandCurrentA.toFixed(0)} A`,
     size: FONT,
   });
 

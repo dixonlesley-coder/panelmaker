@@ -141,9 +141,11 @@ describe('transformer losses', () => {
     const loading = system.supply.demandKva / kva;
     const expected = (kva * 0.002 + kva * 0.01 * loading ** 2) * 1000;
     expect(energy.losses.transformerLossW).toBeCloseTo(expected, 0);
+    // Components are each rounded independently, so the summed-then-rounded total
+    // can differ from the sum-of-rounded components by up to ~0.1.
     expect(energy.losses.totalLossW).toBeCloseTo(
       energy.losses.copperLossW + energy.losses.transformerLossW,
-      1,
+      0,
     );
   });
 });
@@ -165,7 +167,9 @@ describe('energy cost', () => {
     const base = computeEnergyEconomics(project, system);
     const dearer = computeEnergyEconomics(project, system, { tariffIdrPerKwh: base.tariffIdrPerKwh * 2 });
     expect(dearer.tariffIdrPerKwh).toBeCloseTo(base.tariffIdrPerKwh * 2, 5);
-    expect(dearer.monthlyEnergyCost).toBeCloseTo(base.monthlyEnergyCost * 2, 0);
+    // Doubling the tariff doubles the bill; compare the ratio so an independent
+    // ±1 IDR rounding of two multi-million-rupiah totals doesn't flake the test.
+    expect(dearer.monthlyEnergyCost / base.monthlyEnergyCost).toBeCloseTo(2, 4);
   });
 
   it('scales loss energy by load factor when requested', () => {

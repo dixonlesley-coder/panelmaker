@@ -8,12 +8,15 @@ import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC } from './control/motorFLC';
 import { circuitDemandFactor } from './occupancy';
+import { derivedPointsLoadW, finalCircuitWarnings, summarizeFinalCircuit } from './fixtures';
 import { sizeCableTray, sizeCircuitConduit } from './containment';
 import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
+import { checkBusbarWithstand } from './busbarFault';
+import { verifyEnclosureThermal } from './enclosureThermal';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
 import { computeHarmonics, harmonicsWarnings } from './harmonics';
@@ -37,13 +40,16 @@ export interface ComputePanelOptions {
 
 /**
  * A leaf circuit's connected demand (W): motor kW for motors, else connected W,
- * times the demand factor. `demandFactor` lets the caller pass an occupancy-
- * resolved factor; absent, the circuit's own value (default 1) is used.
+ * times the demand factor. When the circuit carries point-level detail
+ * (fixtures/sockets), the connected W is derived from the points and supersedes
+ * the flat `loadW`. `demandFactor` lets the caller pass an occupancy-resolved
+ * factor; absent, the circuit's own value (default 1) is used.
  */
 export function circuitConnectedW(c: CircuitInput, demandFactor?: number): number {
   const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
   const df = demandFactor ?? c.demandFactor ?? 1;
-  return (isMotor ? c.motorKw! * 1000 : c.loadW) * df;
+  const baseW = isMotor ? c.motorKw! * 1000 : (derivedPointsLoadW(c) ?? c.loadW);
+  return baseW * df;
 }
 
 function effectiveLoadW(c: CircuitInput, panel: PanelInput, opts: ComputePanelOptions): number {
@@ -94,7 +100,11 @@ function computeCircuit(
     : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
   const designCurrentA = round(ib, 1);
 
-  const breaker = selectBreaker({ designCurrentA: ib, loadKind: c.loadKind });
+  const breaker = selectBreaker({
+    designCurrentA: ib,
+    loadKind: c.loadKind,
+    overrideA: c.breakerOverrideA,
+  });
   const isTrunk = c.role === 'incomer' || isFeeder;
   const baseMinSection = isTrunk ? 4 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
@@ -103,7 +113,19 @@ function computeCircuit(
     breakerRatingA: breaker.ratingA,
     deratingFactor: df,
     minSectionMm2: minSection,
+    // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the
+    // resulting `vd` below is then within limit by construction in normal cases,
+    // and any residual over-limit is the genuinely-impossible (max-section) case.
+    vd: {
+      lengthM: c.lengthM,
+      cosPhi: c.cosPhi,
+      system: circuitSystem,
+      voltageV: useVoltage,
+      isLighting: c.isLighting,
+    },
   });
+  // Mark a manually pinned cable minimum so the UI can color it as an override.
+  if (c.cableOverrideMm2 !== undefined) cable.overridden = true;
   const vd = voltageDrop({
     currentA: ib,
     lengthM: c.lengthM,
@@ -192,6 +214,9 @@ function computeCircuit(
     result.zsOhm = zs.zsOhm;
     result.zsMaxOhm = zs.zsMaxOhm;
     result.disconnectsInTime = zs.disconnectsInTime;
+    result.earthFaultA = zs.earthFaultA;
+    result.peMinAdiabaticMm2 = zs.peMinAdiabaticMm2;
+    result.peAdiabaticOk = zs.peAdiabaticOk;
 
     warnings.push(
       ...protectionWarnings(result, {
@@ -200,6 +225,13 @@ function computeCircuit(
         panelId: panel.id,
       }),
     );
+  }
+
+  // Point-level (fixture / socket / switch-group) summary and checks.
+  const finalCircuit = summarizeFinalCircuit(c);
+  if (finalCircuit) {
+    result.finalCircuit = finalCircuit;
+    warnings.push(...finalCircuitWarnings(finalCircuit, { id: c.id, name: c.name }, panel.id));
   }
 
   warnings.push(
@@ -273,7 +305,51 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     1,
   );
   const busbar = sizeBusbar(totalDemandCurrentA);
+  // Verify the busbar can withstand the panel's prospective short-circuit (Icw),
+  // not just carry the continuous load (when the fault level is known).
+  if (opts.faultLevelA !== undefined) {
+    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, round(opts.faultLevelA / 1000, 1));
+    if (!busbar.withstand.adequate) {
+      warnings.push({
+        code: 'busbar-withstand-inadequate',
+        severity: 'error',
+        message: `${panel.name}: busbar ${busbar.csaMm2} mm² short-circuit withstand Icw ${busbar.withstand.icwKa} kA is below the ${busbar.withstand.faultKa} kA prospective fault — increase the bar section, brace it, or use parallel bars.`,
+        panelId: panel.id,
+      });
+    }
+  }
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
+  // Verify the internal temperature rise (IEC 61439-1 / 60890) and recommend an IP
+  // rating; floor-standing assemblies dissipate through different faces than wall-
+  // mounted ones.
+  enclosure.thermal = verifyEnclosureThermal({
+    widthMm: enclosure.widthMm,
+    heightMm: enclosure.heightMm,
+    depthMm: enclosure.depthMm,
+    totalHeatW,
+    mounting: hasFloorGear ? 'free-standing' : 'wall',
+    ambientC: panel.ambientTempC,
+  });
+  if (!enclosure.thermal.withinLimit) {
+    warnings.push({
+      code: 'enclosure-overtemp',
+      severity: 'warning',
+      message: `${panel.name}: estimated internal temperature rise ${enclosure.thermal.tempRiseK} K (≈ ${enclosure.thermal.internalTempC} °C internal) exceeds the recommended limit — add ventilation/cooling or use a larger enclosure.`,
+      panelId: panel.id,
+    });
+  }
+
+  // Future-expansion headroom: busbar reserve over the present demand, and a
+  // recommended spare-ways allowance (good practice ≥ 25% busbar / ~20% ways).
+  const busbarHeadroomPct =
+    busbar.ampacityA > 0
+      ? round(((busbar.ampacityA - totalDemandCurrentA) / busbar.ampacityA) * 100, 0)
+      : 0;
+  const spare = {
+    busbarHeadroomPct,
+    meetsReserveTarget: busbarHeadroomPct >= 25,
+    recommendedSpareWays: Math.max(3, Math.ceil(totalModules * 0.2)),
+  };
 
   // Cable tray for all outgoing cables, laid side-by-side in a single layer.
   const cableTray = sizeCableTray(circuits.map((c) => c.containment?.cableOdMm ?? 0));
@@ -314,11 +390,13 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   return {
     panelId: panel.id,
     name: panel.name,
+    ...(panel.tag ? { tag: panel.tag } : {}),
     circuits,
     busbar,
     enclosure,
     totalConnectedLoadW: round(totalConnectedLoadW, 0),
     totalDemandCurrentA,
+    spare,
     phaseBalance: {
       L1: balance.L1,
       L2: balance.L2,

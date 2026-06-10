@@ -44,3 +44,14 @@ export const TRANSFORMER_NO_LOAD_LOSS_PCT = 0.002; // ~0.2% of kVA
 
 /** Transformer full-load (copper/winding) loss as a fraction of nameplate kVA. */
 export const TRANSFORMER_LOAD_LOSS_PCT = 0.01; // ~1% of kVA at full load, scales with loading²
+
+/* ------------------------------- Time bases -------------------------------- */
+
+/**
+ * Days per billing month — 365/12 (~30.44), not a flat 30, so a monthly figure
+ * ×12 reconciles with the 365-day annual basis used for loss costs.
+ */
+export const DAYS_PER_MONTH = 365 / 12;
+
+/** Days per year, for annualised energy and loss costs. */
+export const DAYS_PER_YEAR = 365;

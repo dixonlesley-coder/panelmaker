@@ -5,8 +5,8 @@
  * app's data directory; thereafter it is read back. The returned id hashes that
  * stored UUID together with the host's `hostname`/`platform`, so it is stable
  * across launches on the same machine but does not leak the raw hostname. It is
- * stored alongside the session so a copied `license.json` taken to another
- * machine can be detected.
+ * stored with the session and checked on every launch (`session.ensureLicensed`),
+ * so a `license.json` copied to another machine is rejected.
  */
 
 import { createHash, randomUUID } from 'node:crypto';

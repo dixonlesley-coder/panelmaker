@@ -42,16 +42,25 @@ never makes the access-control decision.
    After 7 days with no successful verification, it **locks** to the sign-in
    screen. The window length is `OFFLINE_GRACE_MS = 7 * 24 * 3600 * 1000`.
 
+   The window is anchored to a **monotonic clock high-water mark** persisted with
+   the session: rolling the system clock **backwards** past it (the cheap way to
+   fake one's way back inside the window) is detected and refuses grace, so an
+   online re-verification is required. The id_token also carries an OIDC **nonce**
+   bound to each sign-in (replay protection), and the session is keyed to the
+   **machine** it was established on — a copied `license.json` is rejected.
+
 5. **Revocation.** When you **offboard a user** in the Google Admin console (or
    they leave the Workspace), Google **invalidates their refresh token**. The
    silent refresh then fails, so no new verification happens, and the app **locks
    within ≤ 7 days** (immediately once they next go online past the grace window,
    or at the latest when the 7-day window lapses).
 
-The refresh token is stored in `license.json` in the app's `userData` directory,
-**encrypted with Electron `safeStorage`** (OS keychain: Keychain / DPAPI /
-libsecret). If the OS keychain is unavailable it falls back to plaintext with a
-console warning.
+The session is stored in `license.json` in the app's `userData` directory. The
+**entire record** (refresh token, email/hd, machine id, and the grace-window
+anchor) is **encrypted with Electron `safeStorage`** (OS keychain: Keychain /
+DPAPI / libsecret) as one blob, so the grace timestamp can't be hand-edited. If
+the OS keychain is unavailable it falls back to plaintext with a console warning
+(the machine-id check still catches plain file copies in that mode).
 
 ---
 
@@ -75,24 +84,26 @@ as-yet-unconfigured desktop app are all unaffected.
 
 So you can exercise the **enforced** gate without a real Workspace account, the
 sign-in window offers a password-based **demo login** beneath the Google button.
+It is a deliberate gate bypass, so it is **opt-in — OFF by default** and never
+ships in a release unless you turn it on for a *test* build.
 
-- **Enabled by default** with a built-in password: **`panelmaker-demo`** (signed
-  in as `demo@panelmaker.local`). Just type it into the demo field and click
-  **Demo login**.
-- A demo session bypasses Google and stays valid until you sign out (or the demo
-  account is disabled).
-- **Override** the credentials with `DEMO_PASSWORD` / `DEMO_EMAIL` (env at build,
-  or in `license.config.json`).
-- **Disable for production** by building with `PANELMAKER_DISABLE_DEMO=1` (or
-  setting `DEMO_PASSWORD` to empty). The release workflow bakes this flag, so:
+- **Enable it for a test build** with `PANELMAKER_ENABLE_DEMO=1` (uses the
+  built-in password **`panelmaker-demo`**, signed in as `demo@panelmaker.local`),
+  or by setting a non-empty `DEMO_PASSWORD` of your own:
 
   ```bash
-  PANELMAKER_DISABLE_DEMO=1 GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… ALLOWED_HD=… \
-    npx electron-vite build && npx electron-builder --publish always
+  # internal test build with the demo login enabled
+  PANELMAKER_ENABLE_DEMO=1 GOOGLE_CLIENT_ID=… GOOGLE_CLIENT_SECRET=… ALLOWED_HD=… \
+    npx electron-vite build && npx electron-builder
   ```
+- **Override** the credentials with `DEMO_PASSWORD` / `DEMO_EMAIL` (env at build,
+  or in `license.config.json`); `PANELMAKER_DISABLE_DEMO=1` is a hard kill-switch.
+- A demo session bypasses Google and stays valid until you sign out (or the demo
+  account is disabled on the next launch).
 
-> ⚠️ The demo password is a deliberate gate bypass. Keep it for internal test
-> builds and **disable it (or change the password) in real production releases.**
+> ✅ A normal **production release leaves it unset**, so no demo bypass is baked
+> in. The release workflow additionally **refuses to publish** a tagged release
+> when `PANELMAKER_ENABLE_DEMO=1`, as a backstop.
 
 ---
 
@@ -203,13 +214,20 @@ attacker** with local access — the checks live in code that runs on the user's
 machine and can, with effort, be patched out. Treat it as access control for
 honest employees, not DRM.
 
+Already mitigated (not just "hardening to do"): id_token **signature + `aud`/
+`iss`/`exp`/`email_verified`/`hd`/`nonce`** are all verified; the session is
+**fully encrypted** and **machine-bound** (copied files are rejected); and the
+offline grace window resists **clock rollback** via a monotonic high-water mark.
+The remaining residual is binary patching (below).
+
 Recommended hardening:
 
 - **Code-sign** the application (Windows Authenticode, macOS notarization) so
   tampered binaries are detectable and SmartScreen/Gatekeeper warnings disappear.
-  The release workflow (`.github/workflows/release.yml`) already wires this up —
-  it builds **unsigned** until you add the relevant repo secrets, then signs (and
-  notarizes) automatically. Secrets:
+  The release workflow (`.github/workflows/release.yml`) wires this up and, for a
+  **published (tagged)** release, now **refuses to ship an unsigned Windows/macOS
+  installer** — because that artifact also feeds silent auto-update, where an
+  unverifiable binary would be applied to clients. Add the repo secrets to sign:
   - Windows: `WINDOWS_CSC_LINK` (base64 of your `.pfx`) + `WINDOWS_CSC_KEY_PASSWORD`.
   - macOS signing: `MAC_CSC_LINK` (base64 of your Developer ID `.p12`) + `MAC_CSC_KEY_PASSWORD`.
   - macOS notarization: `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID`.

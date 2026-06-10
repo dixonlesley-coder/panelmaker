@@ -4,9 +4,11 @@ import { peConductorSize } from '../standards/grounding';
 import { circuitConnectedW, computePanel } from './computePanel';
 import { circuitDemandFactor, effectiveDiversityFactor } from './occupancy';
 import { determineSupply } from './transformer';
+import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
+import { recommendSpd } from './spd';
 import {
   type Impedance,
   SELECTIVITY_RATIO,
@@ -19,6 +21,7 @@ import {
 } from './fault';
 import { selectBreaker } from './breakerSelect';
 import { sizeCable } from './cableSizing';
+import { CURVE_TRIP_MULTIPLE_LOWER } from '../standards/fault';
 import { round } from './util';
 
 /**
@@ -122,12 +125,17 @@ export function computeSystem(project: ProjectInput): SystemResult {
 
   // Determine the supply (LV direct vs MV + transformer) from the diversified
   // demand presented by the root panel(s). kVA = kW / power-factor.
-  const BUILDING_PF = 0.85;
   const rootDemandW = roots.reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
   const lvVoltageV = roots[0]?.voltageV ?? 400;
-  const totalDemandKva = rootDemandW / 1000 / BUILDING_PF;
+  const totalDemandKva = rootDemandW / 1000 / ASSUMED_BUILDING_PF;
   const supply = determineSupply(totalDemandKva, lvVoltageV);
-  const sources = computeSources(project.sources, totalDemandKva);
+  // Building motors (for the genset motor-start voltage-dip check).
+  const motors = project.panels.flatMap((p) =>
+    p.circuits
+      .filter((c) => c.motorKw !== undefined && c.motorKw > 0)
+      .map((c) => ({ name: c.name, kW: c.motorKw!, starterType: c.starterType })),
+  );
+  const sources = computeSources(project.sources, totalDemandKva, motors);
 
   // Prospective fault at the origin (main LV bus) and the source impedance behind
   // it. Each panel's bus fault decays down its feeder run from its parent's bus.
@@ -173,6 +181,49 @@ export function computeSystem(project: ProjectInput): SystemResult {
     pr.warnings.forEach((w) => warnings.push(w));
   }
 
+  // Cumulative (origin → load) voltage drop down the feeder tree. Each segment's
+  // %drop is referenced to its own nominal voltage and summed along the path —
+  // the conventional way PUIL/IEC express total drop from the origin. A branch
+  // whose cumulative drop exceeds its 3%/5% limit is flagged even when its own
+  // segment is within limit (auto-sizing only controls the per-segment drop).
+  const panelUpstreamDropPct = new Map<string, number>();
+  for (const id of [...postOrder].reverse()) {
+    // root-first
+    const parentId = parentOf.get(id);
+    let upstream = 0;
+    if (parentId !== undefined) {
+      const parent = byId.get(parentId);
+      const feeder = parent?.circuits.find((c) => c.feedsPanelId === id);
+      const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
+      upstream = (panelUpstreamDropPct.get(parentId) ?? 0) + (feederResult?.voltageDrop.dropPercent ?? 0);
+    }
+    upstream = round(upstream, 2);
+    panelUpstreamDropPct.set(id, upstream);
+
+    const pr = results[id];
+    if (!pr) continue;
+    // Feeder circuit ids in this panel — their cumulative drop is the sub-bus
+    // drop that downstream branches already account for, so we don't warn on them.
+    const feederIds = new Set(
+      (byId.get(id)?.circuits ?? []).filter((x) => x.feedsPanelId).map((x) => x.id),
+    );
+    for (const c of pr.circuits) {
+      const cum = round(upstream + c.voltageDrop.dropPercent, 2);
+      c.cumulativeDropPercent = cum;
+      if (!feederIds.has(c.circuitId) && cum > c.voltageDrop.limitPercent + 1e-9) {
+        const w: Warning = {
+          code: 'cumulative-voltage-drop-exceeded',
+          severity: 'warning',
+          message: `${c.name}: cumulative voltage drop ${cum}% from the origin exceeds the ${c.voltageDrop.limitPercent}% limit (this run ${c.voltageDrop.dropPercent}% + ${upstream}% upstream) — shorten the run, upsize the feeder, or relocate the load closer.`,
+          panelId: id,
+          circuitId: c.circuitId,
+        };
+        pr.warnings.push(w);
+        warnings.push(w);
+      }
+    }
+  }
+
   // Current-based selectivity between cascaded breakers (feeder vs sub-panel).
   const selectivity = selectivityReport(project, results, parentOf);
   for (const e of selectivity) {
@@ -181,6 +232,16 @@ export function computeSystem(project: ProjectInput): SystemResult {
         code: 'selectivity-risk',
         severity: 'warning',
         message: `Feeder "${e.upstreamName}" (${e.upstreamRatingA} A) may not discriminate with ${e.downstreamName}'s ${e.downstreamRatingA} A branch — ${e.marginNote} Verify with manufacturer curves.`,
+        panelId: e.upstreamPanelId,
+        circuitId: e.upstreamCircuitId,
+      });
+    } else if (e.scSelective === false && e.selectivityLimitA !== undefined) {
+      // Overload-discriminating, but a thermal-magnetic cascade only discriminates
+      // up to the upstream's instantaneous pickup; above it both trip together.
+      warnings.push({
+        code: 'selectivity-partial',
+        severity: 'info',
+        message: `Feeder "${e.upstreamName}" (${e.upstreamRatingA} A) discriminates with ${e.downstreamName} on overload, but only up to ~${e.selectivityLimitA} A; the ${round((e.downstreamFaultA ?? 0) / 1000, 1)} kA prospective fault there exceeds this, so short-circuit selectivity is only partial — confirm with manufacturer let-through / discrimination tables.`,
         panelId: e.upstreamPanelId,
         circuitId: e.upstreamCircuitId,
       });
@@ -200,8 +261,18 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const earthing = computeEarthing(
     project.earthingSystem ?? 'TN-C-S',
     peConductorSize(mainCable.csaMm2),
+    project.site?.soilResistivityOhmM,
   );
   const powerFactor = computePowerFactor(project);
+
+  // Surge-protection recommendation at the service origin (Type 1 under a
+  // lightning/overhead exposure, else Type 2), keyed to the earthing system.
+  const spd = recommendSpd({
+    earthingSystem,
+    hasExternalLps: project.site?.externalLps ?? false,
+    overheadSupply: project.site?.overheadSupply ?? false,
+    atOrigin: true,
+  });
 
   return {
     projectId: project.id,
@@ -210,6 +281,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
     supply,
     earthing,
     powerFactor,
+    spd,
     ...(sources ? { sources } : {}),
     ...(selectivity.length > 0 ? { selectivity } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
@@ -254,6 +326,14 @@ function selectivityReport(
       ? `ratio ${ratio} ≥ ${SELECTIVITY_RATIO}× — discriminates (screen).`
       : `upstream rating below ${requiredA} A (${SELECTIVITY_RATIO}×); ratio ${ratio}.`;
 
+    // Short-circuit discrimination ceiling: the upstream device stays out of its
+    // instantaneous region (so only the downstream trips) up to its lower magnetic
+    // pickup. Above the prospective fault at the child bus, both trip together.
+    const selectivityLimitA = round(CURVE_TRIP_MULTIPLE_LOWER[feederResult.breaker.curve] * upstreamIn, 0);
+    const childFaultA =
+      childResult.faultLevelKa !== undefined ? round(childResult.faultLevelKa * 1000, 0) : undefined;
+    const scSelective = childFaultA === undefined ? true : childFaultA <= selectivityLimitA + 1e-9;
+
     out.push({
       upstreamPanelId: parentId,
       upstreamCircuitId: feeder.id,
@@ -264,6 +344,9 @@ function selectivityReport(
       downstreamRatingA: downstreamIn,
       ratio,
       selective,
+      selectivityLimitA,
+      downstreamFaultA: childFaultA,
+      scSelective,
       marginNote,
     });
   }

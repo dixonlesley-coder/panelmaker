@@ -7,21 +7,47 @@ import {
   Group,
   NumberInput,
   Paper,
+  Popover,
+  SegmentedControl,
   Select,
+  Stack,
   Table,
   Text,
   TextInput,
   Tooltip,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { IconClipboard, IconCopy, IconCopyPlus, IconPlus, IconWand, IconTrash } from '@tabler/icons-react';
+import { useDisclosure, useLocalStorage } from '@mantine/hooks';
+import {
+  IconAdjustmentsAlt,
+  IconBulb,
+  IconClipboard,
+  IconCopy,
+  IconCopyPlus,
+  IconPlug,
+  IconPlus,
+  IconWand,
+  IconTrash,
+} from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
-import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor } from '@shared/standards';
+import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor, STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
+import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
+import { derivedPointsLoadW } from '@shared/engine/fixtures';
 import { selectHasClipboard, useProjectStore } from '@renderer/state/projectStore';
 import { CircuitWizard } from '@renderer/features/builder/CircuitWizard';
+import { PointsEditor } from '@renderer/features/builder/PointsEditor';
 
 /** Load-kind options for the editable Select (full catalog). */
 const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
+
+/** Manual-override pick lists: Auto + the standard ladders. */
+const BREAKER_OVERRIDE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  ...STANDARD_BREAKER_RATINGS_A.map((r) => ({ value: String(r), label: `${r} A` })),
+];
+const CABLE_OVERRIDE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  ...STANDARD_SECTIONS_MM2.map((s) => ({ value: String(s), label: `${s} mm²` })),
+];
 
 /** Daily-usage schedule presets. */
 const SCHEDULE_OPTIONS = SCHEDULE_PRESETS.map((p) => ({ value: p.key, label: p.label }));
@@ -45,11 +71,13 @@ interface RowProps {
   panelId: string;
   circuit: CircuitInput;
   selected: boolean;
+  /** Detailed mode shows the power-factor and usage-schedule columns. */
+  detailed: boolean;
   onToggle: (checked: boolean) => void;
 }
 
 /** A single editable circuit row. Edits dispatch immutable store updates. */
-function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
+function CircuitRow({ panelId, circuit, selected, detailed, onToggle }: RowProps) {
   const { t } = useTranslation();
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
@@ -57,6 +85,15 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
   const copyCircuit = useProjectStore((s) => s.copyCircuit);
 
   const motor = isMotorKind(circuit.loadKind);
+  // Final circuits (lighting/socket) can model their points; the connected load
+  // is then derived from the points and the flat kW input becomes read-only.
+  const pointsCapable = circuit.loadKind === 'lighting' || circuit.loadKind === 'socket';
+  const hasOverride = circuit.breakerOverrideA !== undefined || circuit.cableOverrideMm2 !== undefined;
+  const derivedW = derivedPointsLoadW(circuit);
+  const pointCount =
+    (circuit.fixtures ?? []).reduce((n, f) => n + f.qty, 0) +
+    (circuit.sockets ?? []).reduce((n, s) => n + s.qty, 0);
+  const [pointsOpen, points] = useDisclosure(false);
 
   const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
 
@@ -113,6 +150,16 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
             suffix=" kW"
             onChange={(v) => patch({ motorKw: typeof v === 'number' ? v : 0 })}
           />
+        ) : derivedW !== undefined ? (
+          <Tooltip label={t('builder.derivedFromPoints')}>
+            <NumberInput
+              value={derivedW / 1000}
+              size="xs"
+              decimalScale={2}
+              suffix=" kW"
+              disabled
+            />
+          </Tooltip>
         ) : (
           <NumberInput
             value={circuit.loadW / 1000}
@@ -137,31 +184,35 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
         />
       </Table.Td>
 
-      <Table.Td>
-        <NumberInput
-          value={circuit.cosPhi}
-          size="xs"
-          min={0.1}
-          max={1}
-          step={0.05}
-          decimalScale={2}
-          onChange={(v) => patch({ cosPhi: typeof v === 'number' ? v : circuit.cosPhi })}
-        />
-      </Table.Td>
+      {detailed && (
+        <Table.Td>
+          <NumberInput
+            value={circuit.cosPhi}
+            size="xs"
+            min={0.1}
+            max={1}
+            step={0.05}
+            decimalScale={2}
+            onChange={(v) => patch({ cosPhi: typeof v === 'number' ? v : circuit.cosPhi })}
+          />
+        </Table.Td>
+      )}
 
-      <Table.Td>
-        <Select
-          data={SCHEDULE_OPTIONS}
-          value={presetKeyFor(circuit.schedule)}
-          size="xs"
-          allowDeselect={false}
-          comboboxProps={{ withinPortal: true }}
-          onChange={(value) => {
-            const preset = SCHEDULE_PRESETS.find((p) => p.key === value);
-            patch({ schedule: preset?.schedule });
-          }}
-        />
-      </Table.Td>
+      {detailed && (
+        <Table.Td>
+          <Select
+            data={SCHEDULE_OPTIONS}
+            value={presetKeyFor(circuit.schedule)}
+            size="xs"
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            onChange={(value) => {
+              const preset = SCHEDULE_PRESETS.find((p) => p.key === value);
+              patch({ schedule: preset?.schedule });
+            }}
+          />
+        </Table.Td>
+      )}
 
       <Table.Td>
         {motor ? (
@@ -182,6 +233,84 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
 
       <Table.Td>
         <Group gap={2} wrap="nowrap" justify="flex-end">
+          {pointsCapable && (
+            <Tooltip
+              label={
+                pointCount > 0
+                  ? t('builder.editPointsCount', { count: pointCount })
+                  : t('builder.editPoints')
+              }
+            >
+              <ActionIcon
+                variant={pointCount > 0 ? 'light' : 'subtle'}
+                color="indigo"
+                aria-label={t('builder.editPoints')}
+                onClick={points.open}
+              >
+                {circuit.loadKind === 'lighting' ? <IconBulb size={16} /> : <IconPlug size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {pointsCapable && pointsOpen && (
+            <PointsEditor
+              panelId={panelId}
+              circuit={circuit}
+              opened={pointsOpen}
+              onClose={points.close}
+            />
+          )}
+          <Popover width={240} position="bottom-end" withinPortal shadow="md">
+            <Popover.Target>
+              <Tooltip label={t('builder.overrides')}>
+                <ActionIcon
+                  variant={hasOverride ? 'light' : 'subtle'}
+                  color={hasOverride ? 'violet' : 'gray'}
+                  aria-label={t('builder.overrides')}
+                >
+                  <IconAdjustmentsAlt size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="xs">
+                <Text size="xs" c="dimmed">
+                  {t('builder.overridesHint')}
+                </Text>
+                <Select
+                  label={t('builder.overrideBreaker')}
+                  size="xs"
+                  data={BREAKER_OVERRIDE_OPTIONS}
+                  value={circuit.breakerOverrideA !== undefined ? String(circuit.breakerOverrideA) : 'auto'}
+                  allowDeselect={false}
+                  comboboxProps={{ withinPortal: true }}
+                  styles={
+                    circuit.breakerOverrideA !== undefined
+                      ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                      : undefined
+                  }
+                  onChange={(v) =>
+                    patch({ breakerOverrideA: v && v !== 'auto' ? Number(v) : undefined })
+                  }
+                />
+                <Select
+                  label={t('builder.overrideCable')}
+                  size="xs"
+                  data={CABLE_OVERRIDE_OPTIONS}
+                  value={circuit.cableOverrideMm2 !== undefined ? String(circuit.cableOverrideMm2) : 'auto'}
+                  allowDeselect={false}
+                  comboboxProps={{ withinPortal: true }}
+                  styles={
+                    circuit.cableOverrideMm2 !== undefined
+                      ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                      : undefined
+                  }
+                  onChange={(v) =>
+                    patch({ cableOverrideMm2: v && v !== 'auto' ? Number(v) : undefined })
+                  }
+                />
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
           <Tooltip label={t('builder.duplicateCircuit')}>
             <ActionIcon
               variant="subtle"
@@ -236,7 +365,26 @@ function BulkActionBar({
   const bulkUpdateCircuits = useProjectStore((s) => s.bulkUpdateCircuits);
   const removeCircuits = useProjectStore((s) => s.removeCircuits);
 
-  const apply = (patch: Partial<CircuitInput>) => {
+  // Stage edits locally and commit once on Apply — committing on every onChange
+  // applied "2" of "25" to every selected circuit and dismissed the bar before
+  // the second digit could be typed.
+  const [lengthM, setLengthM] = useState<number | string>('');
+  const [demandFactor, setDemandFactor] = useState<number | string>('');
+  const [loadKind, setLoadKind] = useState<LoadKind | null>(null);
+
+  const patch = useMemo(() => {
+    const p: Partial<CircuitInput> = {};
+    if (typeof lengthM === 'number') p.lengthM = lengthM;
+    if (typeof demandFactor === 'number') p.demandFactor = demandFactor;
+    if (loadKind) {
+      p.loadKind = loadKind;
+      p.isLighting = loadKind === 'lighting';
+    }
+    return p;
+  }, [lengthM, demandFactor, loadKind]);
+
+  const apply = () => {
+    if (Object.keys(patch).length === 0) return;
     bulkUpdateCircuits(panelId, ids, patch);
     onDone();
   };
@@ -255,9 +403,8 @@ function BulkActionBar({
           step={5}
           suffix=" m"
           placeholder={t('builder.cableLengthPlaceholder')}
-          onChange={(v) => {
-            if (typeof v === 'number') apply({ lengthM: v });
-          }}
+          value={lengthM}
+          onChange={setLengthM}
         />
         <NumberInput
           label={t('builder.demandFactor')}
@@ -268,9 +415,8 @@ function BulkActionBar({
           step={0.05}
           decimalScale={2}
           placeholder={t('builder.demandFactorPlaceholder')}
-          onChange={(v) => {
-            if (typeof v === 'number') apply({ demandFactor: v });
-          }}
+          value={demandFactor}
+          onChange={setDemandFactor}
         />
         <Select
           label={t('builder.loadKind')}
@@ -279,12 +425,12 @@ function BulkActionBar({
           w={150}
           placeholder={t('builder.loadKindPlaceholder')}
           comboboxProps={{ withinPortal: true }}
-          onChange={(value) => {
-            if (!value) return;
-            const kind = value as LoadKind;
-            apply({ loadKind: kind, isLighting: kind === 'lighting' });
-          }}
+          value={loadKind}
+          onChange={(value) => setLoadKind((value as LoadKind | null) ?? null)}
         />
+        <Button size="xs" disabled={Object.keys(patch).length === 0} onClick={apply}>
+          {t('builder.bulkApply')}
+        </Button>
         <Button
           size="xs"
           color="red"
@@ -302,17 +448,28 @@ function BulkActionBar({
   );
 }
 
+/** Stable empty list so the selector keeps referential equality when the panel is missing. */
+const NO_CIRCUITS: CircuitInput[] = [];
+
 /** Structured editor for a panel's branch circuits; recomputes the panel live. */
 export function CircuitTable({ panelId }: { panelId: string }) {
   const { t } = useTranslation();
   const circuits = useProjectStore(
-    (s) => s.project.panels.find((p) => p.id === panelId)?.circuits ?? [],
+    (s) => s.project.panels.find((p) => p.id === panelId)?.circuits ?? NO_CIRCUITS,
   );
   const addCircuit = useProjectStore((s) => s.addCircuit);
   const pasteCircuit = useProjectStore((s) => s.pasteCircuit);
   const hasClipboard = useProjectStore(selectHasClipboard);
 
   const [wizardOpened, wizard] = useDisclosure(false);
+
+  // Progressive disclosure: Simple hides the cosφ / usage-schedule columns so a
+  // first-time user only sees name, kind, load and length. Persisted locally.
+  const [detailMode, setDetailMode] = useLocalStorage<'simple' | 'detailed'>({
+    key: 'panelmaker:circuit-detail',
+    defaultValue: 'simple',
+  });
+  const detailed = detailMode === 'detailed';
 
   // Local selection state for bulk editing, keyed by circuit id.
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -341,7 +498,18 @@ export function CircuitTable({ panelId }: { panelId: string }) {
 
   return (
     <div>
-      <Table.ScrollContainer minWidth={900}>
+      <Group justify="flex-end" mb={6}>
+        <SegmentedControl
+          size="xs"
+          data={[
+            { value: 'simple', label: t('builder.modeSimple') },
+            { value: 'detailed', label: t('builder.modeDetailed') },
+          ]}
+          value={detailMode}
+          onChange={(v) => setDetailMode(v === 'detailed' ? 'detailed' : 'simple')}
+        />
+      </Group>
+      <Table.ScrollContainer minWidth={detailed ? 900 : 660}>
         <Table verticalSpacing="xs" highlightOnHover stickyHeader>
           <Table.Thead>
             <Table.Tr>
@@ -361,8 +529,8 @@ export function CircuitTable({ panelId }: { panelId: string }) {
               <Table.Th w={130}>{t('builder.colKind')}</Table.Th>
               <Table.Th w={120}>{t('builder.colLoad')}</Table.Th>
               <Table.Th w={100}>{t('builder.colLength')}</Table.Th>
-              <Table.Th w={80}>{t('builder.colPf')}</Table.Th>
-              <Table.Th w={170}>{t('builder.colUsage')}</Table.Th>
+              {detailed && <Table.Th w={80}>{t('builder.colPf')}</Table.Th>}
+              {detailed && <Table.Th w={170}>{t('builder.colUsage')}</Table.Th>}
               <Table.Th w={160}>{t('builder.colStarter')}</Table.Th>
               <Table.Th w={108} />
             </Table.Tr>
@@ -374,6 +542,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
                 panelId={panelId}
                 circuit={c}
                 selected={selected.has(c.id)}
+                detailed={detailed}
                 onToggle={(checked) => toggleOne(c.id, checked)}
               />
             ))}

@@ -22,16 +22,29 @@ export function useAutosave(): { hydrated: boolean; saveState: SaveState; target
   const project = useProjectStore((s) => s.project);
   const replaceProject = useProjectStore((s) => s.replaceProject);
   const [hydrated, setHydrated] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
 
   // restore once on mount
   useEffect(() => {
     let cancelled = false;
     loadPersistedProject()
-      .then((p) => {
-        if (!cancelled && p) replaceProject(p);
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          // The store exists but couldn't be read — do NOT autosave over it.
+          setLoadFailed(true);
+          setSaveState('error');
+          return;
+        }
+        if (res.project) replaceProject(res.project);
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!cancelled) {
+          setLoadFailed(true);
+          setSaveState('error');
+        }
+      })
       .finally(() => {
         if (!cancelled) setHydrated(true);
       });
@@ -40,9 +53,12 @@ export function useAutosave(): { hydrated: boolean; saveState: SaveState; target
     };
   }, [replaceProject]);
 
-  // debounced autosave after hydration
+  // Debounced autosave after hydration. Suspended when the launch restore
+  // FAILED (a transient IPC/DB error must not let the pristine sample overwrite
+  // the user's stored project); any persisted-store problem keeps showing as
+  // the 'error' badge until restart.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || loadFailed) return;
     setSaveState('saving');
     const t = setTimeout(() => {
       persistProject(project)
@@ -50,7 +66,7 @@ export function useAutosave(): { hydrated: boolean; saveState: SaveState; target
         .catch(() => setSaveState('error'));
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [project, hydrated]);
+  }, [project, hydrated, loadFailed]);
 
   // best-effort flush on tab/window close (web)
   useEffect(() => {

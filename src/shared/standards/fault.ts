@@ -21,11 +21,48 @@ export const DEFAULT_LV_UTILITY_FAULT_KA = 16;
 export const NOMINAL_PHASE_VOLTAGE_V = 230;
 
 /**
+ * X/R ratio of the equivalent source impedance behind the LV bus. The source is
+ * transformer/utility-dominated and largely reactive, so X/R is high (~7 for an
+ * LV network per IEC 60909 typical values). Used to split the source |Z| derived
+ * from the prospective Isc into R and X components (the magnitude is preserved,
+ * so Isc is unchanged; only the R/X share — which matters for the earth-fault
+ * loop — becomes physical instead of a pure reactance).
+ */
+export const SOURCE_XR_RATIO = 7;
+
+/**
+ * Adiabatic constant k for a protective (PE) conductor (A·s^½/mm²), copper with
+ * PVC insulation as a core of a cable / bunched, 70 °C initial — IEC 60364-5-54
+ * Table 54.3. The PE must satisfy S ≥ √(I²·t)/k to survive the earth-fault
+ * energy let-through (IEC 60364-5-54 §543.1.2).
+ */
+export const PE_ADIABATIC_K = 115;
+
+/**
+ * Representative protective-device clearing time (s) used for the PE adiabatic
+ * thermal-withstand check. An earth fault above the magnetic-trip threshold
+ * clears effectively instantaneously; 0.1 s is the conservative lower-bound of
+ * the adiabatic method's validity range (IEC 60364-4-43 Annex), so it bounds the
+ * let-through energy without needing the device's i²t curve.
+ */
+export const PE_FAULT_CLEAR_TIME_S = 0.1;
+
+/**
  * Fault-circuit factor (Cmin-style) applied to U0 when deriving the maximum
  * permissible earth-fault loop impedance, allowing for voltage depression
  * during the fault (IEC 60364-4-41).
  */
 export const ZS_VOLTAGE_FACTOR = 0.95;
+
+/**
+ * Conductor resistance rises with temperature. For the worst-case earth-fault
+ * loop (ADS) the loop R must be evaluated near the conductor's fault temperature,
+ * not the ~70 °C value tabulated for voltage drop — a higher Zs is the
+ * unfavourable case for disconnection. ~1.28× lifts the 70 °C R toward the PVC
+ * fault limit (~160 °C), making the Zs / disconnection check conservative
+ * (IEC 60364-4-41 / IEC 60909 temperature correction).
+ */
+export const ZS_FAULT_TEMP_FACTOR = 1.28;
 
 /**
  * Magnetic (instantaneous) trip multiple of rated current for each MCB curve
@@ -36,6 +73,19 @@ export const CURVE_TRIP_MULTIPLE: Readonly<Record<BreakerCurve, number>> = {
   B: 5,
   C: 10,
   D: 20,
+};
+
+/**
+ * Lower bound of the magnetic (instantaneous) trip band — the multiple of In
+ * below which an MCB is guaranteed NOT to trip instantaneously (IEC 60898:
+ * B 3-5×, C 5-10×, D 10-20×). For selectivity this is the current up to which an
+ * upstream device stays out of its instantaneous region while a downstream device
+ * clears — i.e. the ceiling of guaranteed short-circuit discrimination.
+ */
+export const CURVE_TRIP_MULTIPLE_LOWER: Readonly<Record<BreakerCurve, number>> = {
+  B: 3,
+  C: 5,
+  D: 10,
 };
 
 /**

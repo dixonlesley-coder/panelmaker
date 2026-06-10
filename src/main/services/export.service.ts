@@ -28,7 +28,8 @@ import type {
   Warning,
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
-import { panelGaSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
+import { panelGaSvg, panelPointsSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
+import { panelLabel } from '@shared/labels';
 import {
   buildSystemBom,
   consolidateBom,
@@ -157,12 +158,26 @@ function panelDiagramsBlock(
   result: PanelResult,
   project: ProjectInput,
 ): Content[] {
-  return [
+  const blocks: Content[] = [
     heading('Single-line diagram'),
     { svg: panelSldSvg(panel, result, titleStripFor(project, 'Single-line diagram')), width: 515 },
     { text: 'General arrangement', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
     { svg: panelGaSvg(panel, result, titleStripFor(project, 'General arrangement')), fit: [515, 360] },
   ];
+  // Lighting & small-power points diagram — only when circuits carry point detail.
+  const hasPoints = panel.circuits.some(
+    (c) => (c.fixtures ?? []).length > 0 || (c.sockets ?? []).length > 0,
+  );
+  if (hasPoints) {
+    blocks.push(
+      { text: 'Lighting & switching', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
+      {
+        svg: panelPointsSvg(panel, result, titleStripFor(project, 'Lighting & switching')),
+        fit: [515, 640],
+      },
+    );
+  }
+  return blocks;
 }
 
 /**
@@ -369,7 +384,7 @@ function panelDocDefinition(
     pageMargins: [36, 36, 36, 48],
     content: [
       ...titleBlock(project, 'Panel Report'),
-      heading(`Panel: ${panel.name}`),
+      heading(`Panel: ${panelLabel(panel)}`),
       panelSpecTable(panel),
       heading('Circuit Schedule'),
       circuitScheduleTable(panel),
@@ -414,7 +429,7 @@ function systemDocDefinition(
   for (const panelId of system.order) {
     const panel = system.panels[panelId];
     if (!panel) continue;
-    content.push(heading(`Panel: ${panel.name}`));
+    content.push(heading(`Panel: ${panelLabel(panel)}`));
     content.push(panelSpecTable(panel));
     content.push({ text: 'Circuit Schedule', style: 'h2', margin: [0, 6, 0, 4] });
     content.push(circuitScheduleTable(panel));

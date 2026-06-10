@@ -5,6 +5,13 @@ import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
 import type { PhaseAssignment, EarthingSystem } from './electrical';
 import type { SourcesResult } from './sources';
+// Type-only imports of result shapes defined alongside their engine modules
+// (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
+import type { SpdResult } from '../engine/spd';
+import type { ElectrodeResult } from '../engine/electrode';
+import type { BusbarWithstandResult } from '../engine/busbarFault';
+import type { EnclosureThermalResult } from '../engine/enclosureThermal';
+import type { FinalCircuitResult } from '../engine/fixtures';
 
 /** Residual-current device requirement for a circuit. */
 export interface RcdSpec {
@@ -24,6 +31,8 @@ export interface EarthingResult {
   mainBondingConductorMm2: number;
   /** Target earth-electrode resistance (ohm). */
   electrodeResistanceTargetOhm: number;
+  /** Earth-electrode (rod array) design from soil resistivity. */
+  electrode?: ElectrodeResult;
   note: string;
 }
 
@@ -62,6 +71,8 @@ export interface BreakerResult {
   ratingA: number;
   deviceClass: BreakerClass;
   curve: BreakerCurve;
+  /** True when the rating came from a manual user override (not auto-sized). */
+  overridden?: boolean;
 }
 
 export interface CableResult {
@@ -70,6 +81,14 @@ export interface CableResult {
   deratedIzA: number;
   deratingFactor: number;
   appliedRule: string;
+  /**
+   * True when the section was increased beyond the ampacity minimum to keep the
+   * run's voltage drop within its 3%/5% limit (informational — the cable is
+   * compliant by construction, the surcharge in copper is just made visible).
+   */
+  vdDriven?: boolean;
+  /** True when a manual user minimum (cableOverrideMm2) is pinned on this run. */
+  overridden?: boolean;
 }
 
 export interface VoltageDropResult {
@@ -88,6 +107,14 @@ export interface CircuitResult {
   breaker: BreakerResult;
   cable: CableResult;
   voltageDrop: VoltageDropResult;
+  /**
+   * Cumulative voltage drop from the supply origin to this circuit's load (%),
+   * i.e. the sum of every upstream feeder segment's drop plus this run's drop.
+   * Set by `computeSystem` once the feeder tree is known. PUIL/IEC measure the
+   * 3%/5% limit from the origin, so a deep branch can breach it even when its own
+   * segment is within limit.
+   */
+  cumulativeDropPercent?: number;
   grounding: GroundingResult;
   rcd: RcdSpec;
   control?: ControlAssembly;
@@ -101,8 +128,16 @@ export interface CircuitResult {
   zsMaxOhm?: number;
   /** True when Zs <= Zs_max (automatic disconnection within the limit). */
   disconnectsInTime?: boolean;
+  /** Prospective earth-fault current at the circuit (A), U0/Zs — TN systems. */
+  earthFaultA?: number;
+  /** Minimum PE CSA for adiabatic thermal withstand of the earth fault (mm²). */
+  peMinAdiabaticMm2?: number;
+  /** True when the PE conductor meets the adiabatic thermal-withstand minimum. */
+  peAdiabaticOk?: boolean;
   /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
   containment?: ContainmentResult;
+  /** Point-level summary (fixtures / sockets / switch groups), when modelled. */
+  finalCircuit?: FinalCircuitResult;
 }
 
 /** Conduit sizing + fill for a single circuit cable. */
@@ -131,6 +166,18 @@ export interface BusbarResult {
   csaMm2: number;
   ampacityA: number;
   totalCurrentA: number;
+  /** Short-circuit (Icw / Ipk) withstand check at the panel's prospective fault. */
+  withstand?: BusbarWithstandResult;
+}
+
+/** Future-expansion headroom on a panel's busbar and ways. */
+export interface SpareCapacityResult {
+  /** Busbar continuous-current headroom over the present demand (%). */
+  busbarHeadroomPct: number;
+  /** True when the busbar reserve meets the recommended ≥ 25% future allowance. */
+  meetsReserveTarget: boolean;
+  /** Recommended spare DIN ways to leave for future circuits (≈ 20%, min 3). */
+  recommendedSpareWays: number;
 }
 
 export interface EnclosureResult {
@@ -142,6 +189,8 @@ export interface EnclosureResult {
   ventilation: Ventilation;
   modules: number;
   rows: number;
+  /** Temperature-rise verification + IP-rating recommendation (IEC 61439-1 / 60890). */
+  thermal?: EnclosureThermalResult;
 }
 
 /**
@@ -276,11 +325,15 @@ export interface QuotationResult {
 export interface PanelResult {
   panelId: string;
   name: string;
+  /** Short panel designation / tag (e.g. "LP-1"), when set on the input. */
+  tag?: string;
   circuits: CircuitResult[];
   busbar: BusbarResult;
   enclosure: EnclosureResult;
   totalConnectedLoadW: number;
   totalDemandCurrentA: number;
+  /** Future-expansion headroom on the busbar + recommended spare ways. */
+  spare?: SpareCapacityResult;
   phaseBalance: PhaseBalanceResult;
   warnings: Warning[];
   standardsVersion: string;
@@ -342,8 +395,18 @@ export interface SelectivityEntry {
   downstreamRatingA: number;
   /** Upstream rating / downstream rating. */
   ratio: number;
-  /** True when ratio meets the discrimination rule of thumb. */
+  /** True when ratio meets the overload discrimination rule of thumb. */
   selective: boolean;
+  /**
+   * Current up to which short-circuit discrimination holds (A): the upstream
+   * device's lower magnetic-trip threshold, below which only the downstream
+   * device trips instantaneously. Above it, both may trip (loss of selectivity).
+   */
+  selectivityLimitA?: number;
+  /** Prospective fault at the downstream bus (A), compared against the limit. */
+  downstreamFaultA?: number;
+  /** True when the downstream fault stays within the short-circuit limit. */
+  scSelective?: boolean;
   marginNote: string;
 }
 
@@ -357,6 +420,8 @@ export interface SystemResult {
   earthing: EarthingResult;
   /** Power-factor analysis + capacitor-bank recommendation. */
   powerFactor: CapacitorBankResult;
+  /** Surge-protection (SPD) recommendation at the service origin. */
+  spd?: SpdResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
   /** Current-based discrimination report per cascaded device pair. */

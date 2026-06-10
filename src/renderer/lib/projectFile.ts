@@ -114,8 +114,27 @@ export function downloadProjectFile(project: ProjectInput): void {
 }
 
 /**
+ * Sentinel thrown when the user dismisses the import file picker (or picks
+ * nothing). Callers detect it by `instanceof` / the `code`, NOT by matching the
+ * message text — the message can be localized/reworded freely.
+ */
+export class ImportCancelledError extends Error {
+  readonly code = 'import-cancelled';
+  constructor() {
+    super('Import cancelled.');
+    this.name = 'ImportCancelledError';
+  }
+}
+
+/** True when an unknown error is the user-cancelled-import sentinel. */
+export function isImportCancelled(e: unknown): boolean {
+  return e instanceof ImportCancelledError || (e as { code?: string })?.code === 'import-cancelled';
+}
+
+/**
  * Open a hidden file picker, read the chosen `.json` file and parse it into a
- * {@link ProjectInput}. Rejects if the user cancels or the file is malformed.
+ * {@link ProjectInput}. Rejects with {@link ImportCancelledError} if the user
+ * cancels, or an ordinary Error if the file is malformed.
  */
 export function pickAndReadProjectFile(): Promise<ProjectInput> {
   return new Promise((resolve, reject) => {
@@ -139,7 +158,7 @@ export function pickAndReadProjectFile(): Promise<ProjectInput> {
         if (!settled) {
           settled = true;
           cleanup();
-          reject(new Error('No file selected.'));
+          reject(new ImportCancelledError());
         }
         return;
       }
@@ -157,8 +176,19 @@ export function pickAndReadProjectFile(): Promise<ProjectInput> {
         });
     });
 
-    // If the dialog is dismissed without a selection, the change event may not
-    // fire; the focus-return cancel guard resolves the dangling promise.
+    // Modern Chromium fires 'cancel' when the dialog is dismissed — the reliable
+    // signal that settles the promise even on window managers where the dialog
+    // never blurs the window (which broke the focus-based guard below).
+    input.addEventListener('cancel', () => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        reject(new ImportCancelledError());
+      }
+    });
+
+    // Fallback for engines without the input 'cancel' event: when focus returns
+    // with no selection, treat it as a cancel.
     window.addEventListener(
       'focus',
       () => {
@@ -166,7 +196,7 @@ export function pickAndReadProjectFile(): Promise<ProjectInput> {
           if (!settled && (!input.files || input.files.length === 0)) {
             settled = true;
             cleanup();
-            reject(new Error('Import cancelled.'));
+            reject(new ImportCancelledError());
           }
         }, 300);
       },

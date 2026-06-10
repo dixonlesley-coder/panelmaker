@@ -12,14 +12,14 @@ import {
 
 describe('motorFLC', () => {
   it('matches the standard table at exact ratings', () => {
-    expect(motorFLC(11)).toBeCloseTo(30, 1);
-    expect(motorFLC(22)).toBeCloseTo(61, 1);
-    expect(motorFLC(37)).toBeCloseTo(102, 1);
-    expect(motorFLC(7.5)).toBeCloseTo(20, 1);
+    expect(motorFLC(11)).toBeCloseTo(22, 1);
+    expect(motorFLC(22)).toBeCloseTo(42, 1);
+    expect(motorFLC(37)).toBeCloseTo(68, 1);
+    expect(motorFLC(7.5)).toBeCloseTo(15.5, 1);
   });
   it('interpolates between ratings', () => {
-    // between 7.5 kW (20 A) and 11 kW (30 A)
-    expect(motorFLC(9)).toBeCloseTo(24.3, 1);
+    // between 7.5 kW (15.5 A) and 11 kW (22 A)
+    expect(motorFLC(9)).toBeCloseTo(18.3, 1);
   });
 });
 
@@ -88,9 +88,9 @@ describe('selectVFD', () => {
 describe('applyStarterTemplate', () => {
   it('builds a DOL assembly', () => {
     const a = applyStarterTemplate({ circuitId: 'c1', starterType: 'DOL', motorKw: 5.5 });
-    expect(a.motor?.flcA).toBeCloseTo(15, 1);
+    expect(a.motor?.flcA).toBeCloseTo(11.5, 1);
     const main = a.devices.find((d) => d.role === 'main-contactor');
-    expect(main?.rating).toContain('18 A');
+    expect(main?.rating).toContain('12 A'); // FLC 11.5 -> 12 A frame
     expect(a.interlocks).toHaveLength(0);
   });
 
@@ -99,9 +99,9 @@ describe('applyStarterTemplate', () => {
     const main = a.devices.find((d) => d.role === 'main-contactor');
     const star = a.devices.find((d) => d.role === 'star-contactor');
     const delta = a.devices.find((d) => d.role === 'delta-contactor');
-    expect(main?.rating).toContain('115 A'); // FLC 102 -> 115 A frame
-    expect(star?.rating).toContain('65 A'); // 102 * 0.58 = 59.2 -> 65 A
-    expect(delta?.rating).toContain('115 A');
+    expect(main?.rating).toContain('80 A'); // FLC 68 -> 80 A frame
+    expect(star?.rating).toContain('40 A'); // 68 * 0.58 = 39.4 -> 40 A
+    expect(delta?.rating).toContain('80 A');
     // control transformer present
     expect(a.devices.some((d) => d.category === 'control_transformer')).toBe(true);
     // mechanical + electrical star<->delta interlocks

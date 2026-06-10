@@ -212,6 +212,46 @@ export const SAMPLE_PARTS: Part[] = [
     attributes: { type: 'hour_run', display: 'LCD', range: '0–9999.9h', sizeMm: '48x24', sku: 'H7EC-NV' },
     defaultUnit: 'pcs',
   },
+  {
+    id: 'led-downlight-12',
+    category: 'light_fixture',
+    manufacturer: 'Philips',
+    model: 'LED downlight 12W',
+    attributes: { watts: 12, lumen: 1100, mounting: 'recessed' },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'switch-1g',
+    category: 'switch',
+    manufacturer: 'Panasonic',
+    model: '1-gang switch 10AX',
+    attributes: { gang: 1, ratingA: 10, ways: 1 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'switch-2g',
+    category: 'switch',
+    manufacturer: 'Panasonic',
+    model: '2-gang switch 10AX',
+    attributes: { gang: 2, ratingA: 10, ways: 1 },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'smart-relay-1ch',
+    category: 'smart_switch',
+    manufacturer: 'Generic',
+    model: 'Smart relay module 1-ch 10A (Wi-Fi)',
+    attributes: { channels: 1, ratingA: 10, protocol: 'wifi', needsNeutral: true },
+    defaultUnit: 'pcs',
+  },
+  {
+    id: 'socket-16a',
+    category: 'socket_outlet',
+    manufacturer: 'Panasonic',
+    model: 'Socket outlet 16A CEE 7/3',
+    attributes: { ratingA: 16, earthed: true },
+    defaultUnit: 'pcs',
+  },
 ];
 
 /** Sample unit prices (IDR) keyed by part id. */
@@ -242,4 +282,9 @@ export const SAMPLE_PRICES: Record<string, number> = {
   'ammeter-selector': 210000,
   'buzzer-22': 78000,
   'hour-meter': 295000,
+  'led-downlight-12': 95000,
+  'switch-1g': 38000,
+  'switch-2g': 62000,
+  'smart-relay-1ch': 185000,
+  'socket-16a': 45000,
 };

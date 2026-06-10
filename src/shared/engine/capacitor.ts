@@ -6,6 +6,7 @@ import {
 } from '../standards/capacitor';
 import type { ProjectInput } from '../types/project';
 import type { CapacitorBankResult } from '../types/results';
+import { derivedPointsLoadW } from './fixtures';
 import { round } from './util';
 
 function clampPf(pf: number): number {
@@ -29,7 +30,9 @@ export function computePowerFactor(
     for (const c of panel.circuits) {
       if (c.role !== 'branch' || c.feedsPanelId) continue; // leaf loads only
       const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
-      const loadKw = (isMotor ? c.motorKw! : c.loadW / 1000) * (c.demandFactor ?? 1);
+      // Point-modelled circuits (fixtures/sockets) derive their connected kW.
+      const baseKw = isMotor ? c.motorKw! : (derivedPointsLoadW(c) ?? c.loadW) / 1000;
+      const loadKw = baseKw * (c.demandFactor ?? 1);
       const pf = clampPf(c.starterType === 'VFD' ? 0.95 : c.cosPhi);
       const phi = Math.acos(pf);
       kw += loadKw;

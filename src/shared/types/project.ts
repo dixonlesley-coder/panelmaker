@@ -6,6 +6,7 @@
 
 import type { SystemType, LoadKind, InstallMethod, EarthingSystem, OccupancyType } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
+import type { LightFixture, SocketOutlet, SwitchGroup } from './fixtures';
 import type { SourcesConfig } from './sources';
 
 /** A load's daily operating window (hours). May wrap past midnight (e.g. 22→6). */
@@ -39,8 +40,24 @@ export interface CircuitInput {
   controlMode?: PumpControlMode;
   sensing?: LevelSensing;
 
+  // Point-level detail (final circuits). When fixtures/sockets are present the
+  // engine derives the connected load from the points, superseding `loadW`.
+  /** Light-fixture rows on a lighting circuit. */
+  fixtures?: LightFixture[];
+  /** Switching points (conventional gangs / smart relay channels) for the fixtures. */
+  switchGroups?: SwitchGroup[];
+  /** Socket-outlet rows on a socket circuit. */
+  sockets?: SocketOutlet[];
+
   /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
   cableOverrideMm2?: number;
+  /**
+   * Manual breaker rating override (A). When set, the engine uses this rating
+   * instead of auto-sizing from the load — and FLAGS non-compliance (an
+   * undersized override nuisance-trips) rather than silently correcting it.
+   * The cable still auto-sizes to cover the override (Iz ≥ In coordination).
+   */
+  breakerOverrideA?: number;
 
   /** Daily operating window; absent = continuous (24 h). Drives the load profile. */
   schedule?: LoadSchedule;
@@ -51,7 +68,14 @@ export interface CircuitInput {
 
 export interface PanelInput {
   id: string;
+  /** Descriptive name, e.g. "Ground-floor lighting & power". */
   name: string;
+  /**
+   * Short panel designation / tag, e.g. "LP-1", "MDP", "MCC-2". Optional; when
+   * set it labels the panel alongside the descriptive name in schedules, the
+   * SLD, the drawings and the PDF.
+   */
+  tag?: string;
   system: SystemType;
   voltageV: number;
   ambientTempC: number;
@@ -130,6 +154,20 @@ export interface ProjectMeta {
   quotation?: QuotationSettings;
 }
 
+/**
+ * Optional site/installation conditions that drive surge-protection (SPD) and
+ * earth-electrode design. All optional with safe defaults (no LPS, underground
+ * supply, ~100 Ω·m soil), so existing projects compute unchanged.
+ */
+export interface SiteConditions {
+  /** Building has an external Lightning Protection System (forces a Type 1 SPD). */
+  externalLps?: boolean;
+  /** Supply arrives via an overhead line / direct-strike exposure (Type 1 SPD). */
+  overheadSupply?: boolean;
+  /** Measured/assumed soil resistivity (Ω·m) for earth-electrode sizing. */
+  soilResistivityOhmM?: number;
+}
+
 export interface ProjectInput {
   id: string;
   name: string;
@@ -140,4 +178,6 @@ export interface ProjectInput {
   sources?: SourcesConfig;
   /** Optional project branding / title-block metadata. */
   meta?: ProjectMeta;
+  /** Optional site conditions (lightning exposure, soil resistivity) for SPD/earthing. */
+  site?: SiteConditions;
 }

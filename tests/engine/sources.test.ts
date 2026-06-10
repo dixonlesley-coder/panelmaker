@@ -35,7 +35,7 @@ describe('solar PV sizing', () => {
 describe('battery sizing', () => {
   it('sizes a LiFePO4 bank for load x autonomy', () => {
     const b = sizeBattery({ enabled: true, backupKw: 10, autonomyHours: 4, chemistry: 'lifepo4' });
-    expect(b.requiredKwh).toBeCloseTo(49.4, 0); // 10*4 / (0.9*0.9)
+    expect(b.requiredKwh).toBeCloseTo(46.8, 0); // 10*4 / (0.9 DoD * 0.95 discharge eff)
     expect(b.moduleCount).toBe(10);
     expect(b.installedKwh).toBeCloseTo(51.2, 1);
     expect(b.inverterKw).toBe(10);

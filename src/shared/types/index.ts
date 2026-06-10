@@ -1,4 +1,5 @@
 export * from './electrical';
+export * from './fixtures';
 export * from './parts';
 export * from './control';
 export * from './schematic';

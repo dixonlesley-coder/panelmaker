@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Card,
@@ -14,9 +13,9 @@ import {
   Title,
 } from '@mantine/core';
 import { IconBattery, IconBolt, IconSun } from '@tabler/icons-react';
-import { computeSystem } from '@shared/engine';
 import type { BatteryConfig, GeneratorConfig, GeneratorMode, SolarConfig } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 
 const DEFAULT_GEN: GeneratorConfig = { enabled: false, backupFraction: 1, mode: 'standby' };
 const DEFAULT_SOLAR: SolarConfig = { enabled: false, targetKwp: 50, panelWp: 550, dcAcRatio: 1.2 };
@@ -74,7 +73,7 @@ export function Sources() {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const updateSources = useProjectStore((s) => s.updateSources);
-  const system = useMemo(() => computeSystem(project), [project]);
+  const system = useSystemResult();
 
   const gen: GeneratorConfig = { ...DEFAULT_GEN, ...project.sources?.generator };
   const solar: SolarConfig = { ...DEFAULT_SOLAR, ...project.sources?.solar };
@@ -138,6 +137,27 @@ export function Sources() {
                   [t('sources.gensetRating'), `${res.generator.ratingKva} kVA`],
                   [t('sources.backupLoad'), `${res.generator.backupKva} kVA`],
                   [t('sources.duty'), res.generator.mode],
+                ]}
+              />
+            )}
+            {res?.gensetStart && res.gensetStart.startingKva > 0 && (
+              <ResultBlock
+                note={res.gensetStart.note}
+                stats={[
+                  [
+                    t('sources.startDip'),
+                    `${res.gensetStart.estimatedDipPct}% ${
+                      res.gensetStart.acceptable
+                        ? t('sources.startDipOk')
+                        : t('sources.startDipHigh')
+                    }`,
+                  ],
+                  [t('sources.startKva'), `${res.gensetStart.startingKva} kVA`],
+                  [
+                    t('sources.limitingMotor'),
+                    res.gensetStart.limitingMotorName ?? '—',
+                  ],
+                  [t('sources.minGensetForStart'), `${res.gensetStart.recommendedMinGensetKva} kVA`],
                 ]}
               />
             )}

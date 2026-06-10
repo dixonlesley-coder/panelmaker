@@ -55,6 +55,11 @@ export const STANDARD_REFERENCES: readonly StandardReference[] = [
     clause: 'IEC 60909 (fault levels); IEC 60898 / 60947-2 (Icu)',
   },
   {
+    key: 'selectivity',
+    topic: 'Discrimination / selectivity between cascaded breakers',
+    clause: 'IEC 60364-5-53 §536; IEC 60947-2 (let-through / coordination tables)',
+  },
+  {
     key: 'disconnection-time',
     topic: 'Earth-fault loop impedance & disconnection time (Zs ≤ Zs,max)',
     clause: 'IEC 60364-4-41 §411 (protection against electric shock)',
@@ -63,6 +68,11 @@ export const STANDARD_REFERENCES: readonly StandardReference[] = [
     key: 'protective-conductor',
     topic: 'Protective (PE) conductor sizing',
     clause: 'IEC 60364-5-54 Table 54.2',
+  },
+  {
+    key: 'adiabatic-pe',
+    topic: 'PE adiabatic thermal withstand (S ≥ √(I²·t)/k)',
+    clause: 'IEC 60364-5-54 §543.1.2 / Table 54.3',
   },
   {
     key: 'main-bonding',

@@ -54,13 +54,16 @@ CREATE TABLE IF NOT EXISTS projects (
   app_version TEXT,
   earthing_system TEXT,
   sources_json TEXT,
-  meta_json TEXT
+  meta_json TEXT,
+  site_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS panels (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  tag TEXT,
+  occupancy TEXT,
   system TEXT NOT NULL,
   voltage_v REAL NOT NULL,
   frequency_hz REAL NOT NULL DEFAULT 50,
@@ -93,12 +96,14 @@ CREATE TABLE IF NOT EXISTS circuits (
   control_mode TEXT,
   sensing TEXT,
   cable_override_mm2 REAL,
+  breaker_override_a REAL,
   schedule_start_hour INTEGER,
   schedule_end_hour INTEGER,
   feeds_panel_id TEXT,
   chosen_cable_part_id TEXT REFERENCES parts(id) ON DELETE SET NULL,
   chosen_breaker_part_id TEXT REFERENCES parts(id) ON DELETE SET NULL,
-  computed_json TEXT
+  computed_json TEXT,
+  points_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS control_assemblies (
@@ -196,6 +201,16 @@ CREATE TABLE IF NOT EXISTS system_edges (
 const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   // Project branding / title-block metadata (added after initial release).
   { table: 'projects', column: 'meta_json', ddl: 'ALTER TABLE projects ADD COLUMN meta_json TEXT' },
+  // Site conditions for SPD / earth-electrode design.
+  { table: 'projects', column: 'site_json', ddl: 'ALTER TABLE projects ADD COLUMN site_json TEXT' },
+  // Short panel designation (e.g. "LP-1").
+  { table: 'panels', column: 'tag', ddl: 'ALTER TABLE panels ADD COLUMN tag TEXT' },
+  // Building occupancy class (was silently dropped by older saves).
+  { table: 'panels', column: 'occupancy', ddl: 'ALTER TABLE panels ADD COLUMN occupancy TEXT' },
+  // Point-level fixtures / switch groups / sockets.
+  { table: 'circuits', column: 'points_json', ddl: 'ALTER TABLE circuits ADD COLUMN points_json TEXT' },
+  // Manual breaker rating override.
+  { table: 'circuits', column: 'breaker_override_a', ddl: 'ALTER TABLE circuits ADD COLUMN breaker_override_a REAL' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

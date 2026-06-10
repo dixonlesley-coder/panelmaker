@@ -15,30 +15,49 @@ function hasLocalStorage(): boolean {
 }
 
 /**
+ * Outcome of the launch restore. "Nothing saved yet" and "the load FAILED" must
+ * be distinguishable: after a failure the caller must NOT start autosaving the
+ * seeded sample, or a transient IPC/DB error would overwrite the user's stored
+ * project with a pristine sample.
+ */
+export type LoadPersistedResult =
+  | { ok: true; project: ProjectInput | null }
+  | { ok: false };
+
+/**
  * Load the most recently saved project to restore on launch: the latest project
  * from SQLite on the desktop, or the last localStorage snapshot on the web.
- * Returns null when nothing has been saved yet (caller falls back to the sample).
+ * `{ ok: true, project: null }` means a clean first launch (fall back to the
+ * sample); `{ ok: false }` means the store exists but could not be read.
  */
-export async function loadPersistedProject(): Promise<ProjectInput | null> {
+export async function loadPersistedProject(): Promise<LoadPersistedResult> {
   const api = desktopApi();
   if (api) {
     try {
       const summaries = await api.listProjects();
-      if (summaries.length === 0) return null;
+      if (summaries.length === 0) return { ok: true, project: null };
       const latest = [...summaries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]!;
-      return await api.loadProject(latest.id);
+      return { ok: true, project: await api.loadProject(latest.id) };
     } catch {
-      return null;
+      return { ok: false };
     }
   }
-  if (!hasLocalStorage()) return null;
+  if (!hasLocalStorage()) return { ok: true, project: null };
+  let raw: string | null;
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ProjectInput;
-    return parsed && Array.isArray(parsed.panels) && parsed.panels.length > 0 ? parsed : null;
+    raw = localStorage.getItem(LS_KEY);
   } catch {
-    return null;
+    return { ok: false }; // storage inaccessible — don't write over what we can't read
+  }
+  if (!raw) return { ok: true, project: null };
+  try {
+    const parsed = JSON.parse(raw) as ProjectInput;
+    const valid = parsed && Array.isArray(parsed.panels) && parsed.panels.length > 0;
+    return { ok: true, project: valid ? parsed : null };
+  } catch {
+    // A corrupted snapshot is unrecoverable garbage — overwriting it loses
+    // nothing, so treat it as a clean start (self-heal) rather than a failure.
+    return { ok: true, project: null };
   }
 }
 

@@ -1,13 +1,15 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppShell, Center, Group, Loader, Menu, NavLink, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
+import { AppShell, Center, Group, Loader, Menu, NavLink, ThemeIcon, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import {
   IconSun,
   IconMoon,
+  IconSearch,
   IconFolder,
   IconSitemap,
   IconGauge,
   IconAdjustmentsBolt,
+  IconChartLine,
   IconBox,
   IconReceipt,
   IconReceipt2,
@@ -32,12 +34,14 @@ import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
 import { Dashboard } from '@renderer/screens/Dashboard';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
+import { Coordination } from '@renderer/screens/Coordination';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
 import { Pricelist } from '@renderer/screens/Pricelist';
 import { Quotation } from '@renderer/screens/Quotation';
 import { Sources } from '@renderer/screens/Sources';
 import { Settings } from '@renderer/screens/Settings';
 import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
+import { CommandPalette, openCommandPalette } from '@renderer/features/CommandPalette';
 import { useAutosave } from '@renderer/features/autosave/useAutosave';
 import { AutosaveIndicator } from '@renderer/features/autosave/AutosaveIndicator';
 
@@ -48,16 +52,40 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
-  { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
-  { screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> },
-  { screen: 'panel', labelKey: 'nav.panel', icon: <IconAdjustmentsBolt size={18} /> },
-  { screen: 'parts', labelKey: 'nav.parts', icon: <IconBox size={18} /> },
-  { screen: 'pricelist', labelKey: 'nav.pricelist', icon: <IconReceipt size={18} /> },
-  { screen: 'quotation', labelKey: 'nav.quotation', icon: <IconReceipt2 size={18} /> },
-  { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
-  { screen: 'settings', labelKey: 'nav.settings', icon: <IconSettings size={18} /> },
+/** Navigation grouped by workflow, so the sidebar reads as a process, not a list. */
+interface NavSection {
+  /** Translation key under the `nav.section*` namespace. */
+  labelKey: string;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    labelKey: 'nav.sectionDesign',
+    items: [
+      { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
+      { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
+      { screen: 'panel', labelKey: 'nav.panel', icon: <IconAdjustmentsBolt size={18} /> },
+      { screen: 'coordination', labelKey: 'nav.coordination', icon: <IconChartLine size={18} /> },
+      { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
+    ],
+  },
+  {
+    labelKey: 'nav.sectionInsight',
+    items: [{ screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> }],
+  },
+  {
+    labelKey: 'nav.sectionCommercial',
+    items: [
+      { screen: 'parts', labelKey: 'nav.parts', icon: <IconBox size={18} /> },
+      { screen: 'pricelist', labelKey: 'nav.pricelist', icon: <IconReceipt size={18} /> },
+      { screen: 'quotation', labelKey: 'nav.quotation', icon: <IconReceipt2 size={18} /> },
+    ],
+  },
+  {
+    labelKey: 'nav.sectionSetup',
+    items: [{ screen: 'settings', labelKey: 'nav.settings', icon: <IconSettings size={18} /> }],
+  },
 ];
 
 /** Toggle between light and dark color schemes. */
@@ -166,6 +194,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
       return <Dashboard />;
     case 'panel':
       return <PanelEditor />;
+    case 'coordination':
+      return <Coordination />;
     case 'parts':
       return <PartsCatalog />;
     case 'pricelist':
@@ -230,19 +260,39 @@ export function App() {
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 240, breakpoint: 'sm' }}
+      navbar={{ width: 248, breakpoint: 'sm' }}
       padding="md"
     >
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Group gap="xs">
-            <IconBolt size={24} color="var(--mantine-color-indigo-5)" />
-            <Title order={4}>PanelMaker</Title>
-            <Text c="dimmed" size="sm" visibleFrom="sm">
-              · {projectName}
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+            {/* App mark: a soft gradient tile, reads as an app icon. */}
+            <ThemeIcon
+              size={32}
+              radius="md"
+              variant="gradient"
+              gradient={{ from: 'indigo.6', to: 'violet.5', deg: 135 }}
+            >
+              <IconBolt size={19} />
+            </ThemeIcon>
+            <Title order={4} style={{ letterSpacing: '-0.01em' }}>
+              PanelMaker
+            </Title>
+            <Text c="dimmed" size="sm" visibleFrom="sm" truncate style={{ minWidth: 0 }}>
+              {projectName}
             </Text>
           </Group>
-          <Group gap="md">
+          <Group gap="md" wrap="nowrap">
+            <Tooltip label={`${t('palette.open')} (${MOD_KEY}+K)`}>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('palette.open')}
+                onClick={openCommandPalette}
+              >
+                <IconSearch size={18} />
+              </ActionIcon>
+            </Tooltip>
             <HistoryControls />
             <AutosaveIndicator saveState={saveState} target={target} />
             <LanguageMenu />
@@ -251,15 +301,31 @@ export function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="sm">
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.screen}
-            label={t(item.labelKey)}
-            leftSection={item.icon}
-            active={activeScreen === item.screen}
-            onClick={() => setScreen(item.screen)}
-          />
+      <AppShell.Navbar p="sm" style={{ gap: 2 }}>
+        {NAV_SECTIONS.map((section, si) => (
+          <div key={section.labelKey}>
+            <Text
+              size="xs"
+              c="dimmed"
+              fw={600}
+              tt="uppercase"
+              px="sm"
+              pb={4}
+              pt={si === 0 ? 4 : 'md'}
+              style={{ letterSpacing: '0.04em' }}
+            >
+              {t(section.labelKey)}
+            </Text>
+            {section.items.map((item) => (
+              <NavLink
+                key={item.screen}
+                label={t(item.labelKey)}
+                leftSection={item.icon}
+                active={activeScreen === item.screen}
+                onClick={() => setScreen(item.screen)}
+              />
+            ))}
+          </div>
         ))}
       </AppShell.Navbar>
 
@@ -267,6 +333,7 @@ export function App() {
         <ActiveScreen screen={activeScreen} />
       </AppShell.Main>
 
+      <CommandPalette />
       <UpdateNotifier />
     </AppShell>
   );

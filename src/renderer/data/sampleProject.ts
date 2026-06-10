@@ -37,6 +37,7 @@ export function createSampleProject(): ProjectInput {
 
   const lpDb = panel({
     name: 'LP-DB (Lighting & Power)',
+    tag: 'LP-1',
     sourceType: 'feeder',
     circuits: [
       branch({
@@ -77,6 +78,7 @@ export function createSampleProject(): ProjectInput {
 
   const mcc = panel({
     name: 'MCC (Pump Motor Control)',
+    tag: 'MCC-1',
     sourceType: 'feeder',
     circuits: [
       branch({
@@ -111,6 +113,7 @@ export function createSampleProject(): ProjectInput {
 
   const main = panel({
     name: 'MDP (Main Distribution)',
+    tag: 'MDP',
     sourceType: 'utility',
     diversityFactor: 0.9,
     circuits: [

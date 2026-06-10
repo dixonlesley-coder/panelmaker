@@ -1,6 +1,8 @@
 /** Distributed energy source configuration (engine input) and results. */
 
 import type { BatteryChemistry } from '../standards/sources';
+// Type-only (erased at runtime — no cycle): genset motor-start assessment.
+import type { GensetStartResult } from '../engine/gensetTransient';
 
 export type GeneratorMode = 'standby' | 'prime';
 
@@ -71,6 +73,8 @@ export interface BatteryResult {
 
 export interface SourcesResult {
   generator?: GeneratorResult;
+  /** Motor-starting voltage-dip assessment for the genset, when motors exist. */
+  gensetStart?: GensetStartResult;
   solar?: SolarResult;
   battery?: BatteryResult;
 }
