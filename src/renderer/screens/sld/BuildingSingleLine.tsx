@@ -37,8 +37,8 @@ const RIGHT_PAD = 16;
 const INCOMER_Y = 8;
 const INCOMER_H = 26;
 const BUS_TOP_Y = 92; // y of the first (L1) phase bar
-const BAR_GAP = 9; // between phase bars
-const NPE_GAP = 8; // gap before the N then PE bars
+const BAR_GAP = 13; // between phase bars — generous so the bus reads clearly
+const NPE_GAP = 11; // gap before the N then PE bars
 const BRK_GAP = 26; // bar block → breaker symbol
 const BRK_H = 20;
 const RCD_BAND = 15;
@@ -394,6 +394,11 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
 
   return (
     <svg width={width} height={L.height} style={{ display: 'block' }}>
+      <defs>
+        <filter id="sldBarShadow" x="-1%" y="-60%" width="102%" height="220%">
+          <feDropShadow dx="0" dy="0.6" stdDeviation="0.7" floodColor="#000" floodOpacity="0.28" />
+        </filter>
+      </defs>
       {supplyHead()}
 
       {/* Incomer + main breaker on the connection bus */}
@@ -407,33 +412,33 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
         bus: {d.busSpec}
       </text>
 
-      {/* Phase / N / PE bars (N and PE labelled with their sized cross-section) */}
-      {L.bars.map((b) => (
-        <g key={b.key}>
-          <line
-            x1={LEFT}
-            y1={b.y}
-            x2={right}
-            y2={b.y}
-            stroke={PHASE_COLOR[b.key] ?? '#888'}
-            strokeWidth={b.key === 'PE' || b.key === 'N' ? 2 : 3}
-            strokeDasharray={b.key === 'PE' ? '4 2' : undefined}
-          />
-          <text x={6} y={b.y + 3} fontSize={8.5} fontWeight={700} fill={PHASE_COLOR[b.key] ?? '#888'}>
-            {b.key}
-          </text>
-          {b.key === 'N' && (
-            <text x={right} y={b.y - 2} fontSize={7.5} textAnchor="end" fill={PHASE_COLOR.N}>
-              {d.neutralSpec}
+      {/* Phase / N / PE bars — drawn as rounded copper rails with a soft sheen and
+          shadow for depth, a coloured label pill, and the N/PE sized section. */}
+      {L.bars.map((b) => {
+        const color = PHASE_COLOR[b.key] ?? '#888';
+        const h = b.key === 'PE' ? 4 : b.key === 'N' ? 5 : 6;
+        const w = right - LEFT;
+        return (
+          <g key={b.key}>
+            <rect x={3} y={b.y - 6} width={LEFT - 12} height={12} rx={6} fill={color} />
+            <text x={3 + (LEFT - 12) / 2} y={b.y + 3} fontSize={8} fontWeight={700} textAnchor="middle" fill="#fff">
+              {b.key}
             </text>
-          )}
-          {b.key === 'PE' && (
-            <text x={right} y={b.y - 2} fontSize={7.5} textAnchor="end" fill={PHASE_COLOR.PE}>
-              {d.peSpec}
-            </text>
-          )}
-        </g>
-      ))}
+            <rect x={LEFT} y={b.y - h / 2} width={w} height={h} rx={h / 2} fill={color} filter="url(#sldBarShadow)" />
+            <rect x={LEFT + 2} y={b.y - h / 2 + 0.6} width={w - 4} height={1.1} rx={0.5} fill="#fff" opacity={0.45} />
+            {b.key === 'N' && (
+              <text x={right - 2} y={b.y - 6} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
+                {d.neutralSpec}
+              </text>
+            )}
+            {b.key === 'PE' && (
+              <text x={right - 2} y={b.y - 6} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
+                {d.peSpec}
+              </text>
+            )}
+          </g>
+        );
+      })}
 
       {/* One column per outgoing way */}
       {d.ways.map((w, i) => {
@@ -545,20 +550,24 @@ function UnifiedPanelNode({ data }: NodeProps) {
         </Group>
       </Group>
 
-      {!expanded ? (
-        <Group justify="space-between" mt={6}>
-          <Text size="xs" c="dimmed">
-            {d.incomerA} · {d.ways.length} ways
-          </Text>
-          <Text size="sm" fw={700}>
-            {d.loadKw}
-          </Text>
-        </Group>
-      ) : (
-        <Box mt={4} style={{ overflow: 'hidden' }}>
-          <PanelSchematic d={d} width={width - 20} />
-        </Box>
-      )}
+      {/* Keyed so the view remounts when the LOD flips — the sld-lod-enter
+          animation then cross-dissolves summary ⇄ detail instead of snapping. */}
+      <Box key={expanded ? 'detail' : 'summary'} className="sld-lod-enter">
+        {!expanded ? (
+          <Group justify="space-between" mt={6}>
+            <Text size="xs" c="dimmed">
+              {d.incomerA} · {d.ways.length} ways
+            </Text>
+            <Text size="sm" fw={700}>
+              {d.loadKw}
+            </Text>
+          </Group>
+        ) : (
+          <Box mt={4} style={{ overflow: 'hidden' }}>
+            <PanelSchematic d={d} width={width - 20} />
+          </Box>
+        )}
+      </Box>
 
       {d.feederIds.map((id) => {
         const idx = feederIndex(id);
