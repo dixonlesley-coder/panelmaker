@@ -3,6 +3,8 @@ import {
   SCHNEIDER_CATALOG_ISSUES,
   SCHNEIDER_CATALOG_PARTS,
   loadCatalog,
+  partsToCatalogFile,
+  serializeCatalogJson,
   withSchneiderCatalog,
   type CatalogFile,
 } from '@shared/data/catalog';
@@ -54,6 +56,28 @@ describe('manufacturer catalogue', () => {
         expect.stringContaining('sku'),
       ]),
     );
+  });
+
+  it('exports current parts back to the committed JSON shape and round-trips', () => {
+    // The Settings "export catalogue" button: serialize → re-load must be lossless.
+    const json = serializeCatalogJson(SCHNEIDER_CATALOG_PARTS);
+    const file = JSON.parse(json) as CatalogFile;
+    const { parts, issues } = loadCatalog(file);
+    expect(issues).toEqual([]);
+    expect(new Set(parts.map((p) => p.id))).toEqual(new Set(SCHNEIDER_CATALOG_PARTS.map((p) => p.id)));
+    // ratingA/curve survive the round-trip
+    const c16 = parts.find((p) => p.id === 'A9F44116');
+    expect(c16?.attributes.ratingA).toBe(16);
+    expect(c16?.attributes.curve).toBe('C');
+  });
+
+  it('export only includes Schneider parts that carry an order code', () => {
+    const file = partsToCatalogFile([
+      { id: 'A9X1', category: 'breaker', manufacturer: 'Schneider', model: 'iC60N C10', attributes: { sku: 'A9X1', ratingA: 10 }, defaultUnit: 'pcs' },
+      { id: 'abb-1', category: 'breaker', manufacturer: 'ABB', model: 'XT1', attributes: { sku: 'ABB123', ratingA: 16 }, defaultUnit: 'pcs' }, // wrong brand
+      { id: 'noSku', category: 'cable', manufacturer: 'Schneider', model: 'NYY', attributes: {}, defaultUnit: 'm' }, // no SKU
+    ]);
+    expect(file.parts.map((p) => p.sku)).toEqual(['A9X1']);
   });
 
   it('merges onto a base list, de-duplicating by SKU (catalogue wins)', () => {

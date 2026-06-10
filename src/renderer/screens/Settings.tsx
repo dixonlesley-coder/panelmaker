@@ -18,6 +18,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   IconBuildingFactory2,
+  IconDatabaseExport,
   IconInfoCircle,
   IconLock,
   IconPhoto,
@@ -28,9 +29,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import { SOIL_TYPES } from '@shared/standards/soil';
+import { loadCatalog, serializeCatalogJson, type CatalogFile } from '@shared/data/catalog';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
+import { downloadText } from '@renderer/lib/download';
 import {
   appVersion,
   checkForUpdates,
@@ -66,9 +69,31 @@ export function Settings() {
   const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
   const setSiteConditions = useProjectStore((s) => s.setSiteConditions);
 
+  const parts = useProjectStore((s) => s.parts);
+
   const panel = project.panels.find((p) => p.id === activePanelId);
   const meta = project.meta ?? {};
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * One-click: serialize the current parts catalogue to the committed dataset
+   * shape (src/shared/data/catalog/schneider.parts.json) and save it. The app is
+   * offline and can't push to git itself, so this produces the exact file to
+   * commit (or hand to Claude) — which then seeds into every install.
+   */
+  function onExportCatalog() {
+    const json = serializeCatalogJson(parts);
+    const { parts: loaded, issues } = loadCatalog(JSON.parse(json) as CatalogFile);
+    if (loaded.length === 0) {
+      notifications.show({ message: t('settings.catalogEmpty'), color: 'yellow' });
+      return;
+    }
+    downloadText('schneider.parts.json', json, 'application/json');
+    notifications.show({
+      message: t('settings.catalogExported', { count: loaded.length }),
+      color: issues.length ? 'yellow' : 'teal',
+    });
+  }
 
   /**
    * The logo is base64-inlined into project.meta and re-serialized on every
@@ -498,6 +523,24 @@ export function Settings() {
           )}
         </Card>
       )}
+
+      <Card withBorder radius="md" padding="md">
+        <Group gap="xs" mb="xs">
+          <IconDatabaseExport size={18} color="var(--mantine-color-grape-6)" />
+          <Text fw={600}>{t('settings.catalogTitle')}</Text>
+        </Group>
+        <Text size="xs" c="dimmed" mb="md">
+          {t('settings.catalogHint')}
+        </Text>
+        <Button
+          variant="light"
+          color="grape"
+          leftSection={<IconDatabaseExport size={16} />}
+          onClick={onExportCatalog}
+        >
+          {t('settings.catalogExport')}
+        </Button>
+      </Card>
 
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" mb="md">

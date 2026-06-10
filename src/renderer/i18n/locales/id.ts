@@ -158,6 +158,12 @@ export const id: TranslationKeys = {
     electrodeTarget: 'Target elektrode',
     application: 'Aplikasi',
     checkUpdates: 'Periksa pembaruan',
+    catalogTitle: 'Katalog komponen',
+    catalogHint:
+      'Setelah mengekstrak katalog pabrikan, ekspor komponen saat ini ke dataset yang di-commit (schneider.parts.json). Aplikasi bersifat offline dan tidak dapat push ke git sendiri — simpan berkas ini ke src/shared/data/catalog/ lalu commit (atau serahkan ke Claude). Pada rilis berikutnya akan di-seed ke setiap instalasi.',
+    catalogExport: 'Ekspor katalog → dataset git (JSON)',
+    catalogExported: 'Mengekspor {{count}} komponen katalog ke schneider.parts.json — commit untuk merilis.',
+    catalogEmpty: 'Tidak ada komponen katalog untuk diekspor (belum ada kode pesanan / SKU).',
     version: 'Versi',
     currency: 'Mata uang',
     standards: 'Standar',
