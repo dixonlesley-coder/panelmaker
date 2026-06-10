@@ -812,6 +812,8 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
             height: 480,
             border: '1px solid var(--mantine-color-default-border)',
             borderRadius: 'var(--mantine-radius-lg)',
+            background: 'var(--mantine-color-body)',
+            overflow: 'hidden',
           }}
           onDragOver={(e) => {
             if (

@@ -128,8 +128,8 @@ export function PanelEditor() {
       </Group>
 
       <Card withBorder radius="md" padding="md">
-        <Tabs defaultValue="build" keepMounted={false}>
-          <Tabs.List mb="md">
+        <Tabs defaultValue="build" keepMounted={false} variant="pills" radius="xl">
+          <Tabs.List mb="md" style={{ gap: 4 }}>
             <Tabs.Tab value="build" leftSection={<IconDragDrop size={16} />}>
               {t('panel.tabBuild')}
             </Tabs.Tab>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppShell, Center, Group, Loader, Menu, NavLink, ThemeIcon, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
+import { AppShell, Center, Group, Loader, Menu, NavLink, Stack, ThemeIcon, Title, ActionIcon, Tooltip, Text, useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 import {
   IconSun,
   IconMoon,
@@ -250,9 +250,21 @@ export function App() {
   }, [undo, redo]);
 
   if (!hydrated) {
+    // Branded splash while the autosaved project hydrates — the same app mark
+    // as the header, so launch feels intentional rather than blank.
     return (
-      <Center h="100vh">
-        <Loader />
+      <Center h="100vh" className="screen-enter">
+        <Stack align="center" gap="lg">
+          <ThemeIcon
+            size={72}
+            radius={20}
+            variant="gradient"
+            gradient={{ from: 'indigo.6', to: 'violet.5', deg: 135 }}
+          >
+            <IconBolt size={40} />
+          </ThemeIcon>
+          <Loader size="sm" />
+        </Stack>
       </Center>
     );
   }
@@ -263,7 +275,7 @@ export function App() {
       navbar={{ width: 248, breakpoint: 'sm' }}
       padding="md"
     >
-      <AppShell.Header>
+      <AppShell.Header className="app-chrome">
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
             {/* App mark: a soft gradient tile, reads as an app icon. */}
@@ -301,7 +313,7 @@ export function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="sm" style={{ gap: 2 }}>
+      <AppShell.Navbar p="sm" className="app-chrome" style={{ gap: 2 }}>
         {NAV_SECTIONS.map((section, si) => (
           <div key={section.labelKey}>
             <Text
@@ -330,7 +342,10 @@ export function App() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <ActiveScreen screen={activeScreen} />
+        {/* Keyed per screen so navigation re-triggers the glide-in animation. */}
+        <div key={activeScreen} className="screen-enter">
+          <ActiveScreen screen={activeScreen} />
+        </div>
       </AppShell.Main>
 
       <CommandPalette />

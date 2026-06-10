@@ -1,7 +1,8 @@
 /*
- * Global finishing touches on top of the Mantine theme: crisp text rendering,
- * a calm focus ring, slim scrollbars and gentle motion. No external assets —
- * fully offline.
+ * Global finishing touches on top of the Mantine theme: a quiet "Apple-like"
+ * surface model (soft grey canvas, elevated white cards, frosted chrome),
+ * crisp text rendering, a calm focus treatment, slim scrollbars and gentle,
+ * consistent motion. No external assets — fully offline.
  */
 
 html,
@@ -11,6 +12,34 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ------------------------------- surfaces -------------------------------- */
+
+/* Canvas vs. card separation: the page sits on a soft grey (the classic
+   macOS #f5f5f7), cards stay white and read as elevated surfaces. Dark mode
+   gets a slightly deeper canvas under the dark-7 cards. */
+[data-mantine-color-scheme='light'] body {
+  background-color: #f5f5f7;
+}
+[data-mantine-color-scheme='dark'] body {
+  background-color: #101113;
+}
+
+/* Frosted chrome: the header and sidebar are translucent and blur whatever
+   scrolls beneath them — content feels like it slides under glass. */
+.app-chrome {
+  background: color-mix(in srgb, var(--mantine-color-body) 78%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+}
+
+/* Hairline borders on the chrome (half-opacity default border). */
+.mantine-AppShell-header,
+.mantine-AppShell-navbar {
+  border-color: color-mix(in srgb, var(--mantine-color-default-border) 65%, transparent);
+}
+
+/* ------------------------------- focus ----------------------------------- */
+
 /* A single, consistent focus treatment (keyboard only — not on click). */
 :focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
@@ -18,10 +47,25 @@ body {
   border-radius: var(--mantine-radius-sm);
 }
 
+/* Inputs glow softly into focus instead of snapping. */
+.mantine-Input-input {
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+.mantine-Input-input:focus,
+.mantine-Input-input:focus-within {
+  border-color: var(--mantine-primary-color-filled);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--mantine-primary-color-filled) 16%, transparent);
+}
+
+/* ------------------------------ scrollbars ------------------------------- */
+
 /* Slim, unobtrusive scrollbars that match both color schemes. */
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -43,27 +87,132 @@ body {
   background: var(--mantine-primary-color-light);
 }
 
-/* Gentle, fast transitions on interactive surfaces (respects reduced motion). */
+/* ------------------------------- numerals -------------------------------- */
+
+/* Engineering figures use tabular (fixed-width) numerals so live recompute
+   doesn't make values jitter horizontally — tables, inputs and stats. */
+tbody td,
+thead th,
+.mantine-NumberInput-input,
+.mantine-Badge-label {
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------- motion --------------------------------- */
+
 @media (prefers-reduced-motion: no-preference) {
+  /* Gentle, fast transitions on interactive surfaces. */
   button,
   [role='button'],
   a,
   .mantine-NavLink-root,
   .mantine-Card-root,
+  .mantine-Paper-root,
   .mantine-ActionIcon-root {
     transition:
-      background-color 120ms ease,
-      border-color 120ms ease,
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
       box-shadow 160ms ease,
-      transform 120ms ease;
+      transform 140ms ease;
   }
-  .mantine-Button-root:active,
-  .mantine-ActionIcon-root:active {
+
+  /* Filled buttons lift a hair on hover and settle on press. */
+  .mantine-Button-root[data-variant='filled']:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: var(--mantine-shadow-sm);
+  }
+  .mantine-Button-root:active:not(:disabled),
+  .mantine-ActionIcon-root:active:not(:disabled) {
     transform: translateY(0.5px);
+  }
+
+  /* Draggable cards (builder palette, override cards) float on hover and
+     grip on pick-up — drag affordance you can feel. */
+  [draggable='true'] {
+    transition:
+      transform 150ms cubic-bezier(0.25, 0.8, 0.25, 1),
+      box-shadow 180ms ease,
+      border-color 140ms ease;
+  }
+  [draggable='true']:hover {
+    transform: translateY(-1.5px);
+    box-shadow: var(--mantine-shadow-md);
+  }
+  [draggable='true']:active {
+    transform: scale(0.98);
+    cursor: grabbing;
+  }
+
+  /* Screens glide in: a short rise + fade, retriggered per navigation. */
+  .screen-enter {
+    animation: screen-in 260ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+
+  /* The color-scheme toggle cross-fades instead of flashing. */
+  body,
+  .mantine-AppShell-header,
+  .mantine-AppShell-navbar {
+    transition:
+      background-color 220ms ease,
+      border-color 220ms ease;
   }
 }
 
-/* React Flow nodes inherit the app font (default ships its own stack). */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.997);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Sidebar: the active item reads as a confident pill. */
+.mantine-NavLink-root[data-active] .mantine-NavLink-label {
+  font-weight: 600;
+}
+
+/* ------------------------------ React Flow ------------------------------- */
+
+/* Diagram nodes inherit the app font (the library ships its own stack). */
 .react-flow {
   font-family: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .react-flow__node {
+    transition: filter 160ms ease, transform 160ms ease;
+  }
+  .react-flow__node:hover {
+    filter: drop-shadow(0 6px 16px rgba(16, 24, 40, 0.14));
+  }
+  .react-flow__edge-path {
+    transition: stroke 160ms ease, stroke-width 160ms ease;
+  }
+}
+
+/* Rounded, elevated canvas controls — and a proper dark-mode treatment
+   (the library defaults to white buttons regardless of scheme). */
+.react-flow__controls {
+  border-radius: var(--mantine-radius-md);
+  overflow: hidden;
+  box-shadow: var(--mantine-shadow-sm);
+}
+.react-flow__controls-button {
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+}
+.react-flow__controls-button:hover {
+  background: var(--mantine-color-default-hover);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+[data-mantine-color-scheme='dark'] .react-flow__attribution {
+  background: transparent;
+  color: var(--mantine-color-dimmed);
 }
