@@ -16,7 +16,7 @@ import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
-import { sizeBusbar, splitBusbarSections } from './busbar';
+import { sizeBusbar, sizeNeutralPeBars, splitBusbarSections } from './busbar';
 import { checkBusbarWithstand, minCsaForWithstand } from './busbarFault';
 import { verifyEnclosureThermal } from './enclosureThermal';
 import { sizeCable } from './cableSizing';
@@ -372,6 +372,11 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
 
   // Main bus rated for the incoming device (IEC 61439-1), not just the demand.
   const busbar = sizeBusbar(totalDemandCurrentA, incomerBreaker.ratingA, busWithstandCsa);
+  // Size the neutral (full) and PE bars off the phase bar.
+  const npe = sizeNeutralPeBars(busbar.csaMm2, busbar.ampacityA);
+  busbar.neutralCsaMm2 = npe.neutralCsaMm2;
+  busbar.neutralAmpacityA = npe.neutralAmpacityA;
+  busbar.peCsaMm2 = npe.peCsaMm2;
   // Split the panel bus into capacity-bounded sections (max ways / max current),
   // so a panel with many ways gets several busbar lines instead of one giant bar.
   // Each section is sized for the worst-phase current of the ways it carries; the

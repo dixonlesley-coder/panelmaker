@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react';
 import { Badge, Box, Group, Text } from '@mantine/core';
 import { IconPlugConnected } from '@tabler/icons-react';
-import type { PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import type { LoadKind, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
@@ -22,26 +22,31 @@ import { useProjectStore } from '@renderer/state/projectStore';
 /**
  * Unified building single-line: every panel on ONE canvas. Zoomed out, a panel
  * is a summary card (name + load); zoom in and it separates into a real internal
- * single-line — incomer (MCCB) → the connection bus → L1/L2/L3 phase bars + N +
- * PE earth bar, with a drawn tap from each MCB to the phase(s) it sits on and the
- * outgoing cable make-up labelled per way. Feeders run from the specific feeding
- * MCB to the child panel. Semantic zoom is driven by the live viewport scale.
+ * single-line drawn with IEC-style component symbols — incomer breaker → the
+ * connection bus → L1/L2/L3 phase bars + sized N + PE earth bars, a breaker
+ * symbol per way tapping the phase(s) it sits on, a contactor on starter
+ * circuits, and a load symbol (motor / lamp / socket / sub-board / load).
  */
 
 /* ----------------------------- schematic geometry -------------------------- */
-const LEFT = 48; // gutter for the bar labels (L1/L2/L3/N/PE)
-const WAY_W = 68; // horizontal pitch per outgoing way
-const RIGHT_PAD = 14;
+const LEFT = 52; // gutter for the bar labels (L1/L2/L3/N/PE)
+const WAY_W = 74; // horizontal pitch per outgoing way
+const RIGHT_PAD = 16;
 const INCOMER_Y = 8;
 const INCOMER_H = 26;
-const BUS_TOP_Y = 84; // y of the first (L1) phase bar
+const BUS_TOP_Y = 88; // y of the first (L1) phase bar
 const BAR_GAP = 9; // between phase bars
 const NPE_GAP = 8; // gap before the N then PE bars
-const MCB_TOP_GAP = 24; // bar block → MCB boxes
-const MCB_H = 20;
-const MCB_W = 46;
-const CABLE_GAP = 12; // MCB → cable label
+const BRK_GAP = 24; // bar block → breaker symbol
+const BRK_H = 20;
+const STARTER_GAP = 6;
+const STARTER_H = 14;
+const LOAD_GAP = 10;
+const LOAD_H = 24;
+const CABLE_GAP = 11;
 
+const FG = 'var(--mantine-color-text)';
+const DIM = 'var(--mantine-color-dimmed)';
 const PHASE_COLOR: Record<string, string> = {
   L1: '#c92a2a',
   L2: '#e8990c',
@@ -58,8 +63,11 @@ function panelWidth(ways: number): number {
 interface UnifiedWay {
   id: string;
   name: string;
+  kind: LoadKind;
   phase: PhaseAssignment; // 'L1' | 'L2' | 'L3' | '3ph'
   breakerA: string;
+  breakerClass: string; // 'MCB' | 'MCCB'
+  starter?: string; // motor-starter type, when controlled
   cable: string; // compact, e.g. "4C×16"
   cableFull: string; // full make-up for the hover title
   feeds?: string;
@@ -75,14 +83,120 @@ interface UnifiedPanelData {
   loadKw: string;
   incomerA: string;
   incomer: string; // "MCCB 250A/4P"
-  busSpec: string; // bus connection make-up
+  busSpec: string; // phase bus make-up
+  neutralSpec: string; // neutral bar size
+  peSpec: string; // PE bar size
   ways: UnifiedWay[];
   feederIds: string[];
   issues?: NodeIssue[];
   [key: string]: unknown;
 }
 
-/** The bars present on this panel, top→bottom, with their y and colour. */
+/* -------------------------------- symbols ---------------------------------- */
+/* Each glyph draws around a vertical conductor at `cx`, starting at `top`. */
+
+/** Circuit breaker (IEC): in-line conductor, open contact, thermal-magnetic box. */
+function breaker(cx: number, top: number, color = FG) {
+  return (
+    <g>
+      <line x1={cx} y1={top} x2={cx} y2={top + 2} stroke={color} strokeWidth={1.2} />
+      <circle cx={cx} cy={top + 2} r={1.4} fill={color} />
+      <line x1={cx} y1={top + 2} x2={cx + 7} y2={top + 12} stroke={color} strokeWidth={1.3} />
+      <circle cx={cx} cy={top + 16} r={1.2} fill={color} />
+      <line x1={cx} y1={top + 16} x2={cx} y2={top + BRK_H} stroke={color} strokeWidth={1.2} />
+      <rect x={cx + 4} y={top + 6} width={5} height={5} fill="none" stroke={color} strokeWidth={0.8} />
+    </g>
+  );
+}
+
+/** Contactor: open contact with the characteristic moving-contact arc. */
+function contactor(cx: number, top: number) {
+  return (
+    <g>
+      <circle cx={cx} cy={top} r={1.3} fill={FG} />
+      <line x1={cx} y1={top} x2={cx + 6} y2={top + 9} stroke={FG} strokeWidth={1.2} />
+      <path d={`M ${cx - 2} ${top + 12} A 4 4 0 0 1 ${cx + 6} ${top + 12}`} fill="none" stroke={FG} strokeWidth={1} />
+      <circle cx={cx} cy={top + 12} r={1.1} fill={FG} />
+    </g>
+  );
+}
+
+/** Motor: circle + M, with the phase count. */
+function motor(cx: number, top: number, threePhase: boolean) {
+  return (
+    <g>
+      <circle cx={cx} cy={top + 11} r={9} fill="var(--mantine-color-body)" stroke={FG} strokeWidth={1} />
+      <text x={cx} y={top + 14} fontSize={9} fontWeight={700} textAnchor="middle" fill={FG}>
+        M
+      </text>
+      <text x={cx} y={top + 23} fontSize={6} textAnchor="middle" fill={DIM}>
+        {threePhase ? '3~' : '1~'}
+      </text>
+    </g>
+  );
+}
+
+/** Lamp (lighting): crossed circle. */
+function lamp(cx: number, top: number) {
+  const r = 7;
+  const k = r * 0.7;
+  return (
+    <g>
+      <circle cx={cx} cy={top + 9} r={r} fill="var(--mantine-color-body)" stroke={FG} strokeWidth={1} />
+      <line x1={cx - k} y1={top + 9 - k} x2={cx + k} y2={top + 9 + k} stroke={FG} strokeWidth={1} />
+      <line x1={cx - k} y1={top + 9 + k} x2={cx + k} y2={top + 9 - k} stroke={FG} strokeWidth={1} />
+    </g>
+  );
+}
+
+/** Socket outlet (IEC): semicircle + diameter line. */
+function socket(cx: number, top: number) {
+  return (
+    <g>
+      <path d={`M ${cx - 7} ${top + 6} A 7 7 0 0 0 ${cx + 7} ${top + 6}`} fill="none" stroke={FG} strokeWidth={1} />
+      <line x1={cx - 7} y1={top + 6} x2={cx + 7} y2={top + 6} stroke={FG} strokeWidth={1} />
+    </g>
+  );
+}
+
+/** Sub-distribution board (feeder target). */
+function board(cx: number, top: number) {
+  const c = 'var(--mantine-color-indigo-5)';
+  return (
+    <g>
+      <rect x={cx - 9} y={top} width={18} height={16} fill="var(--mantine-color-body)" stroke={c} strokeWidth={1.2} />
+      <line x1={cx - 9} y1={top + 5} x2={cx + 9} y2={top + 5} stroke={c} strokeWidth={0.8} />
+      <line x1={cx - 4} y1={top + 16} x2={cx - 4} y2={top + 11} stroke={c} strokeWidth={0.8} />
+      <line x1={cx + 4} y1={top + 16} x2={cx + 4} y2={top + 11} stroke={c} strokeWidth={0.8} />
+    </g>
+  );
+}
+
+/** Generic load box. */
+function loadBox(cx: number, top: number) {
+  return <rect x={cx - 7} y={top + 2} width={14} height={13} fill="none" stroke={FG} strokeWidth={1} />;
+}
+
+/** Pick the end-of-way load symbol for a circuit. */
+function loadSymbol(cx: number, top: number, w: UnifiedWay, threePhase: boolean) {
+  if (w.feeds) return board(cx, top);
+  switch (w.kind) {
+    case 'motor':
+    case 'pump':
+      return motor(cx, top, threePhase);
+    case 'lighting':
+      return lamp(cx, top);
+    case 'socket':
+    case 'ev_charger':
+      return socket(cx, top);
+    default:
+      return loadBox(cx, top);
+  }
+}
+
+/* --------------------------- internal single-line -------------------------- */
+
+/** The bars present on this panel, top→bottom, with their y. */
 function barLayout(threePhase: boolean): { key: string; y: number }[] {
   const out: { key: string; y: number }[] = [];
   const phases = threePhase ? ['L1', 'L2', 'L3'] : ['L'];
@@ -93,40 +207,43 @@ function barLayout(threePhase: boolean): { key: string; y: number }[] {
   return out;
 }
 
-function mcbTopY(threePhase: boolean): number {
-  const bars = barLayout(threePhase);
-  return bars[bars.length - 1]!.y + MCB_TOP_GAP;
+function brkTopY(threePhase: boolean): number {
+  return barLayout(threePhase).at(-1)!.y + BRK_GAP;
 }
+const starterTopY = (b: number) => b + BRK_H + STARTER_GAP;
+const loadTopY = (b: number) => starterTopY(b) + STARTER_H + LOAD_GAP;
 
 function schematicHeight(threePhase: boolean): number {
-  return mcbTopY(threePhase) + MCB_H + CABLE_GAP + 14;
+  return loadTopY(brkTopY(threePhase)) + LOAD_H + CABLE_GAP + 12;
 }
 
-/** The drawn internal single-line for one panel (zoomed-in detail). */
 function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
   const threePhase = d.system === '3ph';
   const bars = barLayout(threePhase);
   const barY = (k: string) => bars.find((b) => b.key === k)?.y ?? BUS_TOP_Y;
   const phaseKeys = threePhase ? ['L1', 'L2', 'L3'] : ['L'];
-  const mcbY = mcbTopY(threePhase);
+  const brkTop = brkTopY(threePhase);
+  const starterTop = starterTopY(brkTop);
+  const loadTop = loadTopY(brkTop);
+  const cableY = loadTop + LOAD_H + CABLE_GAP;
   const right = width - RIGHT_PAD;
   const height = schematicHeight(threePhase);
-  const incomerTailX = LEFT + 16;
+  const tailX = LEFT + 16;
 
   return (
     <svg width={width} height={height} style={{ display: 'block' }}>
-      {/* Incomer (MCCB) */}
-      <rect x={LEFT} y={INCOMER_Y} width={158} height={INCOMER_H} rx={4} fill="var(--mantine-color-indigo-light)" stroke="var(--mantine-color-indigo-5)" />
-      <text x={LEFT + 8} y={INCOMER_Y + 17} fontSize={10} fontWeight={700} fill="var(--mantine-color-text)">
+      {/* Incomer + main breaker on the connection bus */}
+      <rect x={LEFT} y={INCOMER_Y} width={150} height={INCOMER_H} rx={4} fill="var(--mantine-color-indigo-light)" stroke="var(--mantine-color-indigo-5)" />
+      <text x={LEFT + 8} y={INCOMER_Y + 17} fontSize={10} fontWeight={700} fill={FG}>
         {d.incomer}
       </text>
-      {/* Connection bus from the incomer down to the bars, labelled with its make-up */}
-      <line x1={incomerTailX} y1={INCOMER_Y + INCOMER_H} x2={incomerTailX} y2={barY('N')} stroke="var(--mantine-color-dimmed)" strokeWidth={2} />
-      <text x={incomerTailX + 6} y={INCOMER_Y + INCOMER_H + 16} fontSize={8.5} fill="var(--mantine-color-dimmed)">
+      <line x1={tailX} y1={INCOMER_Y + INCOMER_H} x2={tailX} y2={barY('N')} stroke={DIM} strokeWidth={2} />
+      {breaker(tailX, INCOMER_Y + INCOMER_H + 4, 'var(--mantine-color-indigo-6)')}
+      <text x={tailX + 12} y={INCOMER_Y + INCOMER_H + 18} fontSize={8.5} fill={DIM}>
         bus: {d.busSpec}
       </text>
 
-      {/* Phase / N / PE bars */}
+      {/* Phase / N / PE bars — N and PE labelled with their sized cross-section */}
       {bars.map((b) => (
         <g key={b.key}>
           <line
@@ -141,48 +258,58 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
           <text x={6} y={b.y + 3} fontSize={8.5} fontWeight={700} fill={PHASE_COLOR[b.key] ?? '#888'}>
             {b.key}
           </text>
+          {b.key === 'N' && (
+            <text x={right} y={b.y - 2} fontSize={7.5} textAnchor="end" fill={PHASE_COLOR.N}>
+              {d.neutralSpec}
+            </text>
+          )}
+          {b.key === 'PE' && (
+            <text x={right} y={b.y - 2} fontSize={7.5} textAnchor="end" fill={PHASE_COLOR.PE}>
+              {d.peSpec}
+            </text>
+          )}
         </g>
       ))}
 
-      {/* One column per outgoing way: taps from its phase(s) + N + PE to its MCB */}
+      {/* One column per outgoing way */}
       {d.ways.map((w, i) => {
         const cx = LEFT + i * WAY_W + WAY_W / 2;
         const taps = w.phase === '3ph' ? phaseKeys : [w.phase];
         return (
           <g key={w.id}>
-            <title>{`${w.name} — ${w.breakerA}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''}`}</title>
-            {/* phase tap(s) */}
+            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''}`}</title>
+            {/* phase tap(s) to the breaker */}
             {taps.map((k, j) => {
               const ox = cx + (taps.length > 1 ? (j - 1) * 5 : 0);
-              return (
-                <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={mcbY} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.6} />
-              );
+              return <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={brkTop} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.6} />;
             })}
-            {/* neutral tap (single-phase loads) + PE tap (all) */}
+            {/* neutral (1-ph) + PE taps */}
             {w.phase !== '3ph' && (
-              <line x1={cx + 7} y1={barY('N')} x2={cx + 7} y2={mcbY} stroke={PHASE_COLOR.N} strokeWidth={1} strokeDasharray="2 2" />
+              <line x1={cx + 8} y1={barY('N')} x2={cx + 8} y2={brkTop} stroke={PHASE_COLOR.N} strokeWidth={1} strokeDasharray="2 2" />
             )}
-            <line x1={cx + 11} y1={barY('PE')} x2={cx + 11} y2={mcbY + MCB_H} stroke={PHASE_COLOR.PE} strokeWidth={1} strokeDasharray="2 2" />
-            {/* MCB */}
-            <rect
-              x={cx - MCB_W / 2}
-              y={mcbY}
-              width={MCB_W}
-              height={MCB_H}
-              rx={3}
-              fill="var(--mantine-color-body)"
-              stroke={w.warn ? 'var(--mantine-color-red-5)' : w.feeds ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-default-border)'}
-              strokeWidth={w.feeds || w.warn ? 1.6 : 1}
-            />
-            <text x={cx} y={mcbY + 13} fontSize={9} fontWeight={600} textAnchor="middle" fill="var(--mantine-color-text)">
+            <line x1={cx + 12} y1={barY('PE')} x2={cx + 12} y2={loadTop + LOAD_H} stroke={PHASE_COLOR.PE} strokeWidth={1} strokeDasharray="2 2" />
+            {/* main conductor through the column */}
+            <line x1={cx} y1={brkTop + BRK_H} x2={cx} y2={loadTop} stroke={FG} strokeWidth={1.1} />
+            {/* breaker */}
+            {breaker(cx, brkTop, w.warn ? 'var(--mantine-color-red-6)' : FG)}
+            <text x={cx + 9} y={brkTop + 13} fontSize={8} fill={DIM}>
               {w.breakerA}
             </text>
+            {/* contactor on starter circuits */}
+            {w.starter && contactor(cx, starterTop)}
+            {w.starter && (
+              <text x={cx + 9} y={starterTop + 11} fontSize={7} fill={DIM}>
+                {w.starter.replace('_', '-')}
+              </text>
+            )}
+            {/* load symbol */}
+            {loadSymbol(cx, loadTop, w, threePhase)}
             {/* outgoing cable make-up */}
-            <text x={cx} y={mcbY + MCB_H + CABLE_GAP} fontSize={7.5} textAnchor="middle" fill="var(--mantine-color-dimmed)">
+            <text x={cx} y={cableY} fontSize={7.5} textAnchor="middle" fill={DIM}>
               {w.cable}
             </text>
             {w.feeds && (
-              <text x={cx} y={mcbY + MCB_H + CABLE_GAP + 9} fontSize={7.5} fontWeight={700} textAnchor="middle" fill={PHASE_COLOR.L3}>
+              <text x={cx} y={cableY + 9} fontSize={7.5} fontWeight={700} textAnchor="middle" fill={PHASE_COLOR.L3}>
                 → {w.feeds}
               </text>
             )}
@@ -252,7 +379,6 @@ function UnifiedPanelNode({ data }: NodeProps) {
         </Box>
       )}
 
-      {/* One source handle per feeder way, positioned under its MCB column. */}
       {d.feederIds.map((id) => {
         const idx = feederIndex(id);
         const left = expanded ? LEFT + idx * WAY_W + WAY_W / 2 : 24;
@@ -301,8 +427,6 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
     (rows.get(dd) ?? rows.set(dd, []).get(dd)!).push(p.id);
   }
 
-  // Row pitch tall enough for the deepest-detail panel; column pitch per-row uses
-  // each panel's own expanded width so wide (many-way) panels don't overlap.
   const rowPitch =
     Math.max(...project.panels.map((p) => schematicHeight(p.system === '3ph')), 120) + 150;
 
@@ -320,24 +444,30 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
         x += w + GAP;
         return;
       }
+      const inputById = new Map(panel.circuits.map((ci) => [ci.id, ci]));
       const ways: UnifiedWay[] = res.circuits.map((c) => {
         const childId = feederWayToChild.get(c.circuitId);
         const child = childId ? byId.get(childId) : undefined;
+        const ci = inputById.get(c.circuitId);
         return {
           id: c.circuitId,
           name: c.name,
+          kind: ci?.loadKind ?? 'general',
           phase: c.phase,
           breakerA: `${c.breaker.ratingA}A`,
+          breakerClass: c.breaker.deviceClass,
+          ...(c.control ? { starter: c.control.starterType } : {}),
           cable: cableLabel(c.cable.csaMm2, c.grounding.cores, c.cable.runsPerPhase),
           cableFull: c.grounding.cableSpec,
           feeds: child ? (child.tag ?? child.name) : undefined,
           warn: !c.voltageDrop.withinLimit,
         };
       });
+      const bus = res.busbar;
       const busSpec =
-        res.busbar.widthMm > 0
-          ? `${res.busbar.widthMm}×${res.busbar.thicknessMm} mm Cu (${formatAmps(res.busbar.ampacityA)})`
-          : `${res.busbar.csaMm2} mm² (${formatAmps(res.busbar.ampacityA)})`;
+        bus.widthMm > 0
+          ? `${bus.widthMm}×${bus.thicknessMm} mm Cu (${formatAmps(bus.ampacityA)})`
+          : `${bus.csaMm2} mm² (${formatAmps(bus.ampacityA)})`;
       const data: UnifiedPanelData = {
         panelId: id,
         name: res.name,
@@ -348,6 +478,8 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
         incomerA: formatAmps(res.totalDemandCurrentA),
         incomer: `${res.incomer.breaker.deviceClass} ${res.incomer.breaker.ratingA}A/${res.incomer.poles}P`,
         busSpec,
+        neutralSpec: bus.neutralCsaMm2 ? `${bus.neutralCsaMm2} mm²` : '—',
+        peSpec: bus.peCsaMm2 ? `${bus.peCsaMm2} mm²` : '—',
         ways,
         feederIds: ways.filter((wy) => wy.feeds).map((wy) => wy.id),
         issues: toNodeIssues(res.warnings),

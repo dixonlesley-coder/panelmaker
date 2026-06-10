@@ -178,6 +178,12 @@ export interface BusbarResult {
   totalCurrentA: number;
   /** Short-circuit (Icw / Ipk) withstand check at the panel's prospective fault. */
   withstand?: BusbarWithstandResult;
+  /** Neutral bar cross-section (mm² Cu) — full-size for mixed/triplen loads. */
+  neutralCsaMm2?: number;
+  /** Neutral bar continuous rating (A). */
+  neutralAmpacityA?: number;
+  /** Protective-earth (PE) bar cross-section (mm² Cu), IEC 60364-5-54 §543. */
+  peCsaMm2?: number;
 }
 
 /**

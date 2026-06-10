@@ -452,6 +452,12 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
             />
             <KeyVal k={t('results.busbarAmpacity')} v={formatAmps(bus.ampacityA)} />
             <KeyVal k={t('results.busbarTotalCurrent')} v={formatAmps(bus.totalCurrentA)} />
+            {bus.neutralCsaMm2 !== undefined && (
+              <KeyVal
+                k={t('results.busbarNeutralPe')}
+                v={`N ${bus.neutralCsaMm2} mm²${bus.neutralAmpacityA ? ` (${formatAmps(bus.neutralAmpacityA)})` : ''} · PE ${bus.peCsaMm2} mm²`}
+              />
+            )}
             {result.busbarSections.length > 1 && (
               <KeyVal
                 k={t('results.busbarSplit')}

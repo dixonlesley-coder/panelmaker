@@ -37,6 +37,29 @@ export function sizeBusbar(totalCurrentA: number, minAmpacityA = 0, minCsaMm2 = 
   };
 }
 
+/**
+ * Size the neutral and protective-earth (PE) bars from the phase bar.
+ *
+ * - **Neutral**: full-size (= phase bar). LV distribution boards carry single-
+ *   phase and triplen-harmonic load whose neutral current can equal or exceed the
+ *   phase current, so a reduced neutral is unsafe by default (IEC 60364-5-52
+ *   §524, PUIL 2011). Rated the same continuous current as the phase bar.
+ * - **PE**: the IEC 60364-5-54 §543.1.2 / PUIL adiabatic rule applied to the
+ *   phase section S — S for S ≤ 16, 16 for 16 < S ≤ 35, S/2 above — with a 6 mm²
+ *   floor (separate, non-cable-sheath protective conductor).
+ */
+export function sizeNeutralPeBars(
+  phaseCsaMm2: number,
+  phaseAmpacityA: number,
+): { neutralCsaMm2: number; neutralAmpacityA: number; peCsaMm2: number } {
+  const pe = phaseCsaMm2 <= 16 ? phaseCsaMm2 : phaseCsaMm2 <= 35 ? 16 : phaseCsaMm2 / 2;
+  return {
+    neutralCsaMm2: round(phaseCsaMm2, 1),
+    neutralAmpacityA: round(phaseAmpacityA, 0),
+    peCsaMm2: round(Math.max(pe, 6), 1),
+  };
+}
+
 /** One outgoing way's loading, for grouping ways onto busbar sections. */
 export interface BusbarWayLoad {
   id: string;

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { computePanel } from '@shared/engine';
-import { sizeBusbar, splitBusbarSections, type BusbarWayLoad } from '@shared/engine/busbar';
+import {
+  sizeBusbar,
+  sizeNeutralPeBars,
+  splitBusbarSections,
+  type BusbarWayLoad,
+} from '@shared/engine/busbar';
 import { MAX_WAYS_PER_BUSBAR, MAX_BUSBAR_SECTION_CURRENT_A } from '@shared/standards';
 import type { CircuitInput, PanelInput } from '@shared/types';
 
@@ -40,6 +45,32 @@ describe('sizeBusbar', () => {
     const b = sizeBusbar(100);
     expect(b.ampacityA).toBeGreaterThanOrEqual(100);
     expect(b.csaMm2).toBeGreaterThan(0);
+  });
+});
+
+describe('sizeNeutralPeBars', () => {
+  it('sizes a full-size neutral and the IEC PE step', () => {
+    // Large phase bar (>35 mm²) ⇒ full neutral, PE = S/2.
+    const big = sizeNeutralPeBars(200, 800);
+    expect(big.neutralCsaMm2).toBe(200);
+    expect(big.neutralAmpacityA).toBe(800);
+    expect(big.peCsaMm2).toBe(100);
+
+    // 16 < S ≤ 35 ⇒ PE = 16; small S ⇒ PE = S, floored at 6.
+    expect(sizeNeutralPeBars(25, 100).peCsaMm2).toBe(16);
+    expect(sizeNeutralPeBars(10, 60).peCsaMm2).toBe(10);
+    expect(sizeNeutralPeBars(4, 30).peCsaMm2).toBe(6);
+  });
+
+  it('is populated on a computed panel busbar', () => {
+    const p = panel({
+      id: 'P1',
+      name: 'MDP',
+      circuits: [branch({ id: 'c1', name: 'Load', loadW: 20000, loadKind: 'general' })],
+    });
+    const res = computePanel(p, { faultLevelA: 6000 });
+    expect(res.busbar.neutralCsaMm2).toBe(res.busbar.csaMm2);
+    expect(res.busbar.peCsaMm2).toBeGreaterThanOrEqual(6);
   });
 });
 
