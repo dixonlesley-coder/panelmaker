@@ -115,6 +115,12 @@ export interface ProjectState {
   bulkUpdateCircuits: (panelId: string, ids: string[], patch: Partial<CircuitInput>) => void;
   /** Remove several circuits from a panel in a single undoable step. */
   removeCircuits: (panelId: string, ids: string[]) => void;
+  /**
+   * Reorder a panel's circuits to match `orderedIds` (the new left-to-right /
+   * top-to-bottom sequence from the visual builder). Ids not present keep their
+   * relative order at the end; unknown ids are ignored. One undoable step.
+   */
+  reorderCircuits: (panelId: string, orderedIds: string[]) => void;
   /** Append a fully-configured circuit (fresh id) to a panel — used by the wizard. */
   addCircuitConfigured: (panelId: string, circuit: Omit<CircuitInput, 'id'>) => void;
 
@@ -424,6 +430,29 @@ export const useProjectStore = create<ProjectState>((set) => ({
         }),
       ),
     ),
+
+  reorderCircuits: (panelId, orderedIds) =>
+    set((s) => {
+      const panel = s.project.panels.find((p) => p.id === panelId);
+      if (!panel) return s;
+      const rank = new Map(orderedIds.map((id, i) => [id, i] as const));
+      // Stable sort by the requested rank; circuits absent from orderedIds
+      // (rank = +Infinity) keep their existing relative position at the end.
+      const circuits = panel.circuits
+        .map((c, i) => ({ c, i }))
+        .sort((a, b) => {
+          const ra = rank.get(a.c.id) ?? Number.POSITIVE_INFINITY;
+          const rb = rank.get(b.c.id) ?? Number.POSITIVE_INFINITY;
+          return ra === rb ? a.i - b.i : ra - rb;
+        })
+        .map((x) => x.c);
+      // No change (dropped back in place) — leave state untouched so a stray
+      // drag doesn't churn the undo stack or mark the project dirty.
+      if (circuits.every((c, i) => c === panel.circuits[i])) return s;
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (p) => ({ ...p, circuits })),
+      );
+    }),
 
   copyCircuit: (panelId, circuitId) =>
     set((s) => {

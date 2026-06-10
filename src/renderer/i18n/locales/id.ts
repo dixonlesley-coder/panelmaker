@@ -804,7 +804,7 @@ export const id: TranslationKeys = {
     groupPanels: 'Panel belum ditugaskan',
     panelsHint: 'Seret panel ke kanvas untuk disuplai dari papan ini (membuat MCB feeder).',
     panelConnected: '“{{name}}” kini disuplai dari panel ini.',
-    editHint: 'Klik dua kali sirkuit (atau kabelnya) untuk mengeditnya.',
+    editHint: 'Klik dua kali sirkuit (atau kabelnya) untuk mengeditnya; seret sirkuit ke samping untuk mengubah urutan jalur.',
     groupSources: 'Sumber energi',
     solar: 'Surya PV + inverter',
     battery: 'Baterai + inverter',

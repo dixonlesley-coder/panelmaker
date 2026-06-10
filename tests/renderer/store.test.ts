@@ -404,6 +404,40 @@ describe('projectStore', () => {
       ).toBe(startCount);
     });
 
+    it('reorderCircuits rearranges the ways to match the requested order (undoable)', () => {
+      const panelId = useProjectStore
+        .getState()
+        .project.panels.find((p) => p.circuits.length >= 3)!.id;
+      const before = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      const originalIds = before.circuits.map((c) => c.id);
+
+      // Move the last way to the front; the rest keep their relative order.
+      const moved = originalIds[originalIds.length - 1]!;
+      const target = [moved, ...originalIds.filter((id) => id !== moved)];
+      useProjectStore.getState().reorderCircuits(panelId, target);
+
+      const after = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!;
+      expect(after.circuits.map((c) => c.id)).toEqual(target);
+      // No circuits gained or lost in the shuffle.
+      expect(new Set(after.circuits.map((c) => c.id))).toEqual(new Set(originalIds));
+
+      useProjectStore.getState().undo();
+      expect(
+        useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits.map((c) => c.id),
+      ).toEqual(originalIds);
+    });
+
+    it('reorderCircuits with the existing order is a no-op (no undo entry)', () => {
+      const panelId = useProjectStore.getState().project.panels[0]!.id;
+      const sameOrder = useProjectStore
+        .getState()
+        .project.panels.find((p) => p.id === panelId)!
+        .circuits.map((c) => c.id);
+      const canUndoBefore = selectCanUndo(useProjectStore.getState());
+      useProjectStore.getState().reorderCircuits(panelId, sameOrder);
+      expect(selectCanUndo(useProjectStore.getState())).toBe(canUndoBefore);
+    });
+
     it('copyCircuit + pasteCircuit clones into any panel with a fresh id', () => {
       const { project } = useProjectStore.getState();
       const source = project.panels.find((p) => p.circuits.some((c) => c.role === 'branch'))!;
