@@ -1,6 +1,6 @@
 {
   "name": "panelmaker",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Offline electrical panel & system designer (PUIL 2011 / IEC 60364 / IEC 60947)",
   "license": "MIT",
