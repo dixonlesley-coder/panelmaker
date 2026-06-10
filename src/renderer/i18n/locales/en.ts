@@ -440,6 +440,7 @@ export const en = {
     incomerDevice: 'Incoming device',
     busbarSection: 'Section',
     busbarAmpacity: 'Ampacity',
+    busbarNeutralPe: 'Neutral / PE bar',
     busbarTotalCurrent: 'Total current',
     busbarSplit: 'Bus sections',
     busbarSplitValue: '{{count}} sections · ≤{{ways}} ways each',

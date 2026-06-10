@@ -443,6 +443,7 @@ export const id: TranslationKeys = {
     incomerDevice: 'Perangkat masuk',
     busbarSection: 'Penampang',
     busbarAmpacity: 'Ampasitas',
+    busbarNeutralPe: 'Bar netral / PE',
     busbarTotalCurrent: 'Arus total',
     busbarSplit: 'Seksi busbar',
     busbarSplitValue: '{{count}} seksi · ≤{{ways}} jalur tiap seksi',
