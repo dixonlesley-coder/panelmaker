@@ -14,6 +14,7 @@ import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
 import { sizeBusbar } from './busbar';
+import { checkBusbarWithstand } from './busbarFault';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
 import { computeHarmonics, harmonicsWarnings } from './harmonics';
@@ -286,6 +287,19 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     1,
   );
   const busbar = sizeBusbar(totalDemandCurrentA);
+  // Verify the busbar can withstand the panel's prospective short-circuit (Icw),
+  // not just carry the continuous load (when the fault level is known).
+  if (opts.faultLevelA !== undefined) {
+    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, round(opts.faultLevelA / 1000, 1));
+    if (!busbar.withstand.adequate) {
+      warnings.push({
+        code: 'busbar-withstand-inadequate',
+        severity: 'error',
+        message: `${panel.name}: busbar ${busbar.csaMm2} mm² short-circuit withstand Icw ${busbar.withstand.icwKa} kA is below the ${busbar.withstand.faultKa} kA prospective fault — increase the bar section, brace it, or use parallel bars.`,
+        panelId: panel.id,
+      });
+    }
+  }
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
 
   // Cable tray for all outgoing cables, laid side-by-side in a single layer.

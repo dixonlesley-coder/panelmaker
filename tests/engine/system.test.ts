@@ -163,4 +163,49 @@ describe('computeSystem (building tree aggregation)', () => {
     const r = computeSystem(project);
     expect(r.warnings.some((w) => w.code === 'feeder-cycle')).toBe(true);
   });
+
+  it('accumulates voltage drop from the origin down the feeder tree', () => {
+    const project: ProjectInput = {
+      id: 'VD',
+      name: 'Deep tree',
+      panels: [
+        panel({
+          id: 'MAIN',
+          name: 'Main',
+          circuits: [branch({ id: 'f1', name: 'F1', loadKind: 'feeder', feedsPanelId: 'SDB', lengthM: 120 })],
+        }),
+        panel({
+          id: 'SDB',
+          name: 'SDB',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f1',
+          circuits: [branch({ id: 'f2', name: 'F2', loadKind: 'feeder', feedsPanelId: 'SSDB', lengthM: 120 })],
+        }),
+        panel({
+          id: 'SSDB',
+          name: 'SSDB',
+          sourceType: 'feeder',
+          fedByCircuitId: 'f2',
+          circuits: [branch({ id: 'b', name: 'Far load', loadW: 8000, lengthM: 80 })],
+        }),
+      ],
+    };
+    const r = computeSystem(project);
+    const f1 = r.panels['MAIN']!.circuits.find((c) => c.circuitId === 'f1')!;
+    const f2 = r.panels['SDB']!.circuits.find((c) => c.circuitId === 'f2')!;
+    const b = r.panels['SSDB']!.circuits.find((c) => c.circuitId === 'b')!;
+
+    expect(b.cumulativeDropPercent).toBeDefined();
+    // Cumulative ≈ each upstream feeder segment + the branch's own run.
+    const expected = f1.voltageDrop.dropPercent + f2.voltageDrop.dropPercent + b.voltageDrop.dropPercent;
+    expect(b.cumulativeDropPercent!).toBeCloseTo(expected, 1);
+    // Strictly larger than its own segment (there IS upstream drop).
+    expect(b.cumulativeDropPercent!).toBeGreaterThan(b.voltageDrop.dropPercent);
+    // When the origin-to-load total breaches the limit, it is flagged.
+    if (b.cumulativeDropPercent! > b.voltageDrop.limitPercent + 1e-9) {
+      expect(
+        r.warnings.some((w) => w.code === 'cumulative-voltage-drop-exceeded' && w.circuitId === 'b'),
+      ).toBe(true);
+    }
+  });
 });

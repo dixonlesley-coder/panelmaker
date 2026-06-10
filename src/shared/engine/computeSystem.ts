@@ -8,6 +8,7 @@ import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
+import { recommendSpd } from './spd';
 import {
   type Impedance,
   SELECTIVITY_RATIO,
@@ -174,6 +175,49 @@ export function computeSystem(project: ProjectInput): SystemResult {
     pr.warnings.forEach((w) => warnings.push(w));
   }
 
+  // Cumulative (origin → load) voltage drop down the feeder tree. Each segment's
+  // %drop is referenced to its own nominal voltage and summed along the path —
+  // the conventional way PUIL/IEC express total drop from the origin. A branch
+  // whose cumulative drop exceeds its 3%/5% limit is flagged even when its own
+  // segment is within limit (auto-sizing only controls the per-segment drop).
+  const panelUpstreamDropPct = new Map<string, number>();
+  for (const id of [...postOrder].reverse()) {
+    // root-first
+    const parentId = parentOf.get(id);
+    let upstream = 0;
+    if (parentId !== undefined) {
+      const parent = byId.get(parentId);
+      const feeder = parent?.circuits.find((c) => c.feedsPanelId === id);
+      const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
+      upstream = (panelUpstreamDropPct.get(parentId) ?? 0) + (feederResult?.voltageDrop.dropPercent ?? 0);
+    }
+    upstream = round(upstream, 2);
+    panelUpstreamDropPct.set(id, upstream);
+
+    const pr = results[id];
+    if (!pr) continue;
+    // Feeder circuit ids in this panel — their cumulative drop is the sub-bus
+    // drop that downstream branches already account for, so we don't warn on them.
+    const feederIds = new Set(
+      (byId.get(id)?.circuits ?? []).filter((x) => x.feedsPanelId).map((x) => x.id),
+    );
+    for (const c of pr.circuits) {
+      const cum = round(upstream + c.voltageDrop.dropPercent, 2);
+      c.cumulativeDropPercent = cum;
+      if (!feederIds.has(c.circuitId) && cum > c.voltageDrop.limitPercent + 1e-9) {
+        const w: Warning = {
+          code: 'cumulative-voltage-drop-exceeded',
+          severity: 'warning',
+          message: `${c.name}: cumulative voltage drop ${cum}% from the origin exceeds the ${c.voltageDrop.limitPercent}% limit (this run ${c.voltageDrop.dropPercent}% + ${upstream}% upstream) — shorten the run, upsize the feeder, or relocate the load closer.`,
+          panelId: id,
+          circuitId: c.circuitId,
+        };
+        pr.warnings.push(w);
+        warnings.push(w);
+      }
+    }
+  }
+
   // Current-based selectivity between cascaded breakers (feeder vs sub-panel).
   const selectivity = selectivityReport(project, results, parentOf);
   for (const e of selectivity) {
@@ -211,8 +255,18 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const earthing = computeEarthing(
     project.earthingSystem ?? 'TN-C-S',
     peConductorSize(mainCable.csaMm2),
+    project.site?.soilResistivityOhmM,
   );
   const powerFactor = computePowerFactor(project);
+
+  // Surge-protection recommendation at the service origin (Type 1 under a
+  // lightning/overhead exposure, else Type 2), keyed to the earthing system.
+  const spd = recommendSpd({
+    earthingSystem,
+    hasExternalLps: project.site?.externalLps ?? false,
+    overheadSupply: project.site?.overheadSupply ?? false,
+    atOrigin: true,
+  });
 
   return {
     projectId: project.id,
@@ -221,6 +275,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
     supply,
     earthing,
     powerFactor,
+    spd,
     ...(sources ? { sources } : {}),
     ...(selectivity.length > 0 ? { selectivity } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },

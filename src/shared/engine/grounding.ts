@@ -8,6 +8,10 @@ import {
 } from '../standards/grounding';
 import type { CableType, EarthingSystem, LoadKind, SystemType } from '../types/electrical';
 import type { EarthingResult, GroundingResult, RcdSpec } from '../types/results';
+import { designElectrode } from './electrode';
+
+/** Default assumed soil resistivity (Ω·m) when the site value is unknown (loam). */
+export const DEFAULT_SOIL_RESISTIVITY_OHM_M = 100;
 
 export interface GroundingInput {
   phaseCsaMm2: number;
@@ -43,12 +47,21 @@ export function sizeGrounding(i: GroundingInput): GroundingResult {
  * conductors and the electrode resistance target. The supply PE is the PE of the
  * main incomer.
  */
-export function computeEarthing(system: EarthingSystem, supplyPeMm2: number): EarthingResult {
+export function computeEarthing(
+  system: EarthingSystem,
+  supplyPeMm2: number,
+  soilResistivityOhmM: number = DEFAULT_SOIL_RESISTIVITY_OHM_M,
+): EarthingResult {
   const info = EARTHING_SYSTEMS.find((s) => s.value === system) ?? EARTHING_SYSTEMS[0]!;
   const requiresRcd = system === 'TT';
   const tail = requiresRcd
     ? ' Earth-fault loop impedance is high, so an RCD provides fault protection on every final circuit.'
     : ' Overcurrent devices clear earth faults; RCDs are still required for socket-outlets and special locations.';
+  // Earth-electrode (driven-rod array) design to reach the target resistance.
+  const electrode = designElectrode({
+    soilResistivityOhmM,
+    targetOhm: MAX_EARTH_RESISTANCE_OHM,
+  });
   return {
     system,
     label: info.label,
@@ -56,6 +69,7 @@ export function computeEarthing(system: EarthingSystem, supplyPeMm2: number): Ea
     mainEarthingConductorMm2: mainEarthingConductor(supplyPeMm2),
     mainBondingConductorMm2: mainBondingConductor(supplyPeMm2),
     electrodeResistanceTargetOhm: MAX_EARTH_RESISTANCE_OHM,
+    electrode,
     note: info.note + tail,
   };
 }

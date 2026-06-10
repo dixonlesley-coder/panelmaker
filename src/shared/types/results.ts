@@ -5,6 +5,11 @@ import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
 import type { PhaseAssignment, EarthingSystem } from './electrical';
 import type { SourcesResult } from './sources';
+// Type-only imports of result shapes defined alongside their engine modules
+// (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
+import type { SpdResult } from '../engine/spd';
+import type { ElectrodeResult } from '../engine/electrode';
+import type { BusbarWithstandResult } from '../engine/busbarFault';
 
 /** Residual-current device requirement for a circuit. */
 export interface RcdSpec {
@@ -24,6 +29,8 @@ export interface EarthingResult {
   mainBondingConductorMm2: number;
   /** Target earth-electrode resistance (ohm). */
   electrodeResistanceTargetOhm: number;
+  /** Earth-electrode (rod array) design from soil resistivity. */
+  electrode?: ElectrodeResult;
   note: string;
 }
 
@@ -94,6 +101,14 @@ export interface CircuitResult {
   breaker: BreakerResult;
   cable: CableResult;
   voltageDrop: VoltageDropResult;
+  /**
+   * Cumulative voltage drop from the supply origin to this circuit's load (%),
+   * i.e. the sum of every upstream feeder segment's drop plus this run's drop.
+   * Set by `computeSystem` once the feeder tree is known. PUIL/IEC measure the
+   * 3%/5% limit from the origin, so a deep branch can breach it even when its own
+   * segment is within limit.
+   */
+  cumulativeDropPercent?: number;
   grounding: GroundingResult;
   rcd: RcdSpec;
   control?: ControlAssembly;
@@ -143,6 +158,8 @@ export interface BusbarResult {
   csaMm2: number;
   ampacityA: number;
   totalCurrentA: number;
+  /** Short-circuit (Icw / Ipk) withstand check at the panel's prospective fault. */
+  withstand?: BusbarWithstandResult;
 }
 
 export interface EnclosureResult {
@@ -379,6 +396,8 @@ export interface SystemResult {
   earthing: EarthingResult;
   /** Power-factor analysis + capacitor-bank recommendation. */
   powerFactor: CapacitorBankResult;
+  /** Surge-protection (SPD) recommendation at the service origin. */
+  spd?: SpdResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
   /** Current-based discrimination report per cascaded device pair. */

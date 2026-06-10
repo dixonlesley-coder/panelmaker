@@ -130,6 +130,20 @@ export interface ProjectMeta {
   quotation?: QuotationSettings;
 }
 
+/**
+ * Optional site/installation conditions that drive surge-protection (SPD) and
+ * earth-electrode design. All optional with safe defaults (no LPS, underground
+ * supply, ~100 Ω·m soil), so existing projects compute unchanged.
+ */
+export interface SiteConditions {
+  /** Building has an external Lightning Protection System (forces a Type 1 SPD). */
+  externalLps?: boolean;
+  /** Supply arrives via an overhead line / direct-strike exposure (Type 1 SPD). */
+  overheadSupply?: boolean;
+  /** Measured/assumed soil resistivity (Ω·m) for earth-electrode sizing. */
+  soilResistivityOhmM?: number;
+}
+
 export interface ProjectInput {
   id: string;
   name: string;
@@ -140,4 +154,6 @@ export interface ProjectInput {
   sources?: SourcesConfig;
   /** Optional project branding / title-block metadata. */
   meta?: ProjectMeta;
+  /** Optional site conditions (lightning exposure, soil resistivity) for SPD/earthing. */
+  site?: SiteConditions;
 }
