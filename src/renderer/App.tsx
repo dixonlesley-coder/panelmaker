@@ -4,6 +4,7 @@ import { AppShell, Center, Group, Loader, Menu, NavLink, ThemeIcon, Title, Actio
 import {
   IconSun,
   IconMoon,
+  IconSearch,
   IconFolder,
   IconSitemap,
   IconGauge,
@@ -40,6 +41,7 @@ import { Quotation } from '@renderer/screens/Quotation';
 import { Sources } from '@renderer/screens/Sources';
 import { Settings } from '@renderer/screens/Settings';
 import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
+import { CommandPalette, openCommandPalette } from '@renderer/features/CommandPalette';
 import { useAutosave } from '@renderer/features/autosave/useAutosave';
 import { AutosaveIndicator } from '@renderer/features/autosave/AutosaveIndicator';
 
@@ -281,6 +283,16 @@ export function App() {
             </Text>
           </Group>
           <Group gap="md" wrap="nowrap">
+            <Tooltip label={`${t('palette.open')} (${MOD_KEY}+K)`}>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('palette.open')}
+                onClick={openCommandPalette}
+              >
+                <IconSearch size={18} />
+              </ActionIcon>
+            </Tooltip>
             <HistoryControls />
             <AutosaveIndicator saveState={saveState} target={target} />
             <LanguageMenu />
@@ -321,6 +333,7 @@ export function App() {
         <ActiveScreen screen={activeScreen} />
       </AppShell.Main>
 
+      <CommandPalette />
       <UpdateNotifier />
     </AppShell>
   );

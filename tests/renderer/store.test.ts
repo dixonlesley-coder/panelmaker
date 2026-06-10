@@ -234,6 +234,32 @@ describe('projectStore', () => {
     });
   });
 
+  it('addSubPanel creates a cross-wired child panel + feeder in one undo step', () => {
+    const parentId = useProjectStore.getState().project.panels[0]!.id;
+    const startPanels = useProjectStore.getState().project.panels.length;
+    const startCircuits = useProjectStore.getState().project.panels[0]!.circuits.length;
+
+    useProjectStore.getState().addSubPanel(parentId);
+
+    const project = useProjectStore.getState().project;
+    expect(project.panels.length).toBe(startPanels + 1);
+    const child = project.panels[project.panels.length - 1]!;
+    const parent = project.panels.find((p) => p.id === parentId)!;
+    const feeder = parent.circuits[parent.circuits.length - 1]!;
+    // Cross-wiring: feeder feeds the child; the child knows its feeder.
+    expect(feeder.loadKind).toBe('feeder');
+    expect(feeder.feedsPanelId).toBe(child.id);
+    expect(child.fedByCircuitId).toBe(feeder.id);
+    expect(child.sourceType).toBe('feeder');
+    // The child becomes the active panel; one undo reverts both edits.
+    expect(useProjectStore.getState().activePanelId).toBe(child.id);
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.panels.length).toBe(startPanels);
+    expect(useProjectStore.getState().project.panels.find((p) => p.id === parentId)!.circuits.length).toBe(
+      startCircuits,
+    );
+  });
+
   it('setSiteConditions merges patches and is undoable', () => {
     useProjectStore.getState().setSiteConditions({ externalLps: true });
     expect(useProjectStore.getState().project.site?.externalLps).toBe(true);

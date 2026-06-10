@@ -121,6 +121,12 @@ export interface ProjectState {
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
   addPanel: () => void;
+  /**
+   * Drop a sub-panel onto a parent: creates the child panel AND the feeder
+   * circuit in the parent (cross-wired feedsPanelId/fedByCircuitId) as one
+   * undoable step. Returns nothing; the child becomes the active panel.
+   */
+  addSubPanel: (parentPanelId: string) => void;
   /** Set (or clear) a panel's building occupancy class. */
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
   /** Append a new panel built from a template (fresh ids) and select it. */
@@ -500,6 +506,51 @@ export const useProjectStore = create<ProjectState>((set) => ({
         ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
         activePanelId: newPanel.id,
         activeScreen: 'panel',
+      };
+    }),
+
+  addSubPanel: (parentPanelId) =>
+    set((s) => {
+      const parent = s.project.panels.find((p) => p.id === parentPanelId);
+      if (!parent) return s;
+      const childId = nextId('P');
+      const feederId = nextId('c');
+      const child: PanelInput = {
+        id: childId,
+        name: `Sub-panel ${s.project.panels.length + 1}`,
+        system: parent.system,
+        voltageV: parent.voltageV,
+        ambientTempC: parent.ambientTempC,
+        installMethod: parent.installMethod,
+        groupingCount: parent.groupingCount,
+        diversityFactor: 0.8,
+        sourceType: 'feeder',
+        fedByCircuitId: feederId,
+        circuits: [],
+      };
+      const feeder: CircuitInput = {
+        id: feederId,
+        name: `Feeder → ${child.name}`,
+        role: 'branch',
+        loadW: 0,
+        cosPhi: 0.85,
+        lengthM: 20,
+        loadKind: 'feeder',
+        isLighting: false,
+        demandFactor: 1,
+        feedsPanelId: childId,
+      };
+      return {
+        ...withHistory(s, (project) => ({
+          ...project,
+          panels: [
+            ...project.panels.map((p) =>
+              p.id === parentPanelId ? { ...p, circuits: [...p.circuits, feeder] } : p,
+            ),
+            child,
+          ],
+        })),
+        activePanelId: childId,
       };
     }),
 

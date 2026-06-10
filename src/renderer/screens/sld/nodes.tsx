@@ -26,6 +26,8 @@ export interface BranchNodeData {
   cable: string;
   starter?: string;
   warn?: boolean;
+  /** Human notes of what the last edit re-sized here (builder change marking). */
+  changed?: string[];
   [key: string]: unknown;
 }
 
@@ -88,21 +90,34 @@ export function BusbarNode({ data }: NodeProps) {
 /** Branch: one outgoing circuit with breaker + cable + optional starter. */
 export function BranchNode({ data }: NodeProps) {
   const d = data as BranchNodeData;
+  const changed = d.changed && d.changed.length > 0;
   return (
     <Paper
       withBorder
       radius="md"
       p="xs"
-      shadow="xs"
+      shadow={changed ? 'md' : 'xs'}
       style={{
         width: 160,
-        borderColor: d.warn ? 'var(--mantine-color-red-5)' : undefined,
+        borderColor: d.warn
+          ? 'var(--mantine-color-red-5)'
+          : changed
+            ? 'var(--mantine-color-teal-5)'
+            : undefined,
+        borderWidth: changed ? 2 : undefined,
       }}
     >
       <Handle type="target" position={Position.Top} />
-      <Text size="xs" fw={600} lineClamp={2} mb={4} title={d.name}>
-        {d.name}
-      </Text>
+      <Group justify="space-between" wrap="nowrap" gap={4} mb={4}>
+        <Text size="xs" fw={600} lineClamp={2} title={d.name} style={{ minWidth: 0 }}>
+          {d.name}
+        </Text>
+        {changed && (
+          <Badge size="xs" variant="filled" color="teal" title={d.changed!.join('\n')}>
+            Δ
+          </Badge>
+        )}
+      </Group>
       <Group gap={4} mb={2}>
         <IconBolt size={12} />
         <Text size="xs" c="dimmed">
@@ -119,6 +134,11 @@ export function BranchNode({ data }: NodeProps) {
             {d.starter}
           </Badge>
         </Group>
+      )}
+      {changed && (
+        <Text size="xs" c="teal.7" mt={4} lineClamp={2}>
+          {d.changed!.join(' · ')}
+        </Text>
       )}
     </Paper>
   );

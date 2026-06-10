@@ -7,13 +7,14 @@ import {
   Group,
   NumberInput,
   Paper,
+  SegmentedControl,
   Select,
   Table,
   Text,
   TextInput,
   Tooltip,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import {
   IconBulb,
   IconClipboard,
@@ -56,11 +57,13 @@ interface RowProps {
   panelId: string;
   circuit: CircuitInput;
   selected: boolean;
+  /** Detailed mode shows the power-factor and usage-schedule columns. */
+  detailed: boolean;
   onToggle: (checked: boolean) => void;
 }
 
 /** A single editable circuit row. Edits dispatch immutable store updates. */
-function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
+function CircuitRow({ panelId, circuit, selected, detailed, onToggle }: RowProps) {
   const { t } = useTranslation();
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
@@ -166,31 +169,35 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
         />
       </Table.Td>
 
-      <Table.Td>
-        <NumberInput
-          value={circuit.cosPhi}
-          size="xs"
-          min={0.1}
-          max={1}
-          step={0.05}
-          decimalScale={2}
-          onChange={(v) => patch({ cosPhi: typeof v === 'number' ? v : circuit.cosPhi })}
-        />
-      </Table.Td>
+      {detailed && (
+        <Table.Td>
+          <NumberInput
+            value={circuit.cosPhi}
+            size="xs"
+            min={0.1}
+            max={1}
+            step={0.05}
+            decimalScale={2}
+            onChange={(v) => patch({ cosPhi: typeof v === 'number' ? v : circuit.cosPhi })}
+          />
+        </Table.Td>
+      )}
 
-      <Table.Td>
-        <Select
-          data={SCHEDULE_OPTIONS}
-          value={presetKeyFor(circuit.schedule)}
-          size="xs"
-          allowDeselect={false}
-          comboboxProps={{ withinPortal: true }}
-          onChange={(value) => {
-            const preset = SCHEDULE_PRESETS.find((p) => p.key === value);
-            patch({ schedule: preset?.schedule });
-          }}
-        />
-      </Table.Td>
+      {detailed && (
+        <Table.Td>
+          <Select
+            data={SCHEDULE_OPTIONS}
+            value={presetKeyFor(circuit.schedule)}
+            size="xs"
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            onChange={(value) => {
+              const preset = SCHEDULE_PRESETS.find((p) => p.key === value);
+              patch({ schedule: preset?.schedule });
+            }}
+          />
+        </Table.Td>
+      )}
 
       <Table.Td>
         {motor ? (
@@ -389,6 +396,14 @@ export function CircuitTable({ panelId }: { panelId: string }) {
 
   const [wizardOpened, wizard] = useDisclosure(false);
 
+  // Progressive disclosure: Simple hides the cosφ / usage-schedule columns so a
+  // first-time user only sees name, kind, load and length. Persisted locally.
+  const [detailMode, setDetailMode] = useLocalStorage<'simple' | 'detailed'>({
+    key: 'panelmaker:circuit-detail',
+    defaultValue: 'simple',
+  });
+  const detailed = detailMode === 'detailed';
+
   // Local selection state for bulk editing, keyed by circuit id.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -416,7 +431,18 @@ export function CircuitTable({ panelId }: { panelId: string }) {
 
   return (
     <div>
-      <Table.ScrollContainer minWidth={900}>
+      <Group justify="flex-end" mb={6}>
+        <SegmentedControl
+          size="xs"
+          data={[
+            { value: 'simple', label: t('builder.modeSimple') },
+            { value: 'detailed', label: t('builder.modeDetailed') },
+          ]}
+          value={detailMode}
+          onChange={(v) => setDetailMode(v === 'detailed' ? 'detailed' : 'simple')}
+        />
+      </Group>
+      <Table.ScrollContainer minWidth={detailed ? 900 : 660}>
         <Table verticalSpacing="xs" highlightOnHover stickyHeader>
           <Table.Thead>
             <Table.Tr>
@@ -436,8 +462,8 @@ export function CircuitTable({ panelId }: { panelId: string }) {
               <Table.Th w={130}>{t('builder.colKind')}</Table.Th>
               <Table.Th w={120}>{t('builder.colLoad')}</Table.Th>
               <Table.Th w={100}>{t('builder.colLength')}</Table.Th>
-              <Table.Th w={80}>{t('builder.colPf')}</Table.Th>
-              <Table.Th w={170}>{t('builder.colUsage')}</Table.Th>
+              {detailed && <Table.Th w={80}>{t('builder.colPf')}</Table.Th>}
+              {detailed && <Table.Th w={170}>{t('builder.colUsage')}</Table.Th>}
               <Table.Th w={160}>{t('builder.colStarter')}</Table.Th>
               <Table.Th w={108} />
             </Table.Tr>
@@ -449,6 +475,7 @@ export function CircuitTable({ panelId }: { panelId: string }) {
                 panelId={panelId}
                 circuit={c}
                 selected={selected.has(c.id)}
+                detailed={detailed}
                 onToggle={(checked) => toggleOne(c.id, checked)}
               />
             ))}

@@ -3,6 +3,7 @@ import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, TextInput } from '
 import {
   IconAlertTriangle,
   IconBulb,
+  IconDragDrop,
   IconColumns,
   IconCpu,
   IconLayoutGrid,
@@ -14,6 +15,7 @@ import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
 import type { OccupancyType } from '@shared/types';
 import { panelLabel } from '@shared/labels';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
+import { VisualBuilder } from '@renderer/features/builder/VisualBuilder';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
 import { SchematicView } from '@renderer/features/schematic/SchematicView';
@@ -135,8 +137,11 @@ export function PanelEditor() {
 
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Card withBorder radius="md" padding="md" h="100%">
-            <Tabs defaultValue="sld" keepMounted={false}>
+            <Tabs defaultValue="build" keepMounted={false}>
               <Tabs.List mb="md">
+                <Tabs.Tab value="build" leftSection={<IconDragDrop size={16} />}>
+                  {t('panel.tabBuild')}
+                </Tabs.Tab>
                 <Tabs.Tab value="sld" leftSection={<IconSitemap size={16} />}>
                   {t('panel.tabSingleLine')}
                 </Tabs.Tab>
@@ -170,6 +175,9 @@ export function PanelEditor() {
                 </Tabs.Tab>
               </Tabs.List>
 
+              <Tabs.Panel value="build">
+                <VisualBuilder panel={panel} result={result} />
+              </Tabs.Panel>
               <Tabs.Panel value="sld">
                 <PanelSld panel={panel} result={result} />
               </Tabs.Panel>

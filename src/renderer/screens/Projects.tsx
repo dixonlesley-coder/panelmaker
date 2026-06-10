@@ -14,10 +14,13 @@ import {
   Table,
   Text,
   TextInput,
+  ThemeIcon,
   Title,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core';
 import {
+  IconBolt,
   IconCopy,
   IconDownload,
   IconFileImport,
@@ -218,6 +221,35 @@ export function Projects() {
     }
   }
 
+  /** One large welcome action: icon tile + title + description. */
+  function HeroAction({
+    icon,
+    title,
+    description,
+    onClick,
+  }: {
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    onClick: () => void;
+  }) {
+    return (
+      <UnstyledButton onClick={onClick} disabled={busy} style={{ flex: 1, minWidth: 180 }}>
+        <Card withBorder radius="lg" padding="lg" h="100%">
+          <ThemeIcon size={40} radius="md" variant="light" color="indigo" mb="sm">
+            {icon}
+          </ThemeIcon>
+          <Text fw={650} mb={4}>
+            {title}
+          </Text>
+          <Text size="sm" c="dimmed">
+            {description}
+          </Text>
+        </Card>
+      </UnstyledButton>
+    );
+  }
+
   return (
     <Stack gap="md">
       <div>
@@ -235,6 +267,28 @@ export function Projects() {
           {t('projects.webNote')}
         </Alert>
       )}
+
+      {/* Welcome hero: three large, obvious starting points. */}
+      <Group gap="md" align="stretch" wrap="wrap">
+        <HeroAction
+          icon={<IconPlus size={22} />}
+          title={t('projects.heroNew')}
+          description={t('projects.heroNewHint')}
+          onClick={() => void onNew()}
+        />
+        <HeroAction
+          icon={<IconFileImport size={22} />}
+          title={t('projects.heroImport')}
+          description={t('projects.heroImportHint')}
+          onClick={() => void onImport()}
+        />
+        <HeroAction
+          icon={<IconBolt size={22} />}
+          title={t('projects.heroContinue')}
+          description={t('projects.heroContinueHint', { name: project.name })}
+          onClick={() => setScreen('system')}
+        />
+      </Group>
 
       <Card withBorder radius="md" padding="md">
         <Group justify="space-between" align="flex-start">
