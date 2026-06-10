@@ -38,6 +38,7 @@ type PaletteAction =
   | { type: 'load'; loadKind: LoadKind; defaults: Partial<CircuitInput>; nameKey: string }
   | { type: 'spare' }
   | { type: 'subpanel' }
+  | { type: 'connectPanel'; childPanelId: string }
   | { type: 'supply'; sourceType: PanelInput['sourceType'] };
 
 interface PaletteItem {
@@ -173,6 +174,27 @@ const PALETTE: PaletteGroup[] = [
 ];
 
 const DND_MIME = 'application/x-panelmaker-item';
+
+/**
+ * Existing panels that can be adopted as a feeder under `panelId`: those with no
+ * parent yet (unassigned), excluding the panel itself and any panel from which
+ * the current panel is reachable (which would create a feeder cycle).
+ */
+function availableChildPanels(panels: PanelInput[], panelId: string): PanelInput[] {
+  const parentOf = new Map<string, string>();
+  for (const p of panels) for (const c of p.circuits) if (c.feedsPanelId) parentOf.set(c.feedsPanelId, p.id);
+  const wouldCycle = (childId: string): boolean => {
+    let cur: string | undefined = panelId;
+    const seen = new Set<string>();
+    while (cur !== undefined && !seen.has(cur)) {
+      if (cur === childId) return true;
+      seen.add(cur);
+      cur = parentOf.get(cur);
+    }
+    return false;
+  };
+  return panels.filter((p) => p.id !== panelId && !parentOf.has(p.id) && !wouldCycle(p.id));
+}
 
 /* ------------------------------ change marking ----------------------------- */
 
@@ -413,6 +435,12 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
+  const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
+  const allPanels = useProjectStore((s) => s.project.panels);
+  const orphanPanels = useMemo(
+    () => availableChildPanels(allPanels, panel.id),
+    [allPanels, panel.id],
+  );
 
   /** Pin a manual breaker rating / cable minimum onto a specific circuit. */
   const applyOverride = (circuitId: string, kind: 'breaker' | 'cable', value: number) => {
@@ -495,6 +523,15 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
         addSubPanel(panel.id);
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
         break;
+      case 'connectPanel': {
+        const child = allPanels.find((p) => p.id === action.childPanelId);
+        connectPanelAsFeeder(panel.id, action.childPanelId);
+        notifications.show({
+          message: t('vbuilder.panelConnected', { name: child ? (child.tag ?? child.name) : '' }),
+          color: 'teal',
+        });
+        break;
+      }
       case 'supply':
         updatePanel(panel.id, { sourceType: action.sourceType });
         notifications.show({ message: t('vbuilder.supplySet'), color: 'teal' });
@@ -556,6 +593,44 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
                 {t('vbuilder.overrideHint')}
               </Text>
             </div>
+            {orphanPanels.length > 0 && (
+              <div>
+                <Text size="xs" c="dimmed" fw={600} tt="uppercase" mb={6} style={{ letterSpacing: '0.04em' }}>
+                  {t('vbuilder.groupPanels')}
+                </Text>
+                <SimpleGrid cols={1} spacing={6}>
+                  {orphanPanels.map((op) => (
+                    <Paper
+                      key={op.id}
+                      withBorder
+                      radius="md"
+                      p={6}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          DND_MIME,
+                          JSON.stringify({ type: 'connectPanel', childPanelId: op.id }),
+                        );
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      style={{ cursor: 'grab', userSelect: 'none' }}
+                    >
+                      <Group gap={8} wrap="nowrap">
+                        <ThemeIcon size="sm" variant="light" color="teal">
+                          <IconSitemap size={14} />
+                        </ThemeIcon>
+                        <Text size="xs" fw={500} lineClamp={1}>
+                          {op.tag ? `${op.tag} — ${op.name}` : op.name}
+                        </Text>
+                      </Group>
+                    </Paper>
+                  ))}
+                </SimpleGrid>
+                <Text size="xs" c="dimmed" mt={6}>
+                  {t('vbuilder.panelsHint')}
+                </Text>
+              </div>
+            )}
           </Stack>
         </Card>
 

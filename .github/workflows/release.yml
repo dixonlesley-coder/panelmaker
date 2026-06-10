@@ -33,7 +33,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # Internal deployment is Windows-only. Add macos-latest / ubuntu-latest
+        # back here if you ever distribute to those platforms (sign macOS first).
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
