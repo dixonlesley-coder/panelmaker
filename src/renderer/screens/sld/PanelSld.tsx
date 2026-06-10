@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Background,
@@ -13,8 +13,11 @@ import { IconFileVector } from '@tabler/icons-react';
 import type { PanelInput, PanelResult } from '@shared/types';
 import { panelSldSvg, panelSldDxf } from '@shared/drawing';
 import { NODE_TYPES, type BranchNodeData } from '@renderer/screens/sld/nodes';
+import { circuitIssues, incomerIssues, busbarIssues } from '@renderer/lib/nodeIssues';
 import { downloadSvg, downloadDxf } from '@renderer/lib/drawingExport';
 import { formatAmps } from '@renderer/lib/format';
+import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
+import { PanelSettingsEditor } from '@renderer/features/builder/PanelSettingsEditor';
 
 const BRANCH_W = 160;
 const BRANCH_GAP = 24;
@@ -50,6 +53,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
       data: {
         label: panel.name,
         ratingA: `${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA}A ${result.incomer.poles}P · ${formatAmps(result.totalDemandCurrentA)}`,
+        issues: incomerIssues(result.warnings),
       },
       draggable: false,
     },
@@ -72,6 +76,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
         waysLabel: multi ? t('vbuilder.waysCount', { count: section.ways }) : undefined,
         inadequate,
         manualBreak: section.manualBreak,
+        issues: inadequate ? busbarIssues(result.warnings) : undefined,
       },
       draggable: false,
     });
@@ -98,6 +103,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
         warn: !c.voltageDrop.withinLimit,
         breakerOverridden: c.breaker.overridden === true,
         cableOverridden: c.cable.overridden === true,
+        issues: circuitIssues(result.warnings, cid),
       };
       nodes.push({ id: cid, type: 'branch', position: { x, y: branchY }, data, draggable: false });
       edges.push({
@@ -117,6 +123,18 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
 export function PanelSld({ panel, result }: { panel: PanelInput; result: PanelResult }) {
   const { t } = useTranslation();
   const { nodes, edges } = useMemo(() => buildGraph(panel, result, t), [panel, result, t]);
+
+  // Double-click to edit, consistent with the Build tab: a branch opens its
+  // circuit editor (its cable edge focuses the cable), the incomer/busbar opens
+  // panel settings.
+  const [editing, setEditing] = useState<{ circuitId: string; focus: 'device' | 'cable' } | null>(
+    null,
+  );
+  const [panelSettingsOpen, setPanelSettingsOpen] = useState(false);
+  const editingCircuit = editing ? panel.circuits.find((c) => c.id === editing.circuitId) : undefined;
+  const editingResult = editing
+    ? result.circuits.find((c) => c.circuitId === editing.circuitId)
+    : undefined;
 
   return (
     <Stack gap="sm">
@@ -159,12 +177,34 @@ export function PanelSld({ panel, result }: { panel: PanelInput; result: PanelRe
             nodesConnectable={false}
             nodesDraggable={false}
             elementsSelectable={false}
+            // Reserve double-click for opening the editor (zoom would swallow it).
+            zoomOnDoubleClick={false}
+            onNodeDoubleClick={(_, node) => {
+              if (node.type === 'branch') setEditing({ circuitId: node.id, focus: 'device' });
+              else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
+            }}
+            onEdgeDoubleClick={(_, edge) => {
+              const id = edge.id.startsWith('e-busbar-') ? edge.id.slice('e-busbar-'.length) : '';
+              if (id) setEditing({ circuitId: id, focus: 'cable' });
+            }}
           >
             <Background gap={16} />
             <Controls showInteractive={false} />
           </ReactFlow>
         </ReactFlowProvider>
       </Box>
+
+      {editing && editingCircuit && (
+        <CircuitEditor
+          panelId={panel.id}
+          circuit={editingCircuit}
+          result={editingResult}
+          focus={editing.focus}
+          opened
+          onClose={() => setEditing(null)}
+        />
+      )}
+      <PanelSettingsEditor panel={panel} opened={panelSettingsOpen} onClose={() => setPanelSettingsOpen(false)} />
     </Stack>
   );
 }

@@ -1,6 +1,89 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Badge, Box, Group, Paper, Text, ThemeIcon } from '@mantine/core';
-import { IconBattery2, IconBolt, IconCpu, IconPlugConnected, IconSolarPanel } from '@tabler/icons-react';
+import { Badge, Box, Group, HoverCard, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import {
+  IconAlertTriangle,
+  IconBattery2,
+  IconBolt,
+  IconBulb,
+  IconCpu,
+  IconInfoCircle,
+  IconPlugConnected,
+  IconSolarPanel,
+} from '@tabler/icons-react';
+import type { WarningSeverity } from '@shared/types';
+
+/**
+ * A node-attached issue surfaced on hover: the engine warning message plus its
+ * suggested fixes (already flattened to strings).
+ */
+export interface NodeIssue {
+  severity: WarningSeverity;
+  message: string;
+  fixes: string[];
+}
+
+const SEV_COLOR: Record<WarningSeverity, string> = { error: 'red', warning: 'orange', info: 'blue' };
+const SEV_RANK: Record<WarningSeverity, number> = { error: 3, warning: 2, info: 1 };
+const SEV_ICON: Record<WarningSeverity, React.ReactNode> = {
+  error: <IconAlertTriangle size={13} />,
+  warning: <IconAlertTriangle size={13} />,
+  info: <IconInfoCircle size={13} />,
+};
+
+/**
+ * Warning chip shown on any node that has issues: an alert/info icon coloured by
+ * the most severe issue, that reveals the issue text + suggested fixes on hover
+ * (also keyboard/touch-focusable). Returns null when there's nothing to report.
+ */
+export function NodeIssues({ issues }: { issues?: NodeIssue[] }) {
+  if (!issues || issues.length === 0) return null;
+  const top = issues.reduce<WarningSeverity>(
+    (acc, i) => (SEV_RANK[i.severity] > SEV_RANK[acc] ? i.severity : acc),
+    'info',
+  );
+  return (
+    <HoverCard width={290} shadow="md" position="top" openDelay={60} withinPortal>
+      <HoverCard.Target>
+        <ThemeIcon
+          size="sm"
+          radius="xl"
+          variant="light"
+          color={SEV_COLOR[top]}
+          style={{ cursor: 'help', flexShrink: 0 }}
+          // Don't let grabbing the chip start a node drag or trigger edit.
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          {SEV_ICON[top]}
+        </ThemeIcon>
+      </HoverCard.Target>
+      <HoverCard.Dropdown p="xs">
+        <Stack gap={8}>
+          {issues.map((iss, i) => (
+            <div key={i}>
+              <Group gap={6} wrap="nowrap" align="flex-start">
+                <ThemeIcon size="xs" radius="xl" variant="light" color={SEV_COLOR[iss.severity]} style={{ flexShrink: 0, marginTop: 1 }}>
+                  {SEV_ICON[iss.severity]}
+                </ThemeIcon>
+                <Text size="xs" fw={600} style={{ lineHeight: 1.3 }}>
+                  {iss.message}
+                </Text>
+              </Group>
+              {iss.fixes.map((f, j) => (
+                <Group key={j} gap={4} wrap="nowrap" align="flex-start" ml={22} mt={2}>
+                  <IconBulb size={12} color="var(--mantine-color-teal-6)" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <Text size="xs" c="dimmed" style={{ lineHeight: 1.3 }}>
+                    {f}
+                  </Text>
+                </Group>
+              ))}
+            </div>
+          ))}
+        </Stack>
+      </HoverCard.Dropdown>
+    </HoverCard>
+  );
+}
 
 /**
  * Custom React Flow node renderers for the single-line diagrams. Nodes carry a
@@ -11,6 +94,8 @@ import { IconBattery2, IconBolt, IconCpu, IconPlugConnected, IconSolarPanel } fr
 export interface IncomerNodeData {
   label: string;
   ratingA: string;
+  /** Panel-level issues (incomer rating / kA / phase balance / enclosure). */
+  issues?: NodeIssue[];
   [key: string]: unknown;
 }
 
@@ -25,6 +110,8 @@ export interface BusbarNodeData {
   inadequate?: boolean;
   /** True when this section starts at a user-forced (manual) busbar break. */
   manualBreak?: boolean;
+  /** Busbar issues (short-circuit withstand). */
+  issues?: NodeIssue[];
   [key: string]: unknown;
 }
 
@@ -44,6 +131,8 @@ export interface BranchNodeData {
   cableOverridden?: boolean;
   /** Builder only: receive a dropped override card targeted at this circuit. */
   onDropOverride?: (kind: 'breaker' | 'cable', value: number) => void;
+  /** Per-circuit issues (voltage drop, breaking capacity, Zs, selectivity, …). */
+  issues?: NodeIssue[];
   [key: string]: unknown;
 }
 
@@ -64,6 +153,8 @@ export interface PanelNodeData {
   incomerA: string;
   source: 'utility' | 'feeder';
   warn?: boolean;
+  /** Aggregated panel issues, surfaced on hover in the building diagram. */
+  issues?: NodeIssue[];
   [key: string]: unknown;
 }
 
@@ -75,7 +166,7 @@ export function IncomerNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Top} />
       <Group gap={6} wrap="nowrap">
         <IconPlugConnected size={18} color="var(--mantine-color-indigo-5)" />
-        <Box>
+        <Box style={{ minWidth: 0, flex: 1 }}>
           <Text size="sm" fw={700} lineClamp={1}>
             {d.label}
           </Text>
@@ -83,6 +174,7 @@ export function IncomerNode({ data }: NodeProps) {
             Incomer · {d.ratingA}
           </Text>
         </Box>
+        <NodeIssues issues={d.issues} />
       </Group>
       <Handle type="source" position={Position.Bottom} />
     </Paper>
@@ -120,6 +212,7 @@ export function BusbarNode({ data }: NodeProps) {
             </Text>
           )}
           <Text size="xs">{d.ampacity}</Text>
+          <NodeIssues issues={d.issues} />
         </Group>
       </Group>
       {/* Top: incomer feed (section 0). Left: radial dropper from the incomer
@@ -188,11 +281,14 @@ export function BranchNode({ data }: NodeProps) {
         <Text size="xs" fw={600} lineClamp={2} title={d.name} style={{ minWidth: 0 }}>
           {d.name}
         </Text>
-        {changed && (
-          <Badge size="xs" variant="filled" color="teal" title={d.changed!.join('\n')}>
-            Δ
-          </Badge>
-        )}
+        <Group gap={4} wrap="nowrap">
+          <NodeIssues issues={d.issues} />
+          {changed && (
+            <Badge size="xs" variant="filled" color="teal" title={d.changed!.join('\n')}>
+              Δ
+            </Badge>
+          )}
+        </Group>
       </Group>
       <Group gap={4} mb={2}>
         <IconBolt size={12} color={d.breakerOverridden ? 'var(--mantine-color-violet-6)' : undefined} />
@@ -309,9 +405,12 @@ export function PanelNode({ data }: NodeProps) {
             {d.name}
           </Text>
         </Box>
-        <Badge size="xs" variant="light" color={d.source === 'utility' ? 'indigo' : 'gray'}>
-          {d.source}
-        </Badge>
+        <Group gap={4} wrap="nowrap">
+          <NodeIssues issues={d.issues} />
+          <Badge size="xs" variant="light" color={d.source === 'utility' ? 'indigo' : 'gray'}>
+            {d.source}
+          </Badge>
+        </Group>
       </Group>
       <Group justify="space-between">
         <Text size="xs" c="dimmed">

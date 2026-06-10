@@ -22,6 +22,7 @@ import {
 } from '@tabler/icons-react';
 import { computePowerOneline } from '@shared/engine';
 import type { PowerNodeKind, SystemResult } from '@shared/types';
+import { useProjectStore } from '@renderer/state/projectStore';
 
 const STAGE: Record<PowerNodeKind, number> = {
   utility: 0,
@@ -133,6 +134,30 @@ const POWER_NODE_TYPES = { power: PowerSourceNode };
 /** Hybrid power one-line: sources → ATS / combiners → main bus, with interlocks. */
 export function PowerOneline({ system }: { system: SystemResult }) {
   const ol = useMemo(() => computePowerOneline(system), [system]);
+  const panels = useProjectStore((s) => s.project.panels);
+  const setActivePanel = useProjectStore((s) => s.setActivePanel);
+  const setScreen = useProjectStore((s) => s.setScreen);
+
+  // Double-click opens the relevant editor (consistent with the other canvases):
+  // the main-panel node opens that panel; an energy-source node jumps to the
+  // Energy Sources screen.
+  const openForNode = (kind: PowerNodeKind) => {
+    if (kind === 'main-panel') {
+      const root = panels.find((p) => p.sourceType === 'utility') ?? panels[0];
+      if (root) {
+        setActivePanel(root.id);
+        setScreen('panel');
+      }
+    } else if (
+      kind === 'generator' ||
+      kind === 'pv' ||
+      kind === 'pv-inverter' ||
+      kind === 'battery' ||
+      kind === 'battery-inverter'
+    ) {
+      setScreen('sources');
+    }
+  };
 
   const { nodes, edges } = useMemo(() => {
     const rfNodes: Node[] = ol.nodes.map((n) => ({
@@ -197,6 +222,9 @@ export function PowerOneline({ system }: { system: SystemResult }) {
             nodesConnectable={false}
             nodesDraggable={false}
             elementsSelectable={false}
+            // Reserve double-click for opening the editor (zoom would swallow it).
+            zoomOnDoubleClick={false}
+            onNodeDoubleClick={(_, node) => openForNode((node.data as PowerNodeData).kind)}
           >
             <Background gap={16} />
             <Controls showInteractive={false} />

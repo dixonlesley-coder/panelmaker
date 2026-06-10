@@ -31,6 +31,7 @@ import type { CircuitInput, LoadKind, PanelInput, PanelResult, SourcesResult } f
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { NODE_TYPES, OVERRIDE_MIME, type BranchNodeData } from '@renderer/screens/sld/nodes';
+import { circuitIssues, incomerIssues, busbarIssues } from '@renderer/lib/nodeIssues';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps } from '@renderer/lib/format';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
@@ -319,6 +320,7 @@ function buildGraph(
       data: {
         label: panel.tag ? `${panel.tag} — ${panel.name}` : panel.name,
         ratingA: `${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA}A ${result.incomer.poles}P · ${formatAmps(result.totalDemandCurrentA)}`,
+        issues: incomerIssues(result.warnings),
       },
       draggable: false,
     },
@@ -371,6 +373,7 @@ function buildGraph(
         waysLabel: multi ? t('vbuilder.waysCount', { count: section.ways }) : undefined,
         inadequate,
         manualBreak: section.manualBreak,
+        issues: inadequate ? busbarIssues(result.warnings) : undefined,
       },
       draggable: false,
     });
@@ -401,6 +404,7 @@ function buildGraph(
           c.cable.deratedIzA > 0
             ? Math.round((c.designCurrentA / c.cable.deratedIzA) * 100)
             : undefined,
+        issues: circuitIssues(result.warnings, cid),
         onDropOverride: (kind, value) => onOverride(cid, kind, value),
       };
       // Branch nodes are draggable so the user can reorder ways left-to-right
