@@ -40,8 +40,7 @@ import {
   IconStack2,
   IconTags,
 } from '@tabler/icons-react';
-import { computeSystem } from '@shared/engine';
-import type { CostResult, PanelInput, ProjectInput, SystemResult } from '@shared/types';
+import type { CostResult, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
 import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
@@ -50,6 +49,7 @@ import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
 import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 import { exportLabelsPdf, exportSystemPdf, saveProjectToDisk } from '@renderer/api';
 
 const NODE_W = 200;
@@ -101,9 +101,9 @@ function buildGraph(
   for (const [d, ids] of rows) {
     const rowWidth = ids.length * (NODE_W + COL_GAP) - COL_GAP;
     ids.forEach((id, i) => {
-      const panel = byId.get(id) as PanelInput;
+      const panel = byId.get(id);
       const result = system.panels[id];
-      if (!result) return;
+      if (!panel || !result) return;
       const data: PanelNodeData = {
         name: result.name,
         loadKw: formatKw(result.totalConnectedLoadW),
@@ -149,7 +149,7 @@ export function SystemView() {
   const addPanel = useProjectStore((s) => s.addPanel);
   const addPanelFromTemplate = useProjectStore((s) => s.addPanelFromTemplate);
 
-  const system = useMemo(() => computeSystem(project), [project]);
+  const system = useSystemResult();
   const { nodes, edges } = useMemo(() => buildGraph(project, system), [project, system]);
 
   const cost = useMemo(() => {

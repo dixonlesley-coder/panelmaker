@@ -112,6 +112,7 @@ export const id: TranslationKeys = {
     companyLogoAlt: 'Logo perusahaan',
     uploadLogo: 'Unggah logo',
     logoReadError: 'Tidak dapat membaca berkas logo.',
+    logoTooLarge: 'Logo terlalu besar — maksimal {{maxKb}} KB (logo disematkan di setiap penyimpanan dan PDF).',
     environment: 'Lingkungan & faktor koreksi',
     ambientTemp: 'Suhu lingkungan',
     ambientTempHint: 'Digunakan untuk koreksi kabel',
@@ -294,6 +295,7 @@ export const id: TranslationKeys = {
     selectAll: 'Pilih semua',
     bulkEdit: 'Ubah massal',
     bulkDelete: 'Hapus terpilih',
+    bulkApply: 'Terapkan ke terpilih',
     copy: 'Salin',
     paste: 'Tempel',
     // Tabel sirkit

@@ -38,7 +38,11 @@ import {
   loadProject as registryLoadProject,
   saveProject as registrySaveProject,
 } from '@renderer/lib/projectsRegistry';
-import { downloadProjectFile, pickAndReadProjectFile } from '@renderer/lib/projectFile';
+import {
+  downloadProjectFile,
+  isImportCancelled,
+  pickAndReadProjectFile,
+} from '@renderer/lib/projectFile';
 
 /** Format an ISO timestamp for the list; falls back to a dash when absent. */
 function formatWhen(iso: string): string {
@@ -178,9 +182,8 @@ export function Projects() {
       await refresh();
       setScreen('system');
     } catch (e) {
-      const msg = (e as Error).message;
       // A user-cancelled picker is not an error worth a red toast.
-      if (msg !== 'Import cancelled.' && msg !== 'No file selected.') fail(msg);
+      if (!isImportCancelled(e)) fail((e as Error).message);
     } finally {
       setBusy(false);
     }

@@ -236,7 +236,26 @@ function BulkActionBar({
   const bulkUpdateCircuits = useProjectStore((s) => s.bulkUpdateCircuits);
   const removeCircuits = useProjectStore((s) => s.removeCircuits);
 
-  const apply = (patch: Partial<CircuitInput>) => {
+  // Stage edits locally and commit once on Apply — committing on every onChange
+  // applied "2" of "25" to every selected circuit and dismissed the bar before
+  // the second digit could be typed.
+  const [lengthM, setLengthM] = useState<number | string>('');
+  const [demandFactor, setDemandFactor] = useState<number | string>('');
+  const [loadKind, setLoadKind] = useState<LoadKind | null>(null);
+
+  const patch = useMemo(() => {
+    const p: Partial<CircuitInput> = {};
+    if (typeof lengthM === 'number') p.lengthM = lengthM;
+    if (typeof demandFactor === 'number') p.demandFactor = demandFactor;
+    if (loadKind) {
+      p.loadKind = loadKind;
+      p.isLighting = loadKind === 'lighting';
+    }
+    return p;
+  }, [lengthM, demandFactor, loadKind]);
+
+  const apply = () => {
+    if (Object.keys(patch).length === 0) return;
     bulkUpdateCircuits(panelId, ids, patch);
     onDone();
   };
@@ -255,9 +274,8 @@ function BulkActionBar({
           step={5}
           suffix=" m"
           placeholder={t('builder.cableLengthPlaceholder')}
-          onChange={(v) => {
-            if (typeof v === 'number') apply({ lengthM: v });
-          }}
+          value={lengthM}
+          onChange={setLengthM}
         />
         <NumberInput
           label={t('builder.demandFactor')}
@@ -268,9 +286,8 @@ function BulkActionBar({
           step={0.05}
           decimalScale={2}
           placeholder={t('builder.demandFactorPlaceholder')}
-          onChange={(v) => {
-            if (typeof v === 'number') apply({ demandFactor: v });
-          }}
+          value={demandFactor}
+          onChange={setDemandFactor}
         />
         <Select
           label={t('builder.loadKind')}
@@ -279,12 +296,12 @@ function BulkActionBar({
           w={150}
           placeholder={t('builder.loadKindPlaceholder')}
           comboboxProps={{ withinPortal: true }}
-          onChange={(value) => {
-            if (!value) return;
-            const kind = value as LoadKind;
-            apply({ loadKind: kind, isLighting: kind === 'lighting' });
-          }}
+          value={loadKind}
+          onChange={(value) => setLoadKind((value as LoadKind | null) ?? null)}
         />
+        <Button size="xs" disabled={Object.keys(patch).length === 0} onClick={apply}>
+          {t('builder.bulkApply')}
+        </Button>
         <Button
           size="xs"
           color="red"
@@ -302,11 +319,14 @@ function BulkActionBar({
   );
 }
 
+/** Stable empty list so the selector keeps referential equality when the panel is missing. */
+const NO_CIRCUITS: CircuitInput[] = [];
+
 /** Structured editor for a panel's branch circuits; recomputes the panel live. */
 export function CircuitTable({ panelId }: { panelId: string }) {
   const { t } = useTranslation();
   const circuits = useProjectStore(
-    (s) => s.project.panels.find((p) => p.id === panelId)?.circuits ?? [],
+    (s) => s.project.panels.find((p) => p.id === panelId)?.circuits ?? NO_CIRCUITS,
   );
   const addCircuit = useProjectStore((s) => s.addCircuit);
   const pasteCircuit = useProjectStore((s) => s.pasteCircuit);

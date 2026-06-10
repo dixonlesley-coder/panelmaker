@@ -16,6 +16,7 @@ import type {
   SuggestedFix,
 } from '@shared/types';
 import { buildSchematic, mergeSchematic } from '@shared/engine';
+import { desktopApi, persistSchematic } from '@renderer/api';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { findPanelTemplate } from '@renderer/data/panelTemplates';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
@@ -36,22 +37,36 @@ export type Screen =
   | 'sources'
   | 'settings';
 
-/** A monotonic id generator for circuits/panels created at runtime. */
+/**
+ * Collision-resistant id for circuits/panels/schematic elements created at
+ * runtime. These ids are PERSISTED with the project (autosave round-trips the
+ * whole graph), so a plain in-memory counter collides after an app relaunch —
+ * session 2's `c-rt1` duplicates session 1's, and every id-keyed update then
+ * patches both rows. UUIDs make ids unique across sessions by construction; the
+ * timestamped counter is only a fallback for environments without crypto.
+ */
 let runtimeSeq = 0;
-const nextId = (prefix: string) => `${prefix}-rt${(runtimeSeq += 1)}`;
+const nextId = (prefix: string): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-rt${Date.now().toString(36)}-${(runtimeSeq += 1)}`;
+};
 
-/** A separate counter for schematic rungs/symbols authored at runtime. */
-let schematicSeq = 0;
-const nextSchematicId = (prefix: string) => `${prefix}-rt${(schematicSeq += 1)}`;
+/** Schematic rungs/symbols are persisted too — same collision-safe generator. */
+const nextSchematicId = nextId;
 
 /** Maximum number of undoable project states retained. */
 const HISTORY_LIMIT = 50;
 
+/**
+ * Consecutive same-field keystrokes coalesce into ONE undo step when they land
+ * within this window, so Ctrl+Z undoes "rename the circuit", not one character.
+ */
+const HISTORY_COALESCE_MS = 1200;
+
 /** A fresh, collision-resistant project id for new/duplicated projects. */
 function freshProjectId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `PRJ-${crypto.randomUUID()}`;
-  }
   return nextId('PRJ');
 }
 
@@ -67,6 +82,13 @@ export interface ProjectState {
   past: ProjectInput[];
   /** Redo stack: states undone away from, newest first. */
   future: ProjectInput[];
+  /**
+   * The coalescing tag of the most recent history push: keystroke-driven edits
+   * to the same field within {@link HISTORY_COALESCE_MS} reuse the existing undo
+   * snapshot instead of pushing one per character. Cleared by undo/redo and by
+   * any non-coalescing edit.
+   */
+  lastEdit: { key: string; at: number } | null;
   /**
    * A copied circuit held outside project history, ready to paste into any
    * panel. Stored as a deep clone so later edits never mutate the clipboard.
@@ -213,20 +235,86 @@ function nextFreeCol(schematic: ControlSchematic, rungId: string): number {
   return cols.length === 0 ? 0 : Math.max(...cols) + 1;
 }
 
+/** True when a schematic carries no hand-authored content (safe to replace). */
+function schematicPristine(schematic: ControlSchematic): boolean {
+  return schematic.rungs.every((r) => r.generated) && schematic.symbols.every((sy) => sy.generated);
+}
+
+/**
+ * Debounced, best-effort persistence of an edited schematic (desktop SQLite;
+ * no-op on web). Hand-authored rungs/symbols previously lived only in memory and
+ * silently vanished on restart even though the IPC + repo existed end-to-end.
+ */
+const schematicSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function queuePersistSchematic(circuitId: string): void {
+  const prev = schematicSaveTimers.get(circuitId);
+  if (prev !== undefined) clearTimeout(prev);
+  schematicSaveTimers.set(
+    circuitId,
+    setTimeout(() => {
+      schematicSaveTimers.delete(circuitId);
+      const schematic = useProjectStore.getState().schematics[circuitId];
+      if (schematic) void persistSchematic(schematic);
+    }, 800),
+  );
+}
+
+/** Circuits whose persisted schematic has already been looked up this session. */
+const hydratedSchematics = new Set<string>();
+
+/**
+ * Load a previously persisted (hand-edited) schematic for the circuit, replacing
+ * the freshly generated one — unless the user has already started editing it.
+ */
+function hydrateSchematic(circuitId: string): void {
+  if (hydratedSchematics.has(circuitId)) return;
+  hydratedSchematics.add(circuitId);
+  const api = desktopApi();
+  if (!api) return;
+  void api
+    .loadSchematic(circuitId)
+    .then((saved) => {
+      if (!saved) return;
+      useProjectStore.setState((s) => {
+        const current = s.schematics[circuitId];
+        // Keep in-memory work if the user already authored something this session.
+        if (!current || !schematicPristine(current)) return s;
+        return { schematics: { ...s.schematics, [circuitId]: saved } };
+      });
+    })
+    .catch(() => undefined);
+}
+
 /**
  * Apply an undoable project edit: compute the next project from the current
  * state and, when it actually changed, push the PREVIOUS project onto the undo
  * stack (capped at {@link HISTORY_LIMIT}) and clear the redo stack. Schematic and
  * price edits do not flow through here and stay out of project history.
+ *
+ * `coalesceKey` (keystroke-driven edits: a circuit name, a panel field, …) makes
+ * consecutive same-key edits within {@link HISTORY_COALESCE_MS} share ONE undo
+ * snapshot — the one taken before the first keystroke — so undo restores whole
+ * edits, and a 12-character rename doesn't evict 12 slots of history.
  */
 function withHistory(
   s: ProjectState,
   next: (project: ProjectInput) => ProjectInput,
-): Pick<ProjectState, 'project' | 'past' | 'future'> {
+  coalesceKey?: string,
+): Pick<ProjectState, 'project' | 'past' | 'future' | 'lastEdit'> {
   const project = next(s.project);
-  if (project === s.project) return { project: s.project, past: s.past, future: s.future };
-  const past = [...s.past, s.project].slice(-HISTORY_LIMIT);
-  return { project, past, future: [] };
+  if (project === s.project) {
+    return { project: s.project, past: s.past, future: s.future, lastEdit: s.lastEdit };
+  }
+  const now = Date.now();
+  const coalesce =
+    coalesceKey !== undefined &&
+    s.past.length > 0 &&
+    s.lastEdit !== null &&
+    s.lastEdit.key === coalesceKey &&
+    now - s.lastEdit.at <= HISTORY_COALESCE_MS;
+  const past = coalesce ? s.past : [...s.past, s.project].slice(-HISTORY_LIMIT);
+  const lastEdit = coalesceKey !== undefined ? { key: coalesceKey, at: now } : null;
+  return { project, past, future: [], lastEdit };
 }
 
 const initialProject = createSampleProject();
@@ -240,6 +328,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   schematics: {},
   past: [],
   future: [],
+  lastEdit: null,
   circuitClipboard: null,
 
   setScreen: (screen) => set({ activeScreen: screen }),
@@ -247,10 +336,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   updateCircuit: (panelId, circuitId, patch) =>
     set((s) =>
-      withHistory(s, (project) =>
-        mapPanel(project, panelId, (panel) =>
-          mapCircuit(panel, circuitId, (c) => ({ ...c, ...patch })),
-        ),
+      withHistory(
+        s,
+        (project) =>
+          mapPanel(project, panelId, (panel) =>
+            mapCircuit(panel, circuitId, (c) => ({ ...c, ...patch })),
+          ),
+        `c:${panelId}:${circuitId}:${Object.keys(patch).sort().join('+')}`,
       ),
     ),
 
@@ -275,14 +367,20 @@ export const useProjectStore = create<ProjectState>((set) => ({
     ),
 
   removeCircuit: (panelId, circuitId) =>
-    set((s) =>
-      withHistory(s, (project) =>
-        mapPanel(project, panelId, (panel) => ({
-          ...panel,
-          circuits: panel.circuits.filter((c) => c.id !== circuitId),
-        })),
-      ),
-    ),
+    set((s) => {
+      // Drop the circuit's schematic too, so a future circuit can never inherit
+      // a stale one (schematics live outside project history by design).
+      const { [circuitId]: _dropped, ...schematics } = s.schematics;
+      return {
+        ...withHistory(s, (project) =>
+          mapPanel(project, panelId, (panel) => ({
+            ...panel,
+            circuits: panel.circuits.filter((c) => c.id !== circuitId),
+          })),
+        ),
+        schematics,
+      };
+    }),
 
   duplicateCircuit: (panelId, circuitId) =>
     set((s) =>
@@ -336,12 +434,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set((s) => {
       if (ids.length === 0) return s;
       const idSet = new Set(ids);
-      return withHistory(s, (project) =>
-        mapPanel(project, panelId, (panel) => ({
-          ...panel,
-          circuits: panel.circuits.filter((c) => !idSet.has(c.id)),
-        })),
+      const schematics = Object.fromEntries(
+        Object.entries(s.schematics).filter(([cid]) => !idSet.has(cid)),
       );
+      return {
+        ...withHistory(s, (project) =>
+          mapPanel(project, panelId, (panel) => ({
+            ...panel,
+            circuits: panel.circuits.filter((c) => !idSet.has(c.id)),
+          })),
+        ),
+        schematics,
+      };
     }),
 
   addCircuitConfigured: (panelId, circuit) =>
@@ -356,8 +460,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   updatePanel: (panelId, patch) =>
     set((s) =>
-      withHistory(s, (project) =>
-        mapPanel(project, panelId, (panel) => ({ ...panel, ...patch })),
+      withHistory(
+        s,
+        (project) => mapPanel(project, panelId, (panel) => ({ ...panel, ...patch })),
+        `p:${panelId}:${Object.keys(patch).sort().join('+')}`,
       ),
     ),
 
@@ -427,10 +533,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   updateSources: (patch) =>
     set((s) =>
-      withHistory(s, (project) => ({
-        ...project,
-        sources: { ...project.sources, ...patch },
-      })),
+      withHistory(
+        s,
+        (project) => ({ ...project, sources: { ...project.sources, ...patch } }),
+        `src:${Object.keys(patch).sort().join('+')}`,
+      ),
     ),
 
   setEarthingSystem: (system) =>
@@ -438,10 +545,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setProjectMeta: (patch) =>
     set((s) =>
-      withHistory(s, (project) => ({
-        ...project,
-        meta: { ...project.meta, ...patch },
-      })),
+      withHistory(
+        s,
+        (project) => ({ ...project, meta: { ...project.meta, ...patch } }),
+        `meta:${Object.keys(patch).sort().join('+')}`,
+      ),
     ),
 
   undo: () =>
@@ -453,7 +561,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const activePanelId = previous.panels.some((p) => p.id === s.activePanelId)
         ? s.activePanelId
         : (previous.panels[0]?.id ?? '');
-      return { project: previous, past, future, activePanelId };
+      return { project: previous, past, future, activePanelId, lastEdit: null };
     }),
 
   redo: () =>
@@ -465,11 +573,22 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const activePanelId = next.panels.some((p) => p.id === s.activePanelId)
         ? s.activePanelId
         : (next.panels[0]?.id ?? '');
-      return { project: next, past, future, activePanelId };
+      return { project: next, past, future, activePanelId, lastEdit: null };
     }),
 
-  replaceProject: (project) =>
-    set({ project, activePanelId: project.panels[0]?.id ?? '', schematics: {}, past: [], future: [] }),
+  replaceProject: (project) => {
+    // The in-memory schematics belong to the outgoing project; clear the
+    // hydration cache so the incoming project's schematics reload from disk.
+    hydratedSchematics.clear();
+    set({
+      project,
+      activePanelId: project.panels[0]?.id ?? '',
+      schematics: {},
+      past: [],
+      future: [],
+      lastEdit: null,
+    });
+  },
 
   newProject: async (name) => {
     const project: ProjectInput = {
@@ -517,15 +636,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
     return true;
   },
 
-  ensureSchematic: (circuitId, assembly) =>
+  ensureSchematic: (circuitId, assembly) => {
     set((s) => {
       if (s.schematics[circuitId]) return s;
       return {
         schematics: { ...s.schematics, [circuitId]: buildSchematic(assembly) },
       };
-    }),
+    });
+    // Restore any hand-edited schematic persisted on a previous run (desktop).
+    hydrateSchematic(circuitId);
+  },
 
-  regenerateSchematic: (circuitId, assembly) =>
+  regenerateSchematic: (circuitId, assembly) => {
     set((s) => {
       const regenerated = buildSchematic(assembly);
       const existing = s.schematics[circuitId] ?? regenerated;
@@ -535,9 +657,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
           [circuitId]: mergeSchematic(existing, regenerated),
         },
       };
-    }),
+    });
+    queuePersistSchematic(circuitId);
+  },
 
-  addRung: (circuitId) =>
+  addRung: (circuitId) => {
     set((s) => ({
       schematics: mapSchematic(s.schematics, circuitId, (existing) => {
         if (!existing) return undefined;
@@ -551,9 +675,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
         };
         return { ...existing, rungs: [...existing.rungs, rung] };
       }),
-    })),
+    }));
+    queuePersistSchematic(circuitId);
+  },
 
-  addSymbol: (circuitId, rungId, type) =>
+  addSymbol: (circuitId, rungId, type) => {
     set((s) => ({
       schematics: mapSchematic(s.schematics, circuitId, (existing) => {
         if (!existing) return undefined;
@@ -570,9 +696,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
         };
         return { ...existing, symbols: [...existing.symbols, symbol] };
       }),
-    })),
+    }));
+    queuePersistSchematic(circuitId);
+  },
 
-  removeSymbol: (circuitId, symbolId) =>
+  removeSymbol: (circuitId, symbolId) => {
     set((s) => ({
       schematics: mapSchematic(s.schematics, circuitId, (existing) => {
         if (!existing) return undefined;
@@ -584,9 +712,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
           ),
         };
       }),
-    })),
+    }));
+    queuePersistSchematic(circuitId);
+  },
 
-  removeRung: (circuitId, rungId) =>
+  removeRung: (circuitId, rungId) => {
     set((s) => ({
       schematics: mapSchematic(s.schematics, circuitId, (existing) => {
         if (!existing) return undefined;
@@ -605,9 +735,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
           ),
         };
       }),
-    })),
+    }));
+    queuePersistSchematic(circuitId);
+  },
 
-  detachRung: (circuitId, rungId) =>
+  detachRung: (circuitId, rungId) => {
     set((s) => ({
       schematics: mapSchematic(s.schematics, circuitId, (existing) => {
         if (!existing) return undefined;
@@ -618,7 +750,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
           ),
         };
       }),
-    })),
+    }));
+    queuePersistSchematic(circuitId);
+  },
 }));
 
 /** Selector: whether an undo is currently available (the past stack is non-empty). */

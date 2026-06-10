@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -24,10 +24,10 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { computeSystem } from '@shared/engine';
 import { EARTHING_SYSTEMS } from '@shared/standards';
 import type { EarthingSystem, InstallMethod } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 import {
   appVersion,
   checkForUpdates,
@@ -66,9 +66,23 @@ export function Settings() {
   const meta = project.meta ?? {};
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * The logo is base64-inlined into project.meta and re-serialized on every
+   * debounced autosave (and into each PDF), so cap it — a multi-MB photo would
+   * make every save pay for it and can blow the web localStorage quota.
+   */
+  const LOGO_MAX_BYTES = 512 * 1024;
+
   /** Read a chosen image file as a base64 data URL and store it on the project. */
   function onLogoFile(file: File | null) {
     if (!file) return;
+    if (file.size > LOGO_MAX_BYTES) {
+      notifications.show({
+        message: t('settings.logoTooLarge', { maxKb: Math.round(LOGO_MAX_BYTES / 1024) }),
+        color: 'red',
+      });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') setProjectMeta({ logoDataUrl: reader.result });
@@ -78,7 +92,7 @@ export function Settings() {
     reader.readAsDataURL(file);
   }
 
-  const system = useMemo(() => computeSystem(project), [project]);
+  const system = useSystemResult();
   const standardsVersion = Object.values(system.panels)[0]?.standardsVersion ?? 'unknown';
   const earthing = system.earthing;
 
@@ -98,19 +112,28 @@ export function Settings() {
 
   async function onCheckUpdates() {
     setChecking(true);
-    const status = await checkForUpdates();
-    setChecking(false);
-    const message =
-      status.state === 'available'
-        ? t('settings.updateAvailable', { version: status.version })
-        : status.state === 'not-available'
-          ? t('settings.updateLatest')
-          : status.state === 'disabled'
-            ? status.reason
-            : status.state === 'error'
-              ? t('settings.updateCheckFailed', { message: status.message })
-              : t('settings.updateChecking');
-    notifications.show({ message, color: status.state === 'available' ? 'indigo' : 'gray' });
+    try {
+      const status = await checkForUpdates();
+      const message =
+        status.state === 'available'
+          ? t('settings.updateAvailable', { version: status.version })
+          : status.state === 'not-available'
+            ? t('settings.updateLatest')
+            : status.state === 'disabled'
+              ? status.reason
+              : status.state === 'error'
+                ? t('settings.updateCheckFailed', { message: status.message })
+                : t('settings.updateChecking');
+      notifications.show({ message, color: status.state === 'available' ? 'indigo' : 'gray' });
+    } catch (e) {
+      // An IPC rejection must still clear the spinner and surface as a failure.
+      notifications.show({
+        message: t('settings.updateCheckFailed', { message: (e as Error).message }),
+        color: 'red',
+      });
+    } finally {
+      setChecking(false);
+    }
   }
 
   if (!panel) {

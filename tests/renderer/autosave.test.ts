@@ -31,7 +31,9 @@ describe('autosave (web / localStorage)', () => {
   it('round-trips the project through localStorage', async () => {
     const project = createSampleProject();
     await persistProject(project);
-    const loaded = await loadPersistedProject();
+    const res = await loadPersistedProject();
+    expect(res.ok).toBe(true);
+    const loaded = res.ok ? res.project : null;
     expect(loaded?.id).toBe(project.id);
     expect(loaded?.name).toBe(project.name);
     expect(loaded?.panels.length).toBe(project.panels.length);
@@ -42,7 +44,12 @@ describe('autosave (web / localStorage)', () => {
     expect(ev?.schedule).toEqual({ startHour: 22, endHour: 6 });
   });
 
-  it('returns null when nothing has been saved', async () => {
-    expect(await loadPersistedProject()).toBeNull();
+  it('reports a clean first launch as ok with no project', async () => {
+    expect(await loadPersistedProject()).toEqual({ ok: true, project: null });
+  });
+
+  it('self-heals a corrupted web snapshot (unrecoverable → clean start)', async () => {
+    localStorage.setItem('panelmaker:project', '{not json');
+    expect(await loadPersistedProject()).toEqual({ ok: true, project: null });
   });
 });

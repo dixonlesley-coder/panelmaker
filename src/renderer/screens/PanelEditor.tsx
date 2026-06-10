@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, Title } from '@mantine/core';
 import {
@@ -10,7 +9,6 @@ import {
   IconSitemap,
   IconTable,
 } from '@tabler/icons-react';
-import { computeSystem } from '@shared/engine';
 import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
 import type { OccupancyType } from '@shared/types';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
@@ -21,6 +19,7 @@ import { PanelLayout } from '@renderer/features/layout/PanelLayout';
 import { CableSchedule } from '@renderer/features/schedule/CableSchedule';
 import { PanelSld } from '@renderer/screens/sld/PanelSld';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 
 /** The single-panel editor: structured builder on the left, views on the right. */
 export function PanelEditor() {
@@ -31,7 +30,7 @@ export function PanelEditor() {
   const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
 
   // Compute the whole system so feeder loads aggregate correctly, then pick this panel.
-  const system = useMemo(() => computeSystem(project), [project]);
+  const system = useSystemResult();
 
   const panel = project.panels.find((p) => p.id === activePanelId);
   const result = panel ? system.panels[panel.id] : undefined;

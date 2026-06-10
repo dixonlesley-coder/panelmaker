@@ -109,6 +109,7 @@ export const en = {
     companyLogoAlt: 'Company logo',
     uploadLogo: 'Upload logo',
     logoReadError: 'Could not read the logo file.',
+    logoTooLarge: 'Logo is too large — keep it under {{maxKb}} KB (it is embedded in every save and PDF).',
     environment: 'Environment & derating',
     ambientTemp: 'Ambient temperature',
     ambientTempHint: 'Used for cable derating',
@@ -291,6 +292,7 @@ export const en = {
     selectAll: 'Select all',
     bulkEdit: 'Bulk edit',
     bulkDelete: 'Delete selected',
+    bulkApply: 'Apply to selected',
     copy: 'Copy',
     paste: 'Paste',
     // Circuit table

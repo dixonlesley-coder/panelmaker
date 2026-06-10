@@ -114,6 +114,47 @@ describe('projectStore', () => {
     expect(useProjectStore.getState().activePanelId).toBe(restored.panels[0]!.id);
   });
 
+  it('generates collision-resistant runtime ids (no counter reuse across "relaunches")', () => {
+    // Session 1: add a circuit and capture its id.
+    const panelId = useProjectStore.getState().project.panels[0]!.id;
+    useProjectStore.getState().addCircuit(panelId);
+    const s1 = useProjectStore.getState().project.panels[0]!;
+    const firstId = s1.circuits[s1.circuits.length - 1]!.id;
+
+    // "Relaunch": restore the same project (as autosave does) — module counters
+    // would reset here; UUID-backed ids must still never collide.
+    const persisted = JSON.parse(JSON.stringify(useProjectStore.getState().project));
+    useProjectStore.getState().replaceProject(persisted);
+    useProjectStore.getState().addCircuit(panelId);
+
+    const s2 = useProjectStore.getState().project.panels[0]!;
+    const secondId = s2.circuits[s2.circuits.length - 1]!.id;
+    expect(secondId).not.toBe(firstId);
+    const ids = s2.circuits.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('coalesces rapid same-field edits into one undo step', () => {
+    const panelId = useProjectStore.getState().project.panels[0]!.id;
+    const original = useProjectStore.getState().project.panels[0]!.name;
+
+    // Simulate typing "ABC" — three onChange commits within the coalesce window.
+    useProjectStore.getState().updatePanel(panelId, { name: 'A' });
+    useProjectStore.getState().updatePanel(panelId, { name: 'AB' });
+    useProjectStore.getState().updatePanel(panelId, { name: 'ABC' });
+
+    expect(useProjectStore.getState().project.panels[0]!.name).toBe('ABC');
+    // One undo restores the pre-typing name, not "AB".
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.panels[0]!.name).toBe(original);
+    expect(selectCanUndo(useProjectStore.getState())).toBe(false);
+
+    // A different field does NOT coalesce with the name edits.
+    useProjectStore.getState().updatePanel(panelId, { name: 'X' });
+    useProjectStore.getState().updatePanel(panelId, { voltageV: 380 });
+    expect(useProjectStore.getState().past.length).toBe(2);
+  });
+
   describe('undo / redo', () => {
     it('undo restores the previous project; redo re-applies the edit', () => {
       const { project, updatePanel } = useProjectStore.getState();
