@@ -39,6 +39,24 @@ export const SOURCE_XR_RATIO = 7;
 export const PE_ADIABATIC_K = 115;
 
 /**
+ * Adiabatic k by insulation family (IEC 60364-5-54 Table 54.3, copper PE as a
+ * core of the cable): PVC (70 °C) → 115; XLPE (90 °C) → 143.
+ */
+export const PE_ADIABATIC_K_BY_INSULATION: Readonly<Record<'PVC' | 'XLPE', number>> = {
+  PVC: 115,
+  XLPE: 143,
+};
+
+/**
+ * Typical sustained (AVR-forced) short-circuit capability of a standby
+ * generator, as a multiple of its rated full-load current. Subtransient current
+ * decays within cycles; what a breaker's magnetic element actually sees on a
+ * genset is ~3× FLC — the worst case for automatic disconnection (ADS), since
+ * loops sized for the stiff utility source may never reach the trip threshold.
+ */
+export const GENSET_SUSTAINED_FAULT_MULTIPLE = 3;
+
+/**
  * Representative protective-device clearing time (s) used for the PE adiabatic
  * thermal-withstand check. An earth fault above the magnetic-trip threshold
  * clears effectively instantaneously; 0.1 s is the conservative lower-bound of

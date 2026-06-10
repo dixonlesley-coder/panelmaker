@@ -197,6 +197,7 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     frequencyHz: 50,
     ambientTempC: p.ambientTempC,
     installMethod: p.installMethod,
+    insulation: undefToNull(p.insulation),
     groupingCount: p.groupingCount,
     activePricelistId: null,
     diversityFactor: p.diversityFactor,
@@ -224,6 +225,8 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (tag !== undefined) p.tag = tag;
   const occupancy = nullToUndef(r.occupancy);
   if (occupancy !== undefined) p.occupancy = occupancy as PanelInput['occupancy'];
+  const insulation = nullToUndef(r.insulation);
+  if (insulation !== undefined) p.insulation = insulation as PanelInput['insulation'];
   return p;
 }
 

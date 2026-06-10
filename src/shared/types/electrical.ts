@@ -2,7 +2,13 @@
 
 export type SystemType = '1ph' | '3ph';
 
-export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF';
+export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF' | 'N2XY';
+
+/**
+ * Conductor insulation family: PVC (70 °C — NYM/NYY) or XLPE (90 °C — N2XY).
+ * Drives the ampacity table, the ambient-correction table and the PE adiabatic k.
+ */
+export type Insulation = 'PVC' | 'XLPE';
 
 export type LoadKind =
   | 'general'

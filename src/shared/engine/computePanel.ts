@@ -37,6 +37,8 @@ export interface ComputePanelOptions {
   faultLevelA?: number;
   /** Per-phase source impedance up to this panel's bus (ohm), for Zs. */
   sourceZ?: Impedance;
+  /** Site soil thermal resistivity (K·m/W) — derates buried runs. */
+  soilThermalResistivityKmW?: number;
 }
 
 /**
@@ -113,11 +115,13 @@ function computeCircuit(
   const isTrunk = c.role === 'incomer' || isFeeder;
   const baseMinSection = isTrunk ? 4 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
+  const insulation = panel.insulation ?? 'PVC';
   const cable = sizeCable({
     designCurrentA: ib,
     breakerRatingA: breaker.ratingA,
     deratingFactor: df,
     minSectionMm2: minSection,
+    insulation,
     // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the
     // resulting `vd` below is then within limit by construction in normal cases,
     // and any residual over-limit is the genuinely-impossible (max-section) case.
@@ -153,6 +157,8 @@ function computeCircuit(
     threePhase,
     hasNeutral,
     runsPerPhase,
+    // XLPE multicore is N2XY; PVC keeps the NYY (3ph) / NYM (1ph) defaults.
+    ...(insulation === 'XLPE' ? { cableType: 'N2XY' as const } : {}),
   });
   const rcd = circuitRcd({
     earthingSystem: opts.earthingSystem ?? 'TN-C-S',
@@ -219,6 +225,7 @@ function computeCircuit(
       curve: breaker.curve,
       breakerRatingA: breaker.ratingA,
       runsPerPhase,
+      insulation,
     });
     result.zsOhm = zs.zsOhm;
     result.zsMaxOhm = zs.zsMaxOhm;
@@ -264,6 +271,8 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     ambientC: panel.ambientTempC,
     groupingCount: panel.groupingCount,
     installMethod: panel.installMethod,
+    insulation: panel.insulation,
+    soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
   });
 
   const branches = panel.circuits.filter((c) => c.role === 'branch');

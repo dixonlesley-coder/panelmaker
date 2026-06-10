@@ -178,6 +178,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
       earthingSystem,
       faultLevelA: faultA,
       sourceZ,
+      soilThermalResistivityKmW: project.site?.soilThermalResistivityKmW,
     });
     results[id] = pr;
     pr.warnings.forEach((w) => warnings.push(w));

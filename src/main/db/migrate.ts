@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS panels (
   frequency_hz REAL NOT NULL DEFAULT 50,
   ambient_temp_c REAL NOT NULL DEFAULT 30,
   install_method TEXT NOT NULL DEFAULT 'conduit',
+  insulation TEXT,
   grouping_count INTEGER NOT NULL DEFAULT 1,
   active_pricelist_id TEXT REFERENCES pricelists(id) ON DELETE SET NULL,
   diversity_factor REAL NOT NULL DEFAULT 0.8,
@@ -214,6 +215,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'breaker_override_a', ddl: 'ALTER TABLE circuits ADD COLUMN breaker_override_a REAL' },
   // Manual busbar section break.
   { table: 'circuits', column: 'busbar_break_before', ddl: 'ALTER TABLE circuits ADD COLUMN busbar_break_before INTEGER' },
+  // Cable insulation family (PVC / XLPE).
+  { table: 'panels', column: 'insulation', ddl: 'ALTER TABLE panels ADD COLUMN insulation TEXT' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

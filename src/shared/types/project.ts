@@ -4,7 +4,14 @@
  * these shapes; the engine never imports DB or DOM code.
  */
 
-import type { SystemType, LoadKind, InstallMethod, EarthingSystem, OccupancyType } from './electrical';
+import type {
+  SystemType,
+  LoadKind,
+  InstallMethod,
+  Insulation,
+  EarthingSystem,
+  OccupancyType,
+} from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { LightFixture, SocketOutlet, SwitchGroup } from './fixtures';
 import type { SourcesConfig } from './sources';
@@ -87,6 +94,12 @@ export interface PanelInput {
   voltageV: number;
   ambientTempC: number;
   installMethod: InstallMethod;
+  /**
+   * Cable insulation family for this panel's circuits: PVC (NYM/NYY, 70 °C) or
+   * XLPE (N2XY, 90 °C). Default PVC. Drives ampacity, ambient derating and the
+   * PE adiabatic constant.
+   */
+  insulation?: Insulation;
   groupingCount: number;
   /** Diversity factor applied to the aggregated load when feeding upstream. */
   diversityFactor: number;
@@ -173,6 +186,11 @@ export interface SiteConditions {
   overheadSupply?: boolean;
   /** Measured/assumed soil resistivity (Ω·m) for earth-electrode sizing. */
   soilResistivityOhmM?: number;
+  /**
+   * Soil THERMAL resistivity (K·m/W) for buried-cable derating (IEC reference
+   * 2.5). Distinct from the electrical resistivity above.
+   */
+  soilThermalResistivityKmW?: number;
 }
 
 export interface ProjectInput {

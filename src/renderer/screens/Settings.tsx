@@ -371,6 +371,20 @@ export function Settings() {
             onChange={(v) => v && setSiteConditions({ soilResistivityOhmM: Number(v) })}
             maw={320}
           />
+          <NumberInput
+            label={t('settings.soilThermal')}
+            description={t('settings.soilThermalHint')}
+            value={project.site?.soilThermalResistivityKmW ?? 2.5}
+            min={0.5}
+            max={4}
+            step={0.5}
+            decimalScale={1}
+            suffix=" K·m/W"
+            onChange={(v) =>
+              typeof v === 'number' && setSiteConditions({ soilThermalResistivityKmW: v })
+            }
+            maw={220}
+          />
         </Group>
 
         {system.spd && (
