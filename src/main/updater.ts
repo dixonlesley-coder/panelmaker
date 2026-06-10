@@ -41,8 +41,12 @@ export function initAutoUpdater(win: BrowserWindow): void {
   if (started) return;
   started = true;
 
+  // Download in the background, but NEVER auto-apply on quit. electron-updater
+  // verifies code signatures on Windows/macOS but not on the Linux AppImage, so
+  // silently installing on quit could apply an unverified artifact. Installation
+  // happens only when the user clicks "Restart & update" (→ quitAndInstall).
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('checking-for-update', () => send({ state: 'checking' }));
   autoUpdater.on('update-available', (info) => send({ state: 'available', version: info.version }));
@@ -74,7 +78,9 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
   }
   try {
     const result = await autoUpdater.checkForUpdates();
-    if (result?.updateInfo && result.updateInfo.version !== app.getVersion()) {
+    // Trust electron-updater's own semver comparison rather than a string !==,
+    // which would treat a downgrade/regression as "available".
+    if (result?.isUpdateAvailable) {
       return { state: 'available', version: result.updateInfo.version };
     }
     return { state: 'not-available', version: app.getVersion() };

@@ -88,6 +88,20 @@ describe('validateIdTokenClaims', () => {
       validateIdTokenClaims(goodClaims({ email_verified: 'true' }), opts).reason,
     ).toBe('email-unverified');
   });
+
+  it('does not check the nonce when none is expected (refresh path)', () => {
+    expect(validateIdTokenClaims(goodClaims({ nonce: 'whatever' }), opts).ok).toBe(true);
+  });
+
+  it('enforces the nonce when one is expected (interactive path)', () => {
+    const withNonce = { ...opts, expectedNonce: 'n-123' };
+    expect(validateIdTokenClaims(goodClaims({ nonce: 'n-123' }), withNonce).ok).toBe(true);
+    expect(validateIdTokenClaims(goodClaims({ nonce: 'other' }), withNonce).reason).toBe(
+      'nonce-mismatch',
+    );
+    // A missing nonce against an expected one is also rejected (replay defence).
+    expect(validateIdTokenClaims(goodClaims(), withNonce).reason).toBe('nonce-mismatch');
+  });
 });
 
 describe('withinOfflineGrace', () => {
@@ -113,6 +127,19 @@ describe('withinOfflineGrace', () => {
 
   it('uses exactly 7 days for the window', () => {
     expect(OFFLINE_GRACE_MS).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+
+  it('refuses grace when the clock was rolled back past the high-water mark', () => {
+    const hwm = NOW_MS;
+    const lastVerified = NOW_MS - 2 * 60 * 60 * 1000; // 2h ago
+    const rolledBackNow = NOW_MS - 60 * 60 * 1000; // 1h ago (still ≥ lastVerified)
+    // Without the high-water mark this is comfortably inside the 7-day window:
+    expect(withinOfflineGrace(lastVerified, rolledBackNow)).toBe(true);
+    // With it, the rollback (now ≪ hwm) is detected and grace is refused:
+    expect(withinOfflineGrace(lastVerified, rolledBackNow, hwm)).toBe(false);
+    // A tiny backwards nudge within tolerance (NTP correction) is still honoured:
+    const nudged = NOW_MS - 60 * 1000; // 1 min before hwm
+    expect(withinOfflineGrace(lastVerified, nudged, hwm)).toBe(true);
   });
 });
 
@@ -165,42 +192,57 @@ describe('deriveMachineId', () => {
   });
 });
 
-describe('demo / test account', () => {
-  it('is enabled by default with the built-in credentials', () => {
-    const cfg = getDemoConfig();
-    expect(cfg.enabled).toBe(true);
-    expect(cfg.email).toBe(DEFAULT_DEMO_EMAIL);
-    expect(cfg.password).toBe(DEFAULT_DEMO_PASSWORD);
-    expect(isDemoEnabled()).toBe(true);
-  });
-
-  it('accepts the correct password and rejects others', () => {
-    expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD)).toBe(true);
-    expect(verifyDemoPassword('wrong')).toBe(false);
-    expect(verifyDemoPassword('')).toBe(false);
-    expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD + 'x')).toBe(false);
-  });
-
-  it('honours a custom password and the disable switch via env', () => {
-    const saved = {
-      pw: process.env.DEMO_PASSWORD,
-      disable: process.env.PANELMAKER_DISABLE_DEMO,
-    };
+describe('demo / test account (opt-in)', () => {
+  /** Run `fn` with the demo-related env vars set, restoring them afterwards. */
+  function withEnv(env: Record<string, string | undefined>, fn: () => void) {
+    const keys = ['DEMO_PASSWORD', 'PANELMAKER_ENABLE_DEMO', 'PANELMAKER_DISABLE_DEMO'];
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
     try {
-      process.env.DEMO_PASSWORD = 's3cret';
-      delete process.env.PANELMAKER_DISABLE_DEMO;
+      for (const k of keys) {
+        if (env[k] === undefined) delete process.env[k];
+        else process.env[k] = env[k];
+      }
+      fn();
+    } finally {
+      for (const k of keys) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k]!;
+      }
+    }
+  }
+
+  it('is DISABLED by default (no accidental production bypass)', () => {
+    withEnv({}, () => {
+      expect(getDemoConfig().enabled).toBe(false);
+      expect(isDemoEnabled()).toBe(false);
+      // A disabled demo rejects even the built-in password.
+      expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD)).toBe(false);
+    });
+  });
+
+  it('is enabled by the explicit PANELMAKER_ENABLE_DEMO flag (default password)', () => {
+    withEnv({ PANELMAKER_ENABLE_DEMO: '1' }, () => {
+      const cfg = getDemoConfig();
+      expect(cfg.enabled).toBe(true);
+      expect(cfg.email).toBe(DEFAULT_DEMO_EMAIL);
+      expect(cfg.password).toBe(DEFAULT_DEMO_PASSWORD);
+      expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD)).toBe(true);
+      expect(verifyDemoPassword('wrong')).toBe(false);
+      expect(verifyDemoPassword('')).toBe(false);
+      expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD + 'x')).toBe(false);
+    });
+  });
+
+  it('is enabled by setting a custom password; the kill-switch overrides it', () => {
+    withEnv({ DEMO_PASSWORD: 's3cret' }, () => {
       expect(getDemoConfig().password).toBe('s3cret');
+      expect(isDemoEnabled()).toBe(true);
       expect(verifyDemoPassword('s3cret')).toBe(true);
       expect(verifyDemoPassword(DEFAULT_DEMO_PASSWORD)).toBe(false);
-
-      process.env.PANELMAKER_DISABLE_DEMO = '1';
+    });
+    withEnv({ DEMO_PASSWORD: 's3cret', PANELMAKER_DISABLE_DEMO: '1' }, () => {
       expect(isDemoEnabled()).toBe(false);
       expect(verifyDemoPassword('s3cret')).toBe(false);
-    } finally {
-      if (saved.pw === undefined) delete process.env.DEMO_PASSWORD;
-      else process.env.DEMO_PASSWORD = saved.pw;
-      if (saved.disable === undefined) delete process.env.PANELMAKER_DISABLE_DEMO;
-      else process.env.PANELMAKER_DISABLE_DEMO = saved.disable;
-    }
+    });
   });
 });

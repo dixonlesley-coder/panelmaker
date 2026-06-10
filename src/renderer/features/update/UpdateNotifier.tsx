@@ -18,7 +18,10 @@ export function UpdateNotifier() {
     if (!isDesktop()) return;
     return onUpdateStatus((s) => {
       setStatus(s);
-      setDismissed(false);
+      // Re-show the banner only on a genuinely new event (an update appearing or
+      // finishing download) — not on every progress tick or a transient error,
+      // so dismissing it stays dismissed mid-download.
+      if (s.state === 'available' || s.state === 'downloaded') setDismissed(false);
     });
   }, []);
 

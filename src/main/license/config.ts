@@ -150,12 +150,14 @@ export function licensingEnforced(): boolean {
 /**
  * Default credentials for the demo/test account. It lets you exercise the
  * *enforced* gate without a real Google Workspace account by signing in with a
- * password instead of OAuth. Enabled by default with this password; override via
- * DEMO_EMAIL / DEMO_PASSWORD, and DISABLE it for production with
- * `PANELMAKER_DISABLE_DEMO=1` (or by setting DEMO_PASSWORD to empty).
+ * password instead of OAuth.
  *
- * NOTE: a built-in password is a deliberate gate bypass — disable it in real
- * production builds.
+ * It is **opt-in** (disabled by default) — a built-in password is a deliberate
+ * gate bypass, so a production release must not ship it by accident. Enable it
+ * for a *test* build only, by either:
+ *   - `PANELMAKER_ENABLE_DEMO=1` (uses {@link DEFAULT_DEMO_PASSWORD}), or
+ *   - setting a non-empty `DEMO_PASSWORD` (env or `license.config.json`).
+ * `PANELMAKER_DISABLE_DEMO=1` is a hard kill-switch that overrides both.
  */
 export const DEFAULT_DEMO_EMAIL = 'demo@panelmaker.local';
 export const DEFAULT_DEMO_PASSWORD = 'panelmaker-demo';
@@ -166,15 +168,19 @@ export interface DemoConfig {
   enabled: boolean;
 }
 
-/** Resolve the demo-account configuration (enabled by default). */
+/** Resolve the demo-account configuration (disabled unless explicitly opted in). */
 export function getDemoConfig(): DemoConfig {
   const file = readConfigFile();
   const email = clean(process.env.DEMO_EMAIL) ?? clean(file.DEMO_EMAIL) ?? DEFAULT_DEMO_EMAIL;
-  // An explicitly-set empty DEMO_PASSWORD disables the account; unset -> default.
+  // A custom password is itself an opt-in; the enable flag uses the default one.
   const explicit = process.env.DEMO_PASSWORD ?? file.DEMO_PASSWORD;
-  const password = explicit === undefined ? DEFAULT_DEMO_PASSWORD : explicit.trim();
-  const disabled = process.env.PANELMAKER_DISABLE_DEMO === '1' || password.length === 0;
-  return { email, password, enabled: !disabled };
+  const customPassword = explicit !== undefined ? explicit.trim() : '';
+  const enableFlag = process.env.PANELMAKER_ENABLE_DEMO === '1';
+  const password = customPassword.length > 0 ? customPassword : DEFAULT_DEMO_PASSWORD;
+
+  const optedIn = enableFlag || customPassword.length > 0;
+  const killed = process.env.PANELMAKER_DISABLE_DEMO === '1';
+  return { email, password, enabled: optedIn && !killed && password.length > 0 };
 }
 
 /** Whether the demo / test account is available for sign-in. */

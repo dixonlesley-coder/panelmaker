@@ -61,6 +61,11 @@ export interface TokenSet {
   idToken: string;
   /** Present only on the first consent (we request `access_type=offline`). */
   refreshToken?: string;
+  /**
+   * The OIDC `nonce` sent in the authorization request. The caller must check
+   * the verified id_token carries this exact value (replay protection).
+   */
+  nonce: string;
 }
 
 /** A simple HTML page shown in the browser after the redirect. */
@@ -84,6 +89,7 @@ export function runInteractiveSignIn(timeoutMs = 5 * 60 * 1000): Promise<TokenSe
   const cfg = getLicensingConfig();
   const pkce = createPkcePair();
   const state = randomToken();
+  const nonce = randomToken();
 
   return new Promise<TokenSet>((resolve, reject) => {
     let settled = false;
@@ -112,16 +118,20 @@ export function runInteractiveSignIn(timeoutMs = 5 * 60 * 1000): Promise<TokenSe
         const code = url.searchParams.get('code');
         const returnedState = url.searchParams.get('state');
 
+        // Validate `state` before honoring anything else — Google includes it on
+        // error redirects too. A request with the wrong/missing state is a forged
+        // local call (any process can hit the loopback port): answer 400 but keep
+        // the server waiting for the real callback, so it can't cancel a pending
+        // sign-in. The flow still times out normally if nothing genuine arrives.
+        if (returnedState !== state) {
+          res.writeHead(400, { 'Content-Type': 'text/html' });
+          res.end(resultPage('Sign-in failed (state mismatch).'));
+          return;
+        }
         if (error) {
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(resultPage('Sign-in was cancelled or denied.'));
           finish(() => reject(new Error(`oauth-error: ${error}`)));
-          return;
-        }
-        if (returnedState !== state) {
-          res.writeHead(400, { 'Content-Type': 'text/html' });
-          res.end(resultPage('Sign-in failed (state mismatch).'));
-          finish(() => reject(new Error('state-mismatch')));
           return;
         }
         if (!code) {
@@ -135,7 +145,7 @@ export function runInteractiveSignIn(timeoutMs = 5 * 60 * 1000): Promise<TokenSe
         const tokens = await exchangeCode(code, pkce.verifier, redirectUri, cfg);
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(resultPage('Signed in successfully.'));
-        finish(() => resolve(tokens));
+        finish(() => resolve({ ...tokens, nonce }));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'text/html' });
         res.end(resultPage('Sign-in failed.'));
@@ -163,6 +173,9 @@ export function runInteractiveSignIn(timeoutMs = 5 * 60 * 1000): Promise<TokenSe
       authUrl.searchParams.set('code_challenge', pkce.challenge);
       authUrl.searchParams.set('code_challenge_method', pkce.method);
       authUrl.searchParams.set('state', state);
+      // OIDC nonce: echoed back inside the signed id_token, binding the token to
+      // this exact authentication request (replay protection). Verified upstream.
+      authUrl.searchParams.set('nonce', nonce);
       // Hint Google to pre-scope the account chooser to the Workspace domain.
       if (cfg.allowedHd) authUrl.searchParams.set('hd', cfg.allowedHd);
       const urlStr = authUrl.toString();
@@ -175,13 +188,24 @@ export function runInteractiveSignIn(timeoutMs = 5 * 60 * 1000): Promise<TokenSe
   });
 }
 
+/**
+ * Surface a token-endpoint failure without leaking the response body to the
+ * renderer/UI (it propagates verbatim over IPC into the sign-in window): the
+ * body is logged main-process-side only, the thrown error carries the status.
+ */
+function tokenEndpointError(kind: string, status: number, body: string): Error {
+  // eslint-disable-next-line no-console
+  console.error(`[panelmaker] ${kind}: HTTP ${status} — ${body.slice(0, 500)}`);
+  return new Error(`${kind}: HTTP ${status}`);
+}
+
 /** Exchange an authorization code for tokens at Google's token endpoint. */
 async function exchangeCode(
   code: string,
   codeVerifier: string,
   redirectUri: string,
   cfg: ReturnType<typeof getLicensingConfig>,
-): Promise<TokenSet> {
+): Promise<Omit<TokenSet, 'nonce'>> {
   const body = new URLSearchParams({
     code,
     client_id: cfg.clientId,
@@ -198,7 +222,7 @@ async function exchangeCode(
     body: body.toString(),
   });
   if (!res.ok) {
-    throw new Error(`token-exchange-failed: ${res.status} ${await res.text()}`);
+    throw tokenEndpointError('token-exchange-failed', res.status, await res.text());
   }
   const json = (await res.json()) as { id_token?: string; refresh_token?: string };
   if (!json.id_token) throw new Error('token-exchange-missing-id-token');
@@ -226,7 +250,7 @@ export async function refreshIdToken(refreshToken: string): Promise<string> {
     body: body.toString(),
   });
   if (!res.ok) {
-    throw new Error(`token-refresh-failed: ${res.status} ${await res.text()}`);
+    throw tokenEndpointError('token-refresh-failed', res.status, await res.text());
   }
   const json = (await res.json()) as { id_token?: string };
   if (!json.id_token) throw new Error('token-refresh-missing-id-token');
