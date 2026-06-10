@@ -799,7 +799,7 @@ export const en = {
     groupPanels: 'Unassigned panels',
     panelsHint: 'Drag a panel onto the canvas to feed it from this board (creates a feeder MCB).',
     panelConnected: '“{{name}}” is now fed from this panel.',
-    editHint: 'Double-click a circuit (or its cable) to edit it.',
+    editHint: 'Double-click a circuit (or its cable) to edit it; drag a circuit sideways to reorder the ways.',
     groupSources: 'Energy sources',
     solar: 'Solar PV + inverter',
     battery: 'Battery + inverter',

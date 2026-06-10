@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Background,
@@ -7,6 +7,7 @@ import {
   type Node,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
 } from '@xyflow/react';
 import { Badge, Box, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -402,7 +403,9 @@ function buildGraph(
             : undefined,
         onDropOverride: (kind, value) => onOverride(cid, kind, value),
       };
-      nodes.push({ id: cid, type: 'branch', position: { x, y: branchY }, data, draggable: false });
+      // Branch nodes are draggable so the user can reorder ways left-to-right
+      // (committed on drag-stop); the incomer / busbar / source nodes are fixed.
+      nodes.push({ id: cid, type: 'branch', position: { x, y: branchY }, data, draggable: true });
       edges.push({
         id: `e-busbar-${cid}`,
         source: busId,
@@ -525,6 +528,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
+  const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
   const allPanels = useProjectStore((s) => s.project.panels);
   const orphanPanels = useMemo(
@@ -592,11 +596,38 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
     return diffResults(prev.fp, fp);
   }, [result, panel.id]);
 
-  const { nodes, edges } = useMemo(
+  const graph = useMemo(
     () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources, t),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [panel, result, changes, enabledSources, sizedSources, t],
   );
+
+  // The canvas is a controlled-but-locally-draggable projection: React Flow owns
+  // transient drag offsets, and we re-sync to the deterministic layout whenever
+  // the model recomputes (after a reorder commit or any other edit).
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState(graph.nodes);
+  useEffect(() => {
+    setRfNodes(graph.nodes);
+  }, [graph.nodes, setRfNodes]);
+
+  /** Commit a drag: re-derive the way order from the dropped positions. */
+  const onNodeDragStop = () => {
+    const orderedIds = rfNodes
+      .filter((n) => n.type === 'branch')
+      .slice()
+      .sort((a, b) => {
+        // Busbar sections are stacked ~SECTION_DY apart — bucket by row first,
+        // then left-to-right within the row.
+        const ra = Math.round(a.position.y / SECTION_DY);
+        const rb = Math.round(b.position.y / SECTION_DY);
+        return ra === rb ? a.position.x - b.position.x : ra - rb;
+      })
+      .map((n) => n.id);
+    // Snap back to the canonical layout; a real reorder recomputes and the sync
+    // effect re-lays-out in the new order (a drop-in-place just snaps back).
+    setRfNodes(graph.nodes);
+    reorderCircuits(panel.id, orderedIds);
+  };
 
   const onDrop = (e: React.DragEvent) => {
     // An override card needs a circuit target — landing on empty canvas just hints.
@@ -828,16 +859,20 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
         >
           <ReactFlowProvider>
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
+              nodes={rfNodes}
+              edges={graph.edges}
+              onNodesChange={onNodesChange}
+              onNodeDragStop={onNodeDragStop}
               nodeTypes={NODE_TYPES}
               fitView
               fitViewOptions={{ padding: 0.2 }}
               proOptions={{ hideAttribution: true }}
               minZoom={0.2}
               nodesConnectable={false}
-              nodesDraggable={false}
               elementsSelectable={false}
+              // Reserve double-click for opening the circuit editor; React Flow's
+              // default zoom-on-double-click would otherwise swallow it.
+              zoomOnDoubleClick={false}
               onNodeDoubleClick={(_, node) => {
                 if (node.type === 'branch') setEditing({ circuitId: node.id, focus: 'device' });
                 else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
