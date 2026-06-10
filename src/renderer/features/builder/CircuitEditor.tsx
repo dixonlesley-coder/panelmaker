@@ -115,7 +115,7 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             />
             <Stat
               label={t('circuitEditor.cable')}
-              value={`${result.cable.csaMm2} mm²`}
+              value={`${result.cable.runsPerPhase && result.cable.runsPerPhase > 1 ? `${result.cable.runsPerPhase}× ` : ''}${result.cable.csaMm2} mm²`}
               color={result.cable.overridden ? 'violet' : undefined}
             />
             <Stat

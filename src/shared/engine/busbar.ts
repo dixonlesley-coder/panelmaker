@@ -6,9 +6,14 @@ import { round } from './util';
 /**
  * Smallest standard copper bar whose continuous rating covers the total current.
  * Falls back to a current-density estimate if the load exceeds the table.
+ *
+ * `minAmpacityA` floors the bar's rating independently of the carried current —
+ * IEC 61439-1 requires the main bus to be rated for the incoming device's rated
+ * current (In), not just today's demand, so the incomer can't cook the bar.
  */
-export function sizeBusbar(totalCurrentA: number): BusbarResult {
-  const match = COPPER_BUSBAR_TABLE.find((b) => b.ampacityA >= totalCurrentA);
+export function sizeBusbar(totalCurrentA: number, minAmpacityA = 0): BusbarResult {
+  const requiredA = Math.max(totalCurrentA, minAmpacityA);
+  const match = COPPER_BUSBAR_TABLE.find((b) => b.ampacityA >= requiredA);
   if (match) {
     return {
       widthMm: match.widthMm,
@@ -18,7 +23,7 @@ export function sizeBusbar(totalCurrentA: number): BusbarResult {
       totalCurrentA: round(totalCurrentA, 1),
     };
   }
-  const csa = Math.ceil(totalCurrentA / COPPER_CURRENT_DENSITY_A_PER_MM2);
+  const csa = Math.ceil(requiredA / COPPER_CURRENT_DENSITY_A_PER_MM2);
   return {
     widthMm: 0,
     thicknessMm: 0,
@@ -81,6 +86,12 @@ function sectionWorstPhaseA(ways: BusbarWayLoad[], system: SystemType): number {
  * practical single bar). Each section is sized for the worst-phase current of the
  * ways it carries. Always returns at least one section (a single empty section for
  * a panel with no ways), so renderers can iterate sections uniformly.
+ *
+ * Sections are **distribution busbars** in IEC 61439-1 terms: each is fed
+ * radially from the incomer (its own dropper off the incoming terminals), NOT
+ * chained in series through the previous bar — so no section carries another
+ * section's through-current and per-group sizing is valid. The panel's main bus
+ * (`PanelResult.busbar`) remains rated for the full incomer current.
  */
 export function splitBusbarSections(
   ways: BusbarWayLoad[],

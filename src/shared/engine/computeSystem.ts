@@ -161,7 +161,9 @@ export function computeSystem(project: ProjectInput): SystemResult {
       const feeder = parent?.circuits.find((c) => c.feedsPanelId === id);
       const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
       if (feeder && feederResult) {
-        sourceZ = addImpedance(parentZ, conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM));
+        const feederRuns = feederResult.cable.runsPerPhase ?? 1;
+        const fz = conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM);
+        sourceZ = addImpedance(parentZ, { rOhm: fz.rOhm / feederRuns, xOhm: fz.xOhm / feederRuns });
         faultA = downstreamFaultA(panel.voltageV, sourceZ, parentFaultA);
       } else {
         sourceZ = parentZ;

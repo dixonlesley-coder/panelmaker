@@ -441,6 +441,12 @@ export function ResultsPanel({ result }: { result: PanelResult }) {
           </Group>
           <Stack gap={4}>
             <KeyVal
+              k={t('results.incomerDevice')}
+              v={`${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA} A ${result.incomer.breaker.curve} · ${result.incomer.poles}P${
+                result.incomer.breakerKa !== undefined ? ` · ${result.incomer.breakerKa} kA` : ''
+              }`}
+            />
+            <KeyVal
               k={t('results.busbarSection')}
               v={`${bus.widthMm} × ${bus.thicknessMm} mm (${bus.csaMm2} mm²)`}
             />

@@ -431,6 +431,7 @@ export const en = {
     arcFlash: 'Arc flash (estimate)',
     boundary: 'boundary {{mm}} mm',
     busbar: 'Busbar',
+    incomerDevice: 'Incoming device',
     busbarSection: 'Section',
     busbarAmpacity: 'Ampacity',
     busbarTotalCurrent: 'Total current',

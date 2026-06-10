@@ -7,7 +7,7 @@ import type { SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
-import { motorFLC } from './control/motorFLC';
+import { motorFLC, motorFLC1ph } from './control/motorFLC';
 import { circuitDemandFactor } from './occupancy';
 import { derivedPointsLoadW, finalCircuitWarnings, summarizeFinalCircuit } from './fixtures';
 import { sizeCableTray, sizeCircuitConduit } from './containment';
@@ -88,17 +88,21 @@ function computeCircuit(
     hasStarter: Boolean(c.starterType),
     isFeeder,
   });
-  const isMotor =
-    (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined && threePhase;
+  const motorLike = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
+  const isMotor = motorLike && threePhase;
 
   // Single-phase circuits on a three-phase panel run at the phase voltage (~230 V).
   const phaseVoltage = panel.system === '3ph' ? round(panel.voltageV / Math.sqrt(3), 0) : panel.voltageV;
   const circuitSystem: SystemType = threePhase ? '3ph' : '1ph';
   const useVoltage = threePhase ? panel.voltageV : phaseVoltage;
 
+  // Motor FLC from the standard tables — including 1-phase machines, whose
+  // efficiency makes the electrical input markedly larger than the shaft kW.
   const ib = isMotor
     ? motorFLC(c.motorKw!, panel.voltageV)
-    : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
+    : motorLike
+      ? motorFLC1ph(c.motorKw!, phaseVoltage)
+      : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
   const designCurrentA = round(ib, 1);
 
   const breaker = selectBreaker({
@@ -127,8 +131,10 @@ function computeCircuit(
   });
   // Mark a manually pinned cable minimum so the UI can color it as an override.
   if (c.cableOverrideMm2 !== undefined) cable.overridden = true;
+  // Equal parallel runs share the current, so the drop is per-run I over per-run CSA.
+  const runsPerPhase = cable.runsPerPhase ?? 1;
   const vd = voltageDrop({
-    currentA: ib,
+    currentA: ib / runsPerPhase,
     lengthM: c.lengthM,
     csaMm2: cable.csaMm2,
     cosPhi: c.cosPhi,
@@ -146,6 +152,7 @@ function computeCircuit(
     panelSystem: panel.system,
     threePhase,
     hasNeutral,
+    runsPerPhase,
   });
   const rcd = circuitRcd({
     earthingSystem: opts.earthingSystem ?? 'TN-C-S',
@@ -211,6 +218,7 @@ function computeCircuit(
       lengthM: c.lengthM,
       curve: breaker.curve,
       breakerRatingA: breaker.ratingA,
+      runsPerPhase,
     });
     result.zsOhm = zs.zsOhm;
     result.zsMaxOhm = zs.zsMaxOhm;
@@ -305,7 +313,24 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     panel.system === '3ph' ? Math.max(balance.L1, balance.L2, balance.L3) : balance.L1,
     1,
   );
-  const busbar = sizeBusbar(totalDemandCurrentA);
+  // Incoming device: the main breaker, snapped to a standard rating ≥ demand,
+  // with poles per the system and a kA check at the bus (when fault is known).
+  const incomerBreaker = selectBreaker({ designCurrentA: totalDemandCurrentA, loadKind: 'feeder' });
+  const incomer: PanelResult['incomer'] = {
+    breaker: incomerBreaker,
+    poles: panel.system === '3ph' ? 4 : 2,
+  };
+  if (incomerBreaker.ratingA + 1e-9 < totalDemandCurrentA) {
+    warnings.push({
+      code: 'incomer-exceeds-range',
+      severity: 'error',
+      message: `${panel.name}: demand ${totalDemandCurrentA} A exceeds the largest standard breaker frame (${incomerBreaker.ratingA} A) — split the board or feed it at MV.`,
+      panelId: panel.id,
+    });
+  }
+
+  // Main bus rated for the incoming device (IEC 61439-1), not just the demand.
+  const busbar = sizeBusbar(totalDemandCurrentA, incomerBreaker.ratingA);
   // Split the panel bus into capacity-bounded sections (max ways / max current),
   // so a panel with many ways gets several busbar lines instead of one giant bar.
   // Each section is sized for the worst-phase current of the ways it carries; the
@@ -335,6 +360,17 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   // main bus passes — warn per inadequate section.
   if (opts.faultLevelA !== undefined) {
     const faultKa = round(opts.faultLevelA / 1000, 1);
+    const incomerKa = checkBreakerKa(incomerBreaker, faultKa);
+    incomer.breakerKa = incomerKa.breakerKa;
+    incomer.kaAdequate = incomerKa.adequate;
+    if (!incomerKa.adequate) {
+      warnings.push({
+        code: 'incomer-ka-inadequate',
+        severity: 'error',
+        message: `${panel.name}: incomer ${incomerBreaker.ratingA} A breaking capacity ${incomerKa.breakerKa} kA is below the ${faultKa} kA prospective fault at the bus — specify a higher-Icu frame.`,
+        panelId: panel.id,
+      });
+    }
     busbar.withstand = checkBusbarWithstand(busbar.csaMm2, faultKa);
     for (const section of busbarSections) {
       section.busbar.withstand = checkBusbarWithstand(section.busbar.csaMm2, faultKa);
@@ -384,7 +420,12 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   };
 
   // Cable tray for all outgoing cables, laid side-by-side in a single layer.
-  const cableTray = sizeCableTray(circuits.map((c) => c.containment?.cableOdMm ?? 0));
+  // Parallel runs occupy one tray slot per run.
+  const cableTray = sizeCableTray(
+    circuits.flatMap((c) =>
+      Array.from({ length: c.cable.runsPerPhase ?? 1 }, () => c.containment?.cableOdMm ?? 0),
+    ),
+  );
 
   // Harmonics / power-quality estimate from the non-linear (VFD/soft-starter/
   // UPS/rectifier) load share. branches and comps are aligned by construction.
@@ -424,6 +465,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     name: panel.name,
     ...(panel.tag ? { tag: panel.tag } : {}),
     circuits,
+    incomer,
     busbar,
     busbarSections,
     enclosure,

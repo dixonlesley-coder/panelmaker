@@ -33,8 +33,8 @@ function sectionWidthPx(ways: number): number {
 /**
  * Panel single-line diagram: incomer → busbar section(s) → one node per branch
  * circuit. The panel bus splits into capacity-bounded sections (max ways / max
- * current); each section is its own bar stacked below the last, chained off the
- * previous bar's riser handle. Layout is deterministic (no async layout pass).
+ * current); each section is its own bar stacked below the last, fed radially
+ * from the incomer. Layout is deterministic (no async layout pass).
  */
 function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: Node[]; edges: Edge[] } {
   const sections = result.busbarSections;
@@ -49,7 +49,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
       position: { x: widest / 2 - 90, y: 0 },
       data: {
         label: panel.name,
-        ratingA: formatAmps(result.totalDemandCurrentA),
+        ratingA: `${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA}A ${result.incomer.poles}P · ${formatAmps(result.totalDemandCurrentA)}`,
       },
       draggable: false,
     },
@@ -75,25 +75,16 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
       },
       draggable: false,
     });
-    if (k === 0) {
-      edges.push({
-        id: 'e-incomer-busbar-0',
-        source: 'incomer',
-        target: busId,
-        targetHandle: 'top',
-        type: 'smoothstep',
-      });
-    } else {
-      edges.push({
-        id: `e-riser-${k}`,
-        source: `busbar-${k - 1}`,
-        sourceHandle: 'lout',
-        target: busId,
-        targetHandle: 'lin',
-        type: 'smoothstep',
-        style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
-      });
-    }
+    // Radial feed: every section gets its own dropper from the incomer, so no
+    // section bar carries another section's through-current.
+    edges.push({
+      id: `e-incomer-busbar-${k}`,
+      source: 'incomer',
+      target: busId,
+      targetHandle: k === 0 ? 'top' : 'lin',
+      type: 'smoothstep',
+      style: k > 0 ? { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 } : undefined,
+    });
 
     section.circuitIds.forEach((cid, j) => {
       const c = byId.get(cid);
@@ -102,7 +93,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
       const data: BranchNodeData = {
         name: c.name,
         breaker: `${c.breaker.deviceClass} ${c.breaker.ratingA}A/${c.breaker.curve}`,
-        cable: `${c.cable.csaMm2} mm²`,
+        cable: `${c.cable.runsPerPhase && c.cable.runsPerPhase > 1 ? `${c.cable.runsPerPhase}× ` : ''}${c.cable.csaMm2} mm²`,
         starter: c.control?.starterType.replace('_', '-'),
         warn: !c.voltageDrop.withinLimit,
         breakerOverridden: c.breaker.overridden === true,

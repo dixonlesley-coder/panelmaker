@@ -11,6 +11,24 @@ export interface MotorRating {
   flcA400: number;
 }
 
+/**
+ * Typical single-phase induction-motor efficiency × power-factor product (η·cosφ)
+ * by rating — small 1-ph motors are markedly less efficient than 3-ph machines,
+ * so FLC must be derived as I = P_shaft / (V · η·cosφ), NOT P_shaft / (V · cosφ).
+ * Values are conservative composites of capacitor-start/run motor data.
+ */
+export const MOTOR_1PH_EFF_TIMES_PF: readonly { kw: number; effPf: number }[] = [
+  { kw: 0.18, effPf: 0.5 },
+  { kw: 0.37, effPf: 0.54 },
+  { kw: 0.55, effPf: 0.57 },
+  { kw: 0.75, effPf: 0.6 },
+  { kw: 1.1, effPf: 0.62 },
+  { kw: 1.5, effPf: 0.65 },
+  { kw: 2.2, effPf: 0.68 },
+  { kw: 3, effPf: 0.7 },
+  { kw: 3.7, effPf: 0.72 },
+];
+
 export const MOTOR_FLC_400V: readonly MotorRating[] = [
   { kw: 0.37, flcA400: 1.0 },
   { kw: 0.55, flcA400: 1.5 },

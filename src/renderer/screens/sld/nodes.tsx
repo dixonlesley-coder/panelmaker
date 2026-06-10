@@ -122,11 +122,10 @@ export function BusbarNode({ data }: NodeProps) {
           <Text size="xs">{d.ampacity}</Text>
         </Group>
       </Group>
-      {/* Top: fed from the incomer (section 0). Left: chained from the previous
-          section's bar (the bus riser). Bottom: down to this section's branches. */}
+      {/* Top: incomer feed (section 0). Left: radial dropper from the incomer
+          for later sections. Bottom: down to this section's branches. */}
       <Handle type="target" position={Position.Top} id="top" />
-      <Handle type="target" position={Position.Left} id="lin" style={{ top: '35%' }} />
-      <Handle type="source" position={Position.Left} id="lout" style={{ top: '65%' }} />
+      <Handle type="target" position={Position.Left} id="lin" style={{ top: '50%' }} />
       <Handle type="source" position={Position.Bottom} id="bottom" />
     </Box>
   );

@@ -112,6 +112,12 @@ function panelSpecTable(panel: PanelResult): Content {
     [{ text: 'Specification', bold: true }, { text: 'Value', bold: true }],
     ['Connected load', `${panel.totalConnectedLoadW} W`],
     ['Total demand current', fmtA(panel.totalDemandCurrentA)],
+    [
+      'Incoming device',
+      `${panel.incomer.breaker.deviceClass} ${panel.incomer.breaker.ratingA} A ${panel.incomer.breaker.curve} · ${panel.incomer.poles}P${
+        panel.incomer.breakerKa !== undefined ? ` · ${panel.incomer.breakerKa} kA` : ''
+      }`,
+    ],
     ['Busbar', `${b.widthMm}×${b.thicknessMm} mm Cu (${b.ampacityA} A)`],
     [
       'Enclosure (W×H×D)',

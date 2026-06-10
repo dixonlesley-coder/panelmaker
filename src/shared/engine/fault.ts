@@ -139,6 +139,8 @@ export interface ZsInput {
   lengthM: number;
   curve: BreakerCurve;
   breakerRatingA: number;
+  /** Equal parallel runs per phase (each with its own PE) — divides the loop Z. */
+  runsPerPhase?: number;
 }
 
 /**
@@ -151,11 +153,13 @@ export interface ZsInput {
  */
 export function checkZs(i: ZsInput): ZsCheck {
   // Evaluate the loop conductor R at the fault temperature (conservative for ADS):
-  // a higher Zs is the unfavourable case for guaranteed disconnection.
+  // a higher Zs is the unfavourable case for guaranteed disconnection. Equal
+  // parallel runs (each with its own PE) divide the conductor impedance.
+  const runs = i.runsPerPhase !== undefined && i.runsPerPhase > 1 ? i.runsPerPhase : 1;
   const phaseZ0 = conductorImpedance(i.phaseCsaMm2, i.lengthM);
   const peZ0 = conductorImpedance(i.peCsaMm2, i.lengthM);
-  const phaseZ = { rOhm: phaseZ0.rOhm * ZS_FAULT_TEMP_FACTOR, xOhm: phaseZ0.xOhm };
-  const peZ = { rOhm: peZ0.rOhm * ZS_FAULT_TEMP_FACTOR, xOhm: peZ0.xOhm };
+  const phaseZ = { rOhm: (phaseZ0.rOhm * ZS_FAULT_TEMP_FACTOR) / runs, xOhm: phaseZ0.xOhm / runs };
+  const peZ = { rOhm: (peZ0.rOhm * ZS_FAULT_TEMP_FACTOR) / runs, xOhm: peZ0.xOhm / runs };
   const loop = addImpedance(addImpedance(i.sourceZ, phaseZ), peZ);
   const zsOhm = impedanceMagnitude(loop);
 
@@ -170,7 +174,9 @@ export function checkZs(i: ZsInput): ZsCheck {
   // §543.1.2). The earth-fault current is U0/Zs; on TT the loop fault current is
   // electrode-limited and cleared by the RCD, so the check is relaxed (as for ADS).
   const earthFaultA = zsOhm > 0 ? NOMINAL_PHASE_VOLTAGE_V / zsOhm : 0;
-  const peMinAdiabaticMm2 = (earthFaultA * Math.sqrt(PE_FAULT_CLEAR_TIME_S)) / PE_ADIABATIC_K;
+  // With parallel runs the fault current splits between the per-run PEs, so the
+  // adiabatic minimum applies to each run's share.
+  const peMinAdiabaticMm2 = (earthFaultA / runs) * Math.sqrt(PE_FAULT_CLEAR_TIME_S) / PE_ADIABATIC_K;
   const peAdiabaticOk =
     i.earthingSystem === 'TT' ? true : i.peCsaMm2 + 1e-9 >= peMinAdiabaticMm2;
 

@@ -434,6 +434,7 @@ export const id: TranslationKeys = {
     arcFlash: 'Arc flash (perkiraan)',
     boundary: 'batas {{mm}} mm',
     busbar: 'Busbar',
+    incomerDevice: 'Perangkat masuk',
     busbarSection: 'Penampang',
     busbarAmpacity: 'Ampasitas',
     busbarTotalCurrent: 'Arus total',

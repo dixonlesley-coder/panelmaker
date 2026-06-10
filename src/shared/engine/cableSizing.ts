@@ -42,6 +42,14 @@ export const CONTINUOUS_FACTOR = 1.25;
  * on both ampacity and voltage drop. `vdDriven` flags the (informational) case
  * where the drop limit — not ampacity — forced the larger conductor.
  */
+/** Most parallel runs per phase the sizer will propose (practical lugging limit). */
+export const PARALLEL_MAX_RUNS = 4;
+/**
+ * Smallest per-run section allowed in a parallel set (mm²) — parallel small
+ * conductors invite unequal current sharing; practice parallels large cables only.
+ */
+export const PARALLEL_MIN_SECTION_MM2 = 50;
+
 export function sizeCable({
   designCurrentA,
   breakerRatingA,
@@ -52,11 +60,12 @@ export function sizeCable({
   const izRequired = Math.max(breakerRatingA, CONTINUOUS_FACTOR * designCurrentA);
   const df = deratingFactor > 0 ? deratingFactor : 1;
 
-  /** Voltage drop within its limit for a candidate section (true if unconstrained). */
-  const vdOk = (section: number): boolean =>
+  /** Voltage drop within limit for a per-run candidate (true if unconstrained).
+   *  Equal parallel runs share the current, so each run sees Ib / runs. */
+  const vdOk = (section: number, runs: number): boolean =>
     vd === undefined ||
     voltageDrop({
-      currentA: designCurrentA,
+      currentA: designCurrentA / runs,
       lengthM: vd.lengthM,
       csaMm2: section,
       cosPhi: vd.cosPhi,
@@ -70,47 +79,55 @@ export function sizeCable({
     1,
   )}A)`;
 
-  // First section meeting ampacity (regardless of Vd) — lets us tell when the
-  // voltage-drop limit, not ampacity, is what forced a larger conductor.
-  let ampacityMinSection: number | undefined;
+  // Try a single cable first, then 2..4 equal parallel runs (IEC 60364-5-52
+  // §523.7). Within a run count, the smallest section meeting ampacity is noted
+  // so a larger pick can be flagged as voltage-drop-driven.
+  let anyAmpacityReached = false;
+  for (let runs = 1; runs <= PARALLEL_MAX_RUNS; runs++) {
+    const minSec = runs === 1 ? minSectionMm2 : Math.max(minSectionMm2, PARALLEL_MIN_SECTION_MM2);
+    const izRequiredPerRun = izRequired / runs;
+    let ampacityMinSection: number | undefined;
 
-  for (const section of STANDARD_SECTIONS_MM2) {
-    if (section < minSectionMm2) continue;
-    const derated = baseKha(section) * df;
-    if (derated < izRequired) continue;
-    if (ampacityMinSection === undefined) ampacityMinSection = section;
-    if (!vdOk(section)) continue;
+    for (const section of STANDARD_SECTIONS_MM2) {
+      if (section < minSec) continue;
+      const deratedRun = baseKha(section) * df;
+      if (deratedRun < izRequiredPerRun) continue;
+      if (ampacityMinSection === undefined) ampacityMinSection = section;
+      anyAmpacityReached = true;
+      if (!vdOk(section, runs)) continue;
 
-    const vdDriven = section > ampacityMinSection;
-    const izStr = round(derated, 1);
-    return {
-      csaMm2: section,
-      baseKhaA: baseKha(section),
-      deratedIzA: izStr,
-      deratingFactor: round(df, 3),
-      vdDriven,
-      appliedRule: vdDriven
-        ? `${ampacityRule.replace('{iz}', String(izStr))}; upsized to hold Vd <= ${
-            vd!.isLighting ? 3 : 5
-          }%`
-        : ampacityRule.replace('{iz}', String(izStr)),
-    };
+      const vdDriven = section > ampacityMinSection;
+      const totalIz = round(deratedRun * runs, 1);
+      const rule = ampacityRule.replace('{iz}', String(totalIz));
+      return {
+        csaMm2: section,
+        baseKhaA: baseKha(section),
+        deratedIzA: totalIz,
+        deratingFactor: round(df, 3),
+        ...(runs > 1 ? { runsPerPhase: runs } : {}),
+        vdDriven,
+        appliedRule:
+          (runs > 1 ? `${runs}× parallel runs — ` : '') +
+          (vdDriven ? `${rule}; upsized to hold Vd <= ${vd!.isLighting ? 3 : 5}%` : rule),
+      };
+    }
   }
 
-  // Nothing satisfied both constraints. Distinguish the two failure modes:
-  //   - ampacity itself unreachable (no section carries the load), vs.
-  //   - ampacity met but the Vd limit unreachable even at the largest section
-  //     (still adequately protected — cable sizing alone can't fix the drop).
+  // Nothing satisfied both constraints even at 4 parallel runs. Distinguish:
+  //   - ampacity itself unreachable (no run count carries the load), vs.
+  //   - ampacity met but the Vd limit unreachable (still adequately protected —
+  //     conductor sizing alone can't fix the drop).
   const largest = STANDARD_SECTIONS_MM2[STANDARD_SECTIONS_MM2.length - 1]!;
-  const ampacityImpossible = ampacityMinSection === undefined;
+  const ampacityImpossible = !anyAmpacityReached;
   return {
     csaMm2: largest,
     baseKhaA: baseKha(largest),
-    deratedIzA: round(baseKha(largest) * df, 1),
+    deratedIzA: round(baseKha(largest) * df * PARALLEL_MAX_RUNS, 1),
     deratingFactor: round(df, 3),
+    runsPerPhase: PARALLEL_MAX_RUNS,
     vdDriven: !ampacityImpossible,
     appliedRule: ampacityImpossible
-      ? 'exceeds-range: largest standard section still below required Iz'
+      ? `exceeds-range: ${PARALLEL_MAX_RUNS}× largest standard section still below required Iz`
       : 'voltage-drop-exceeds-range: largest standard section still over the Vd limit',
   };
 }

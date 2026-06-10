@@ -71,11 +71,28 @@ export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
     type: 'text',
     x: incomerMidX + BREAKER_W / 2 + 6,
     y: INCOMER_Y + BREAKER_H / 2 + FONT / 3,
-    text: `${panelLabel(panel)} · ${result.totalDemandCurrentA.toFixed(0)} A`,
+    text: `${panelLabel(panel)} · ${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA}A ${result.incomer.poles}P (Ib ${result.totalDemandCurrentA.toFixed(0)} A)`,
     size: FONT,
   });
 
-  // --- One busbar section per row, chained by a left-side riser. ---
+  // --- One busbar section per row, each fed RADIALLY from the incomer. ---
+  // The left-margin rail is the incomer feed conductor (it carries the
+  // downstream sections' current); the section bars themselves only carry
+  // their own group, which is what their per-section sizing assumes.
+  const railX = busLeft - 14;
+  if (sections.length > 1) {
+    const lastBusY = BUS_Y + (sections.length - 1) * SECTION_STEP;
+    prims.push({ type: 'line', x1: railX, y1: BUS_Y, x2: railX, y2: lastBusY, weight: 2 });
+    prims.push({ type: 'line', x1: busLeft, y1: BUS_Y, x2: railX, y2: BUS_Y, weight: 2 });
+    prims.push({
+      type: 'text',
+      x: railX - 4,
+      y: BUS_Y + 24,
+      text: 'feed',
+      size: FONT,
+      dim: true,
+    });
+  }
   sections.forEach((section, k) => {
     const busY = BUS_Y + k * SECTION_STEP;
     const breakerY = busY + BREAKER_DY;
@@ -85,9 +102,10 @@ export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
     const busX2 = branchX(count - 1);
     const bus = section.busbar;
 
-    // Bus riser from the previous section's bar (left side).
+    // Radial dropper: tap from the feed rail into this section's bar.
     if (k > 0) {
-      prims.push({ type: 'line', x1: busLeft, y1: BUS_Y + (k - 1) * SECTION_STEP, x2: busLeft, y2: busY, weight: 2 });
+      prims.push({ type: 'line', x1: railX, y1: busY, x2: busX1 - 20, y2: busY, weight: 2 });
+      prims.push({ type: 'circle', cx: railX, cy: busY, r: 2.4, weight: 1 });
     }
 
     // The thick horizontal bar.
@@ -137,7 +155,7 @@ export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
         type: 'text',
         x: x + 6,
         y: (breakerY + BREAKER_H + loadY) / 2,
-        text: `${c.cable.csaMm2} mm²`,
+        text: `${c.cable.runsPerPhase && c.cable.runsPerPhase > 1 ? `${c.cable.runsPerPhase}× ` : ''}${c.cable.csaMm2} mm²`,
         size: FONT,
         anchor: 'start',
         dim: true,

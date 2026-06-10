@@ -317,7 +317,7 @@ function buildGraph(
       position: { x: incomerX, y: 0 },
       data: {
         label: panel.tag ? `${panel.tag} — ${panel.name}` : panel.name,
-        ratingA: formatAmps(result.totalDemandCurrentA),
+        ratingA: `${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA}A ${result.incomer.poles}P · ${formatAmps(result.totalDemandCurrentA)}`,
       },
       draggable: false,
     },
@@ -351,8 +351,9 @@ function buildGraph(
   });
 
   // One busbar bar per section, stacked vertically, each carrying its own ways.
-  // The incomer feeds section 0; each later section is chained off the previous
-  // bar's left handle (the bus riser), so the split reads as extra busbar lines.
+  // Every section is fed RADIALLY from the incomer (its own dropper) — not
+  // chained through the previous bar — so each bar carries only its own group
+  // and the per-section sizing is valid (IEC 61439 distribution busbars).
   sections.forEach((section, k) => {
     const busbarY = BUSBAR_Y + k * SECTION_DY;
     const branchY = busbarY + (BRANCH_Y - BUSBAR_Y);
@@ -372,25 +373,14 @@ function buildGraph(
       },
       draggable: false,
     });
-    if (k === 0) {
-      edges.push({
-        id: 'e-incomer-busbar-0',
-        source: 'incomer',
-        target: busId,
-        targetHandle: 'top',
-        type: 'smoothstep',
-      });
-    } else {
-      edges.push({
-        id: `e-riser-${k}`,
-        source: `busbar-${k - 1}`,
-        sourceHandle: 'lout',
-        target: busId,
-        targetHandle: 'lin',
-        type: 'smoothstep',
-        style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
-      });
-    }
+    edges.push({
+      id: `e-incomer-busbar-${k}`,
+      source: 'incomer',
+      target: busId,
+      targetHandle: k === 0 ? 'top' : 'lin',
+      type: 'smoothstep',
+      style: k > 0 ? { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 } : undefined,
+    });
 
     section.circuitIds.forEach((cid, j) => {
       const c = byId.get(cid);
@@ -400,7 +390,7 @@ function buildGraph(
       const data: BranchNodeData = {
         name: c.name,
         breaker: `${c.breaker.deviceClass} ${c.breaker.ratingA}A/${c.breaker.curve}`,
-        cable: `${c.cable.csaMm2} mm²`,
+        cable: `${c.cable.runsPerPhase && c.cable.runsPerPhase > 1 ? `${c.cable.runsPerPhase}× ` : ''}${c.cable.csaMm2} mm²`,
         starter: c.control?.starterType.replace('_', '-'),
         warn: !c.voltageDrop.withinLimit,
         changed: changes.get(cid),
