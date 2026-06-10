@@ -1,0 +1,2 @@
+# Dev-only tooling for scripts/extract_catalogue.py — never bundled into the app.
+pdfplumber>=0.11

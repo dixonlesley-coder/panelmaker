@@ -1,0 +1,21 @@
+{
+  "catalogVersion": "schneider-starter-0",
+  "manufacturer": "Schneider Electric",
+  "source": "Schneider Electric LV catalogue. These two rows are vetted starter examples; populate the bulk with scripts/extract_catalogue.py against your licensed catalogue PDF. Every order code / rating must be verified against the manufacturer datasheet before use.",
+  "parts": [
+    {
+      "sku": "A9F44116",
+      "category": "breaker",
+      "series": "Acti9 iC60N",
+      "model": "iC60N 1P C16",
+      "attributes": { "ratingA": 16, "poles": 1, "curve": "C", "deviceClass": "MCB", "breakingKa": 6 }
+    },
+    {
+      "sku": "A9F44332",
+      "category": "breaker",
+      "series": "Acti9 iC60N",
+      "model": "iC60N 3P C32",
+      "attributes": { "ratingA": 32, "poles": 3, "curve": "C", "deviceClass": "MCB", "breakingKa": 6 }
+    }
+  ]
+}

@@ -21,6 +21,7 @@ import { desktopApi, persistSchematic } from '@renderer/api';
 import { createSampleProject } from '@renderer/data/sampleProject';
 import { findPanelTemplate } from '@renderer/data/panelTemplates';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
+import { withSchneiderCatalog } from '@shared/data/catalog';
 import {
   deleteProject as registryDeleteProject,
   loadProject as registryLoadProject,
@@ -361,7 +362,9 @@ const initialProject = createSampleProject();
 
 export const useProjectStore = create<ProjectState>((set) => ({
   project: initialProject,
-  parts: SAMPLE_PARTS,
+  // Web preview starts with the sample parts merged with the committed
+  // manufacturer catalogue (the desktop build seeds the same parts into SQLite).
+  parts: withSchneiderCatalog(SAMPLE_PARTS),
   prices: SAMPLE_PRICES,
   activePanelId: initialProject.panels[0]?.id ?? '',
   activeScreen: 'system',
