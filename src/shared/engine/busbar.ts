@@ -37,6 +37,8 @@ export interface BusbarWayLoad {
   threePhase: boolean;
   /** Assigned line for single-phase ways (ignored when `threePhase`). */
   phase: 'L1' | 'L2' | 'L3';
+  /** Force a new busbar section to start at this way (user-driven manual break). */
+  breakBefore?: boolean;
 }
 
 export interface SplitBusbarOptions {
@@ -73,12 +75,12 @@ function sectionWorstPhaseA(ways: BusbarWayLoad[], system: SystemType): number {
 }
 
 /**
- * Divide a panel's outgoing ways into busbar sections, each bounded by a maximum
- * way count and a maximum continuous current. Ways are taken in order; a new
- * section starts whenever adding the next way would exceed either cap. Each
- * section is sized for the worst-phase current of the ways it carries. Always
- * returns at least one section (a single empty section for a panel with no ways),
- * so renderers can iterate sections uniformly.
+ * Divide a panel's outgoing ways into busbar sections. Ways are taken in order; a
+ * new section starts when the user forces a manual break at a way, or when adding
+ * it would exceed the way-count cap or the continuous-current cap (the largest
+ * practical single bar). Each section is sized for the worst-phase current of the
+ * ways it carries. Always returns at least one section (a single empty section for
+ * a panel with no ways), so renderers can iterate sections uniformly.
  */
 export function splitBusbarSections(
   ways: BusbarWayLoad[],
@@ -87,6 +89,8 @@ export function splitBusbarSections(
   const maxWays = Math.max(1, Math.floor(opts.maxWays));
   const sections: BusbarSectionResult[] = [];
   let group: BusbarWayLoad[] = [];
+  // Whether the current group began at a user-forced break (for the badge/flag).
+  let groupManual = false;
 
   const flush = () => {
     if (group.length === 0) return;
@@ -97,22 +101,37 @@ export function splitBusbarSections(
       ways: group.length,
       sectionCurrentA: currentA,
       busbar: sizeBusbar(currentA),
+      manualBreak: groupManual,
     });
     group = [];
+    groupManual = false;
   };
 
   for (const w of ways) {
+    const manual = w.breakBefore === true;
     if (group.length > 0) {
       const overWays = group.length + 1 > maxWays;
       const overCurrent = sectionWorstPhaseA([...group, w], opts.system) > opts.maxSectionCurrentA;
-      if (overWays || overCurrent) flush();
+      if (manual || overWays || overCurrent) {
+        flush();
+        // The new section is "manual" only when the break was user-forced (a break
+        // on the very first way is a no-op — there is nothing before it to split).
+        if (manual) groupManual = true;
+      }
     }
     group.push(w);
   }
   flush();
 
   if (sections.length === 0) {
-    sections.push({ index: 1, circuitIds: [], ways: 0, sectionCurrentA: 0, busbar: sizeBusbar(0) });
+    sections.push({
+      index: 1,
+      circuitIds: [],
+      ways: 0,
+      sectionCurrentA: 0,
+      busbar: sizeBusbar(0),
+      manualBreak: false,
+    });
   }
   return sections;
 }

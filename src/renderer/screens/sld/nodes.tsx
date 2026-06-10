@@ -23,6 +23,8 @@ export interface BusbarNodeData {
   waysLabel?: string;
   /** True when this section's bar fails the short-circuit withstand check. */
   inadequate?: boolean;
+  /** True when this section starts at a user-forced (manual) busbar break. */
+  manualBreak?: boolean;
   [key: string]: unknown;
 }
 
@@ -101,9 +103,16 @@ export function BusbarNode({ data }: NodeProps) {
       }}
     >
       <Group justify="space-between" wrap="nowrap" gap={8}>
-        <Text size="xs" fw={700} lineClamp={1}>
-          {d.label}
-        </Text>
+        <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+          <Text size="xs" fw={700} lineClamp={1}>
+            {d.label}
+          </Text>
+          {d.manualBreak && (
+            <Badge size="xs" variant="white" color="violet" title="Manual busbar break">
+              manual
+            </Badge>
+          )}
+        </Group>
         <Group gap={8} wrap="nowrap">
           {d.waysLabel && (
             <Text size="xs" style={{ opacity: 0.85 }}>

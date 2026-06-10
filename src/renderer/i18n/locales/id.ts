@@ -817,6 +817,9 @@ export const id: TranslationKeys = {
     cableSection: 'Jalur kabel',
     motorKw: 'Daya motor',
     makeup: 'Susunan: {{spec}} · Iz {{iz}}',
+    busbarSection: 'Busbar',
+    busbarBreak: 'Mulai seksi busbar baru di sini',
+    busbarBreakHint: 'Paksa sirkuit ini ke jalur busbar baru, terlepas dari pemisahan otomatis.',
     done: 'Selesai',
   },
   panelSettings: {

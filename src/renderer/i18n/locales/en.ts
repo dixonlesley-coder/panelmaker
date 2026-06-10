@@ -812,6 +812,9 @@ export const en = {
     cableSection: 'Cable run',
     motorKw: 'Motor rating',
     makeup: 'Make-up: {{spec}} · Iz {{iz}}',
+    busbarSection: 'Busbar',
+    busbarBreak: 'Start a new busbar section here',
+    busbarBreakHint: 'Force this circuit onto a fresh busbar line, regardless of the automatic split.',
     done: 'Done',
   },
   panelSettings: {

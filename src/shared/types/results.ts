@@ -187,6 +187,8 @@ export interface BusbarSectionResult {
   sectionCurrentA: number;
   /** The bar sized for this section's current. */
   busbar: BusbarResult;
+  /** True when this section starts at a user-forced (manual) busbar break. */
+  manualBreak: boolean;
 }
 
 /** Future-expansion headroom on a panel's busbar and ways. */

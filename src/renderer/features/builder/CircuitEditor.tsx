@@ -8,6 +8,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
 } from '@mantine/core';
@@ -256,6 +257,14 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             })}
           </Text>
         )}
+
+        <Divider label={t('circuitEditor.busbarSection')} />
+        <Switch
+          label={t('circuitEditor.busbarBreak')}
+          description={t('circuitEditor.busbarBreakHint')}
+          checked={circuit.busbarBreakBefore === true}
+          onChange={(e) => patch({ busbarBreakBefore: e.currentTarget.checked ? true : undefined })}
+        />
 
         <Group justify="space-between" mt="xs">
           <Button

@@ -71,6 +71,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
         widthPx: sectionWidthPx(section.ways) + 20,
         waysLabel: multi ? t('vbuilder.waysCount', { count: section.ways }) : undefined,
         inadequate,
+        manualBreak: section.manualBreak,
       },
       draggable: false,
     });

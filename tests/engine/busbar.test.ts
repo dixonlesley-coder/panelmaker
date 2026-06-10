@@ -100,6 +100,53 @@ describe('splitBusbarSections', () => {
     expect(section!.sectionCurrentA).toBe(140);
   });
 
+  it('honors a manual break, forcing a new section even under the caps', () => {
+    const ways: BusbarWayLoad[] = [
+      way('a', 10),
+      way('b', 10),
+      { ...way('c', 10), breakBefore: true },
+      way('d', 10),
+    ];
+    const sections = splitBusbarSections(ways, {
+      maxWays: MAX_WAYS_PER_BUSBAR,
+      maxSectionCurrentA: MAX_BUSBAR_SECTION_CURRENT_A,
+      system: '1ph',
+    });
+    expect(sections).toHaveLength(2);
+    expect(sections[0]!.circuitIds).toEqual(['a', 'b']);
+    expect(sections[1]!.circuitIds).toEqual(['c', 'd']);
+    // The section opened by the user-forced break is flagged; the first is not.
+    expect(sections[0]!.manualBreak).toBe(false);
+    expect(sections[1]!.manualBreak).toBe(true);
+  });
+
+  it('treats a break on the very first way as a no-op', () => {
+    const sections = splitBusbarSections(
+      [{ ...way('a', 10), breakBefore: true }, way('b', 10)],
+      { maxWays: MAX_WAYS_PER_BUSBAR, maxSectionCurrentA: MAX_BUSBAR_SECTION_CURRENT_A, system: '1ph' },
+    );
+    expect(sections).toHaveLength(1);
+    expect(sections[0]!.manualBreak).toBe(false);
+  });
+
+  it('auto-splits when a section outgrows the largest practical single bar', () => {
+    // 3-phase ways at 500 A each: two fit one 1430 A bar (1000), a third (1500) does not.
+    const ways: BusbarWayLoad[] = Array.from({ length: 4 }, (_, i) => ({
+      id: `m${i}`,
+      designCurrentA: 500,
+      threePhase: true,
+      phase: 'L1',
+    }));
+    const sections = splitBusbarSections(ways, {
+      maxWays: MAX_WAYS_PER_BUSBAR,
+      maxSectionCurrentA: MAX_BUSBAR_SECTION_CURRENT_A,
+      system: '3ph',
+    });
+    expect(sections.length).toBeGreaterThan(1);
+    // Every section is carryable by a single standard bar (within the practical cap).
+    expect(sections.every((s) => s.sectionCurrentA <= MAX_BUSBAR_SECTION_CURRENT_A)).toBe(true);
+  });
+
   it('always returns at least one (possibly empty) section', () => {
     const sections = splitBusbarSections([], {
       maxWays: MAX_WAYS_PER_BUSBAR,
@@ -138,5 +185,30 @@ describe('computePanel busbar sections', () => {
     expect(grouped).toEqual(r.circuits.map((c) => c.circuitId).sort());
     // The main bus still reflects the whole panel demand.
     expect(r.busbar.totalCurrentA).toBeCloseTo(r.totalDemandCurrentA, 1);
+  });
+
+  it('splits at a circuit flagged with a manual busbar break', () => {
+    const r = computePanel(
+      panel({
+        id: 'P3',
+        name: 'Manual split DB',
+        circuits: [
+          branch({ id: 'c1', name: 'A', loadW: 1500, loadKind: 'lighting', isLighting: true }),
+          branch({ id: 'c2', name: 'B', loadW: 1500, loadKind: 'lighting', isLighting: true }),
+          branch({
+            id: 'c3',
+            name: 'C',
+            loadW: 1500,
+            loadKind: 'lighting',
+            isLighting: true,
+            busbarBreakBefore: true,
+          }),
+        ],
+      }),
+    );
+    expect(r.busbarSections).toHaveLength(2);
+    expect(r.busbarSections[0]!.circuitIds).toEqual(['c1', 'c2']);
+    expect(r.busbarSections[1]!.circuitIds).toEqual(['c3']);
+    expect(r.busbarSections[1]!.manualBreak).toBe(true);
   });
 });

@@ -58,13 +58,6 @@ export const COPPER_CURRENT_DENSITY_A_PER_MM2 = 1.3;
  */
 export const MAX_WAYS_PER_BUSBAR = 12;
 
-/**
- * Maximum continuous current one busbar section carries before it is split into
- * another section (A). Keeps a single bar within a sensible thermal/mechanical
- * envelope; beyond it the load is divided across additional sections/risers.
- */
-export const MAX_BUSBAR_SECTION_CURRENT_A = 800;
-
 export interface BusbarSize {
   /** Bar width (mm). */
   widthMm: number;
@@ -96,3 +89,14 @@ export const COPPER_BUSBAR_TABLE: readonly BusbarSize[] = [
   { widthMm: 80, thicknessMm: 10, csaMm2: 800, ampacityA: 1180 },
   { widthMm: 100, thicknessMm: 10, csaMm2: 1000, ampacityA: 1430 },
 ];
+
+/**
+ * Continuous current at which one busbar section is "too big" for a single bar
+ * and the panel bus auto-splits into another section — the largest practical
+ * standard copper bar's rating ({@link COPPER_BUSBAR_TABLE}). A section's load is
+ * driven by the kW it carries (kW → current), so a panel whose demand outgrows
+ * one feasible bar is divided across sections rather than calling for an
+ * impractically large or paralleled bar.
+ */
+export const MAX_BUSBAR_SECTION_CURRENT_A =
+  COPPER_BUSBAR_TABLE[COPPER_BUSBAR_TABLE.length - 1]?.ampacityA ?? 1430;

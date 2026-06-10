@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   sensing TEXT,
   cable_override_mm2 REAL,
   breaker_override_a REAL,
+  busbar_break_before INTEGER,
   schedule_start_hour INTEGER,
   schedule_end_hour INTEGER,
   feeds_panel_id TEXT,
@@ -211,6 +212,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'points_json', ddl: 'ALTER TABLE circuits ADD COLUMN points_json TEXT' },
   // Manual breaker rating override.
   { table: 'circuits', column: 'breaker_override_a', ddl: 'ALTER TABLE circuits ADD COLUMN breaker_override_a REAL' },
+  // Manual busbar section break.
+  { table: 'circuits', column: 'busbar_break_before', ddl: 'ALTER TABLE circuits ADD COLUMN busbar_break_before INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

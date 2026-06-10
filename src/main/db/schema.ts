@@ -128,6 +128,8 @@ export const circuits = sqliteTable('circuits', {
   cableOverrideMm2: real('cable_override_mm2'),
   /** Manual breaker rating override (A). */
   breakerOverrideA: real('breaker_override_a'),
+  /** Force a new busbar section to start at this circuit (manual bus break). */
+  busbarBreakBefore: integer('busbar_break_before', { mode: 'boolean' }),
   // Daily operating window (absent = continuous) for the load profile.
   scheduleStartHour: integer('schedule_start_hour'),
   scheduleEndHour: integer('schedule_end_hour'),

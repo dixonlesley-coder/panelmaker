@@ -312,13 +312,14 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   // line current of a way follows its phase assignment (3-phase ways load all
   // lines). The main `busbar` above stays the incoming bus (full panel demand).
   const busbarSections = splitBusbarSections(
-    comps.map((cm) => {
+    comps.map((cm, idx) => {
       const assigned = balance.assignment[cm.result.circuitId];
       return {
         id: cm.result.circuitId,
         designCurrentA: cm.result.designCurrentA,
         threePhase: cm.threePhase,
         phase: assigned === 'L2' || assigned === 'L3' ? assigned : 'L1',
+        breakBefore: branches[idx]?.busbarBreakBefore === true,
       };
     }),
     {
