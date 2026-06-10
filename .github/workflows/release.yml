@@ -112,6 +112,21 @@ jobs:
             git push origin "v${VERSION}" || echo "Tag v${VERSION} already on remote"
           fi
 
+          # Pre-create the GitHub Release so electron-builder only UPLOADS to it.
+          # electron-builder uploads the installer + its .blockmap in parallel, and
+          # when the release doesn't exist yet each upload races to create it — on
+          # v0.1.10 both logged "creating GitHub release" and only the blockmap
+          # stuck, dropping the .exe and latest.yml (the run still went green).
+          # Creating the release up-front removes that race.
+          if [[ "${PUBLISH}" == "always" ]]; then
+            VERSION="${VERSION:-$(node -p "require('./package.json').version")}"
+            if gh release view "v${VERSION}" >/dev/null 2>&1; then
+              echo "Release v${VERSION} already exists"
+            else
+              gh release create "v${VERSION}" --title "${VERSION}" --notes "PanelMaker ${VERSION}"
+            fi
+          fi
+
           # Code signing is OPTIONAL (internal-use deployment; certs need a paid
           # subscription). Unsigned publishing is allowed — but warn, because the
           # tradeoffs differ by platform:
