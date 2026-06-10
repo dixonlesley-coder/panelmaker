@@ -8,6 +8,7 @@ import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC } from './control/motorFLC';
 import { circuitDemandFactor } from './occupancy';
+import { derivedPointsLoadW, finalCircuitWarnings, summarizeFinalCircuit } from './fixtures';
 import { sizeCableTray, sizeCircuitConduit } from './containment';
 import { deratingFactor } from './derating';
 import { estimateEnclosure } from './enclosure';
@@ -39,13 +40,16 @@ export interface ComputePanelOptions {
 
 /**
  * A leaf circuit's connected demand (W): motor kW for motors, else connected W,
- * times the demand factor. `demandFactor` lets the caller pass an occupancy-
- * resolved factor; absent, the circuit's own value (default 1) is used.
+ * times the demand factor. When the circuit carries point-level detail
+ * (fixtures/sockets), the connected W is derived from the points and supersedes
+ * the flat `loadW`. `demandFactor` lets the caller pass an occupancy-resolved
+ * factor; absent, the circuit's own value (default 1) is used.
  */
 export function circuitConnectedW(c: CircuitInput, demandFactor?: number): number {
   const isMotor = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
   const df = demandFactor ?? c.demandFactor ?? 1;
-  return (isMotor ? c.motorKw! * 1000 : c.loadW) * df;
+  const baseW = isMotor ? c.motorKw! * 1000 : (derivedPointsLoadW(c) ?? c.loadW);
+  return baseW * df;
 }
 
 function effectiveLoadW(c: CircuitInput, panel: PanelInput, opts: ComputePanelOptions): number {
@@ -215,6 +219,13 @@ function computeCircuit(
         panelId: panel.id,
       }),
     );
+  }
+
+  // Point-level (fixture / socket / switch-group) summary and checks.
+  const finalCircuit = summarizeFinalCircuit(c);
+  if (finalCircuit) {
+    result.finalCircuit = finalCircuit;
+    warnings.push(...finalCircuitWarnings(finalCircuit, { id: c.id, name: c.name }, panel.id));
   }
 
   warnings.push(

@@ -1,20 +1,21 @@
 import { hourlyFactors } from '../standards/schedule';
 import type { CircuitInput, PanelInput, ProjectInput } from '../types/project';
 import type { LoadProfileResult } from '../types/results';
+import { derivedPointsLoadW } from './fixtures';
 import { circuitDemandFactor } from './occupancy';
 import { round } from './util';
 
 /**
- * A circuit's peak demand (kW): motor kW for motors, else connected kW, times the
- * occupancy-resolved demand factor — the same factor the sizing/PF paths use, so
- * the load profile (and the energy bill derived from it) stays consistent with
- * the sized design.
+ * A circuit's peak demand (kW): motor kW for motors, else connected kW (derived
+ * from the fixture/socket points when modelled), times the occupancy-resolved
+ * demand factor — the same basis the sizing/PF paths use, so the load profile
+ * (and the energy bill derived from it) stays consistent with the sized design.
  */
 function circuitDemandKw(c: CircuitInput, panel: PanelInput): number {
   const base =
     (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined
       ? c.motorKw
-      : c.loadW / 1000;
+      : (derivedPointsLoadW(c) ?? c.loadW) / 1000;
   return base * circuitDemandFactor(c, panel);
 }
 

@@ -11,6 +11,7 @@ import type { SpdResult } from '../engine/spd';
 import type { ElectrodeResult } from '../engine/electrode';
 import type { BusbarWithstandResult } from '../engine/busbarFault';
 import type { EnclosureThermalResult } from '../engine/enclosureThermal';
+import type { FinalCircuitResult } from '../engine/fixtures';
 
 /** Residual-current device requirement for a circuit. */
 export interface RcdSpec {
@@ -131,6 +132,8 @@ export interface CircuitResult {
   peAdiabaticOk?: boolean;
   /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
   containment?: ContainmentResult;
+  /** Point-level summary (fixtures / sockets / switch groups), when modelled. */
+  finalCircuit?: FinalCircuitResult;
 }
 
 /** Conduit sizing + fill for a single circuit cable. */

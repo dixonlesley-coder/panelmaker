@@ -12,6 +12,7 @@ export * from './electrode';
 export * from './catalogMatch';
 export * from './gensetTransient';
 export * from './enclosureThermal';
+export * from './fixtures';
 export * from './enclosure';
 export * from './costing';
 export * from './bom';

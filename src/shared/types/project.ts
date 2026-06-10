@@ -6,6 +6,7 @@
 
 import type { SystemType, LoadKind, InstallMethod, EarthingSystem, OccupancyType } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
+import type { LightFixture, SocketOutlet, SwitchGroup } from './fixtures';
 import type { SourcesConfig } from './sources';
 
 /** A load's daily operating window (hours). May wrap past midnight (e.g. 22→6). */
@@ -38,6 +39,15 @@ export interface CircuitInput {
   // Pump / level
   controlMode?: PumpControlMode;
   sensing?: LevelSensing;
+
+  // Point-level detail (final circuits). When fixtures/sockets are present the
+  // engine derives the connected load from the points, superseding `loadW`.
+  /** Light-fixture rows on a lighting circuit. */
+  fixtures?: LightFixture[];
+  /** Switching points (conventional gangs / smart relay channels) for the fixtures. */
+  switchGroups?: SwitchGroup[];
+  /** Socket-outlet rows on a socket circuit. */
+  sockets?: SocketOutlet[];
 
   /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
   cableOverrideMm2?: number;

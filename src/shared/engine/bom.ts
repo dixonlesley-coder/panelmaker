@@ -43,6 +43,11 @@ function matchCablePart(csaMm2: number, parts: Part[]): string | undefined {
   return candidates[0]?.id;
 }
 
+/** Pick the first catalog part of a category (point-level accessories). */
+function matchFirstOfCategory(category: Part['category'], parts: Part[]): string | undefined {
+  return parts.find((p) => p.category === category)?.id;
+}
+
 /** Build the list of BOM lines for a single panel. */
 export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
   const lines: BomLine[] = [];
@@ -81,6 +86,39 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
           category: device.category,
           qty: device.qty,
           matched: device.chosenPartId !== undefined,
+        });
+      }
+    }
+
+    // Point-level detail: fixtures, switching points and socket outlets.
+    const fc = circuit.finalCircuit;
+    if (fc) {
+      for (const row of fc.rows) {
+        if (row.qty <= 0) continue;
+        const isFixture = row.wattsPerFitting !== undefined;
+        const category = isFixture ? 'light_fixture' : 'socket_outlet';
+        const partId = matchFirstOfCategory(category, parts);
+        lines.push({
+          partId,
+          sku: skuOf(parts, partId),
+          description: isFixture
+            ? `${row.name} (${row.wattsPerFitting} W) — ${circuit.name}`
+            : `Socket outlet: ${row.name} — ${circuit.name}`,
+          category,
+          qty: row.qty,
+          matched: partId !== undefined,
+        });
+      }
+      for (const g of fc.switchGroups) {
+        const category = g.kind === 'smart' ? 'smart_switch' : 'switch';
+        const partId = matchFirstOfCategory(category, parts);
+        lines.push({
+          partId,
+          sku: skuOf(parts, partId),
+          description: `${g.detail} switch "${g.label}" — ${circuit.name}`,
+          category,
+          qty: 1,
+          matched: partId !== undefined,
         });
       }
     }

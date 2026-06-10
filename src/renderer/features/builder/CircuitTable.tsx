@@ -14,11 +14,22 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconClipboard, IconCopy, IconCopyPlus, IconPlus, IconWand, IconTrash } from '@tabler/icons-react';
+import {
+  IconBulb,
+  IconClipboard,
+  IconCopy,
+  IconCopyPlus,
+  IconPlug,
+  IconPlus,
+  IconWand,
+  IconTrash,
+} from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, StarterType } from '@shared/types';
 import { LOAD_KINDS, LOAD_DEFAULTS, SCHEDULE_PRESETS, presetKeyFor } from '@shared/standards';
+import { derivedPointsLoadW } from '@shared/engine/fixtures';
 import { selectHasClipboard, useProjectStore } from '@renderer/state/projectStore';
 import { CircuitWizard } from '@renderer/features/builder/CircuitWizard';
+import { PointsEditor } from '@renderer/features/builder/PointsEditor';
 
 /** Load-kind options for the editable Select (full catalog). */
 const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
@@ -57,6 +68,14 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
   const copyCircuit = useProjectStore((s) => s.copyCircuit);
 
   const motor = isMotorKind(circuit.loadKind);
+  // Final circuits (lighting/socket) can model their points; the connected load
+  // is then derived from the points and the flat kW input becomes read-only.
+  const pointsCapable = circuit.loadKind === 'lighting' || circuit.loadKind === 'socket';
+  const derivedW = derivedPointsLoadW(circuit);
+  const pointCount =
+    (circuit.fixtures ?? []).reduce((n, f) => n + f.qty, 0) +
+    (circuit.sockets ?? []).reduce((n, s) => n + s.qty, 0);
+  const [pointsOpen, points] = useDisclosure(false);
 
   const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
 
@@ -113,6 +132,16 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
             suffix=" kW"
             onChange={(v) => patch({ motorKw: typeof v === 'number' ? v : 0 })}
           />
+        ) : derivedW !== undefined ? (
+          <Tooltip label={t('builder.derivedFromPoints')}>
+            <NumberInput
+              value={derivedW / 1000}
+              size="xs"
+              decimalScale={2}
+              suffix=" kW"
+              disabled
+            />
+          </Tooltip>
         ) : (
           <NumberInput
             value={circuit.loadW / 1000}
@@ -182,6 +211,32 @@ function CircuitRow({ panelId, circuit, selected, onToggle }: RowProps) {
 
       <Table.Td>
         <Group gap={2} wrap="nowrap" justify="flex-end">
+          {pointsCapable && (
+            <Tooltip
+              label={
+                pointCount > 0
+                  ? t('builder.editPointsCount', { count: pointCount })
+                  : t('builder.editPoints')
+              }
+            >
+              <ActionIcon
+                variant={pointCount > 0 ? 'light' : 'subtle'}
+                color="indigo"
+                aria-label={t('builder.editPoints')}
+                onClick={points.open}
+              >
+                {circuit.loadKind === 'lighting' ? <IconBulb size={16} /> : <IconPlug size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {pointsCapable && pointsOpen && (
+            <PointsEditor
+              panelId={panelId}
+              circuit={circuit}
+              opened={pointsOpen}
+              onClose={points.close}
+            />
+          )}
           <Tooltip label={t('builder.duplicateCircuit')}>
             <ActionIcon
               variant="subtle"

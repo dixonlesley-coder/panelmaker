@@ -13,6 +13,7 @@ export * from './capacitor';
 export * from './harmonics';
 export * from './arcFlash';
 export * from './occupancy';
+export * from './fixtures';
 export * from './containment';
 export * from './labor';
 export * from './control';
