@@ -462,6 +462,10 @@ export function SystemView() {
               minZoom={0.2}
               nodesConnectable={false}
               nodesDraggable={false}
+              // Reserve double-click for opening the panel; otherwise React
+              // Flow's built-in zoom-on-double-click swallows it (and a click a
+              // few px off the node hits the pane-zoom instead of the node).
+              zoomOnDoubleClick={false}
               onNodeDoubleClick={(_, node) => openPanel(node.id)}
             >
               <Background gap={18} />
