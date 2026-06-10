@@ -9,7 +9,7 @@ import {
   ReactFlowProvider,
   useNodesState,
 } from '@xyflow/react';
-import { Badge, Box, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Box, Button, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconAirConditioning,
@@ -23,6 +23,7 @@ import {
   IconHandMove,
   IconPlug,
   IconPlugConnected,
+  IconScale,
   IconSitemap,
   IconSolarPanel,
   IconSparkles,
@@ -30,6 +31,7 @@ import {
 import type { CircuitInput, LoadKind, PanelInput, PanelResult, SourcesResult } from '@shared/types';
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
+import { balancePhases, type PhaseCircuit } from '@shared/engine';
 import { NODE_TYPES, OVERRIDE_MIME, type BranchNodeData } from '@renderer/screens/sld/nodes';
 import { circuitIssues, incomerIssues, busbarIssues } from '@renderer/lib/nodeIssues';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -304,6 +306,7 @@ function buildGraph(
   onOverride: (circuitId: string, kind: 'breaker' | 'cable', value: number) => void,
   enabledSources: SourceKind[],
   sizedSources: SourcesResult | undefined,
+  feederChild: (childPanelId: string) => { childName: string; childIncomerA?: string } | undefined,
   t: TFn,
 ): { nodes: Node[]; edges: Edge[] } {
   const sections = result.busbarSections;
@@ -405,6 +408,7 @@ function buildGraph(
             ? Math.round((c.designCurrentA / c.cable.deratedIzA) * 100)
             : undefined,
         issues: circuitIssues(result.warnings, cid),
+        feeder: input?.feedsPanelId ? feederChild(input.feedsPanelId) : undefined,
         onDropOverride: (kind, value) => onOverride(cid, kind, value),
       };
       // Branch nodes are draggable so the user can reorder ways left-to-right
@@ -533,7 +537,9 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
+  const setPhaseAssignments = useProjectStore((s) => s.setPhaseAssignments);
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
+  const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const allPanels = useProjectStore((s) => s.project.panels);
   const orphanPanels = useMemo(
     () => availableChildPanels(allPanels, panel.id),
@@ -553,7 +559,18 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   const isRoot = panel.sourceType === 'utility';
   const sourcesConfig = useProjectStore((s) => s.project.sources);
   const updateSources = useProjectStore((s) => s.updateSources);
-  const sizedSources = useSystemResult().sources;
+  const system = useSystemResult();
+  const sizedSources = system.sources;
+  /** Label + incomer current for a sub-panel a feeder way points at. */
+  const feederChild = (childPanelId: string): { childName: string; childIncomerA?: string } | undefined => {
+    const child = allPanels.find((p) => p.id === childPanelId);
+    if (!child) return undefined;
+    const childRes = system.panels[childPanelId];
+    return {
+      childName: child.tag ? `${child.tag} — ${child.name}` : child.name,
+      childIncomerA: childRes ? formatAmps(childRes.totalDemandCurrentA) : undefined,
+    };
+  };
   const enabledSources = useMemo<SourceKind[]>(() => {
     if (!isRoot) return [];
     const out: SourceKind[] = [];
@@ -590,6 +607,31 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
     });
   };
 
+  /**
+   * One-click phase rebalance: re-optimise ALL single-phase ways across L1/L2/L3
+   * (ignoring any current pins) and pin the result, so the as-built schedule
+   * carries a stable, balanced phase assignment.
+   */
+  const onAutoBalance = () => {
+    const phaseCircuits: PhaseCircuit[] = result.circuits.map((cr) => ({
+      id: cr.circuitId,
+      currentA: cr.designCurrentA,
+      threePhase: cr.phase === '3ph',
+    }));
+    const bal = balancePhases(phaseCircuits, panel.system);
+    const assignment: Record<string, 'L1' | 'L2' | 'L3'> = {};
+    for (const cr of result.circuits) {
+      const a = bal.assignment[cr.circuitId];
+      if (a === 'L1' || a === 'L2' || a === 'L3') assignment[cr.circuitId] = a;
+    }
+    if (Object.keys(assignment).length === 0) {
+      notifications.show({ message: t('vbuilder.phaseNothing'), color: 'yellow' });
+      return;
+    }
+    setPhaseAssignments(panel.id, assignment);
+    notifications.show({ message: t('vbuilder.phaseBalanced', { pct: bal.imbalancePct }), color: 'teal' });
+  };
+
   // Change marking: diff this result against the previous one for this panel.
   const prevRef = useRef<{ panelId: string; fp: PanelFingerprint } | null>(null);
   const changes = useMemo(() => {
@@ -601,7 +643,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   }, [result, panel.id]);
 
   const graph = useMemo(
-    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources, t),
+    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources, feederChild, t),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [panel, result, changes, enabledSources, sizedSources, t],
   );
@@ -711,11 +753,23 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
             {t('vbuilder.hint')} {t('vbuilder.editHint')}
           </Text>
         </Group>
-        {changes.size > 0 && (
-          <Badge variant="light" color="teal" leftSection={<IconSparkles size={12} />}>
-            {t('vbuilder.resized', { count: changes.size })}
-          </Badge>
-        )}
+        <Group gap="xs">
+          {changes.size > 0 && (
+            <Badge variant="light" color="teal" leftSection={<IconSparkles size={12} />}>
+              {t('vbuilder.resized', { count: changes.size })}
+            </Badge>
+          )}
+          {panel.system === '3ph' && (
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconScale size={14} />}
+              onClick={onAutoBalance}
+            >
+              {t('vbuilder.autoBalance')}
+            </Button>
+          )}
+        </Group>
       </Group>
 
       <Group align="stretch" gap="sm" wrap="nowrap">
@@ -878,8 +932,13 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
               // default zoom-on-double-click would otherwise swallow it.
               zoomOnDoubleClick={false}
               onNodeDoubleClick={(_, node) => {
-                if (node.type === 'branch') setEditing({ circuitId: node.id, focus: 'device' });
-                else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
+                if (node.type === 'branch') {
+                  // A feeder way represents a sub-panel — drill into it instead
+                  // of editing the feeder circuit (its MCB shows on the node).
+                  const circ = panel.circuits.find((c) => c.id === node.id);
+                  if (circ?.feedsPanelId) setActivePanel(circ.feedsPanelId);
+                  else setEditing({ circuitId: node.id, focus: 'device' });
+                } else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
                 else if (node.type === 'source') {
                   setEditingSource((node.data as { kind: SourceKind }).kind);
                 }

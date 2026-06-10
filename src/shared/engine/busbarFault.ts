@@ -90,6 +90,19 @@ const TOLERANCE_KA = 1e-6;
 const CLAUSE = 'IEC 61439-1 §9.3 & Table 7; IEC 60909-0';
 
 /**
+ * Minimum copper bar cross-section (mm²) whose thermal short-time withstand Icw
+ * covers `faultKa` for `durationS`. Inverts the adiabatic Icw law
+ *   icwKa = (density · csa / 1000) / √t  ≥  faultKa
+ * so the bus sizer can floor the bar at the section the fault demands instead of
+ * only flagging an inadequate bar after the fact.
+ */
+export function minCsaForWithstand(faultKa: number, durationS = 1): number {
+  if (faultKa <= 0) return 0;
+  const t = durationS > 0 ? durationS : 1;
+  return (faultKa * 1000 * Math.sqrt(t)) / BUSBAR_SHORT_TIME_DENSITY_A_PER_MM2;
+}
+
+/**
  * Check the short-circuit withstand of a copper busbar.
  *
  * The thermal rating uses the adiabatic 1-second copper current density:

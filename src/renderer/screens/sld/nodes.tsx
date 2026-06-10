@@ -8,6 +8,7 @@ import {
   IconCpu,
   IconInfoCircle,
   IconPlugConnected,
+  IconSitemap,
   IconSolarPanel,
 } from '@tabler/icons-react';
 import type { WarningSeverity } from '@shared/types';
@@ -133,6 +134,11 @@ export interface BranchNodeData {
   onDropOverride?: (kind: 'breaker' | 'cable', value: number) => void;
   /** Per-circuit issues (voltage drop, breaking capacity, Zs, selectivity, …). */
   issues?: NodeIssue[];
+  /**
+   * Set when this way is a feeder to a sub-panel: the MCB on this node is what
+   * feeds `childName`. Double-clicking the node drills into that sub-panel.
+   */
+  feeder?: { childName: string; childIncomerA?: string };
   [key: string]: unknown;
 }
 
@@ -272,8 +278,10 @@ export function BranchNode({ data }: NodeProps) {
             ? 'var(--mantine-color-teal-5)'
             : overridden
               ? 'var(--mantine-color-violet-5)'
-              : undefined,
-        borderWidth: changed || overridden ? 2 : undefined,
+              : d.feeder
+                ? 'var(--mantine-color-indigo-4)'
+                : undefined,
+        borderWidth: changed || overridden || d.feeder ? 2 : undefined,
       }}
     >
       <Handle type="target" position={Position.Top} />
@@ -316,6 +324,19 @@ export function BranchNode({ data }: NodeProps) {
           </Text>
         )}
       </Group>
+      {d.feeder && (
+        <Group gap={4} mt={4} wrap="nowrap" align="center">
+          <IconSitemap size={12} color="var(--mantine-color-teal-6)" style={{ flexShrink: 0 }} />
+          <Text size="xs" c="teal.7" fw={600} lineClamp={1} style={{ minWidth: 0 }} title={`Feeds ${d.feeder.childName} — double-click to open`}>
+            {d.feeder.childName}
+          </Text>
+          {d.feeder.childIncomerA && (
+            <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+              {d.feeder.childIncomerA}
+            </Text>
+          )}
+        </Group>
+      )}
       {d.starter && (
         <Group gap={4} mt={4}>
           <IconCpu size={12} color="var(--mantine-color-grape-5)" />

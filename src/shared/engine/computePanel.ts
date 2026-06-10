@@ -17,7 +17,7 @@ import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
 import { sizeBusbar, splitBusbarSections } from './busbar';
-import { checkBusbarWithstand } from './busbarFault';
+import { checkBusbarWithstand, minCsaForWithstand } from './busbarFault';
 import { verifyEnclosureThermal } from './enclosureThermal';
 import { sizeCable } from './cableSizing';
 import { balancePhases, circuitIsThreePhase } from './phase';
@@ -363,8 +363,15 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     });
   }
 
+  // Prospective fault at this bus (kA), known when the supply chain provides it.
+  const faultKa = opts.faultLevelA !== undefined ? round(opts.faultLevelA / 1000, 1) : undefined;
+  // Floor the bar cross-section at what the fault's short-circuit withstand (Icw)
+  // demands, so the bus auto-grows to survive the fault rather than only being
+  // flagged inadequate after sizing for the load.
+  const busWithstandCsa = faultKa !== undefined ? minCsaForWithstand(faultKa) : 0;
+
   // Main bus rated for the incoming device (IEC 61439-1), not just the demand.
-  const busbar = sizeBusbar(totalDemandCurrentA, incomerBreaker.ratingA);
+  const busbar = sizeBusbar(totalDemandCurrentA, incomerBreaker.ratingA, busWithstandCsa);
   // Split the panel bus into capacity-bounded sections (max ways / max current),
   // so a panel with many ways gets several busbar lines instead of one giant bar.
   // Each section is sized for the worst-phase current of the ways it carries; the
@@ -385,6 +392,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
       maxWays: MAX_WAYS_PER_BUSBAR,
       maxSectionCurrentA: MAX_BUSBAR_SECTION_CURRENT_A,
       system: panel.system,
+      minCsaMm2: busWithstandCsa,
     },
   );
 
@@ -392,8 +400,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   // just carry the continuous load (when the fault level is known). A section bar
   // is sized for its own (smaller) load, so it can fail withstand even when the
   // main bus passes — warn per inadequate section.
-  if (opts.faultLevelA !== undefined) {
-    const faultKa = round(opts.faultLevelA / 1000, 1);
+  if (faultKa !== undefined) {
     let incomerKa = checkBreakerKa(incomerBreaker, faultKa);
     // An MCB-class incomer tops out at ~10 kA Icu; at a stiffer origin the
     // incoming device must be an MCCB frame of the same rating.
@@ -426,7 +433,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
         warnings.push({
           code: 'busbar-withstand-inadequate',
           severity: 'error',
-          message: `${where}: busbar ${section.busbar.csaMm2} mm² short-circuit withstand Icw ${section.busbar.withstand.icwKa} kA is below the ${section.busbar.withstand.faultKa} kA prospective fault — increase the bar section, brace it, or use parallel bars.`,
+          message: `${where}: even the largest standard bar (${section.busbar.csaMm2} mm², Icw ${section.busbar.withstand.icwKa} kA) is below the ${section.busbar.withstand.faultKa} kA prospective fault — use parallel bars, brace the run, or add upstream current limiting.`,
           panelId: panel.id,
         });
       }

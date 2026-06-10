@@ -46,6 +46,7 @@ import type { CostResult, ProjectInput, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
 import { NODE_TYPES, type PanelNodeData } from '@renderer/screens/sld/nodes';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
+import { BuildingSingleLine } from '@renderer/screens/sld/BuildingSingleLine';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
 import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
@@ -436,8 +437,11 @@ export function SystemView() {
       )}
 
       <Card withBorder radius="md" padding="xs">
-        <Tabs defaultValue="building">
+        <Tabs defaultValue="single-line">
           <Tabs.List>
+            <Tabs.Tab value="single-line" leftSection={<IconSitemap size={14} />}>
+              {t('system.tabSingleLine')}
+            </Tabs.Tab>
             <Tabs.Tab value="building" leftSection={<IconSitemap size={14} />}>
               {t('system.tabBuilding')}
             </Tabs.Tab>
@@ -445,6 +449,15 @@ export function SystemView() {
               {t('system.tabPower')}
             </Tabs.Tab>
           </Tabs.List>
+
+          <Tabs.Panel value="single-line" pt="xs">
+            <Group justify="flex-end" px="xs" pb={4}>
+              <Text size="xs" c="dimmed">
+                {t('system.singleLineHint')}
+              </Text>
+            </Group>
+            <BuildingSingleLine system={system} />
+          </Tabs.Panel>
 
           <Tabs.Panel value="building" pt="xs">
             <Group justify="flex-end" px="xs" pb={4}>

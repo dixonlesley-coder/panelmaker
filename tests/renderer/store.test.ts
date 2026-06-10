@@ -238,6 +238,7 @@ describe('projectStore', () => {
     const parentId = useProjectStore.getState().project.panels[0]!.id;
     const startPanels = useProjectStore.getState().project.panels.length;
     const startCircuits = useProjectStore.getState().project.panels[0]!.circuits.length;
+    const activeBefore = useProjectStore.getState().activePanelId;
 
     useProjectStore.getState().addSubPanel(parentId);
 
@@ -251,8 +252,10 @@ describe('projectStore', () => {
     expect(feeder.feedsPanelId).toBe(child.id);
     expect(child.fedByCircuitId).toBe(feeder.id);
     expect(child.sourceType).toBe('feeder');
-    // The child becomes the active panel; one undo reverts both edits.
-    expect(useProjectStore.getState().activePanelId).toBe(child.id);
+    // The view STAYS on the current panel — the sub-panel is added in place (its
+    // feeder way appears in the parent's single-line), not opened. One undo
+    // reverts both edits.
+    expect(useProjectStore.getState().activePanelId).toBe(activeBefore);
     useProjectStore.getState().undo();
     expect(useProjectStore.getState().project.panels.length).toBe(startPanels);
     expect(useProjectStore.getState().project.panels.find((p) => p.id === parentId)!.circuits.length).toBe(
@@ -436,6 +439,22 @@ describe('projectStore', () => {
       const canUndoBefore = selectCanUndo(useProjectStore.getState());
       useProjectStore.getState().reorderCircuits(panelId, sameOrder);
       expect(selectCanUndo(useProjectStore.getState())).toBe(canUndoBefore);
+    });
+
+    it('setPhaseAssignments pins the listed circuits to their lines (undoable)', () => {
+      const panel = useProjectStore
+        .getState()
+        .project.panels.find((p) => p.circuits.length >= 2)!;
+      const [a, b] = panel.circuits;
+      useProjectStore.getState().setPhaseAssignments(panel.id, { [a!.id]: 'L2', [b!.id]: 'L3' });
+
+      const after = useProjectStore.getState().project.panels.find((p) => p.id === panel.id)!;
+      expect(after.circuits.find((c) => c.id === a!.id)!.phaseOverride).toBe('L2');
+      expect(after.circuits.find((c) => c.id === b!.id)!.phaseOverride).toBe('L3');
+
+      useProjectStore.getState().undo();
+      const reverted = useProjectStore.getState().project.panels.find((p) => p.id === panel.id)!;
+      expect(reverted.circuits.find((c) => c.id === a!.id)!.phaseOverride).toBe(a!.phaseOverride);
     });
 
     it('copyCircuit + pasteCircuit clones into any panel with a fresh id', () => {

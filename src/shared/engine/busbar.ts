@@ -10,10 +10,14 @@ import { round } from './util';
  * `minAmpacityA` floors the bar's rating independently of the carried current —
  * IEC 61439-1 requires the main bus to be rated for the incoming device's rated
  * current (In), not just today's demand, so the incomer can't cook the bar.
+ *
+ * `minCsaMm2` floors the bar's cross-section so it also meets the short-circuit
+ * withstand (Icw) the prospective fault demands — the bus grows to survive the
+ * fault instead of merely being flagged inadequate.
  */
-export function sizeBusbar(totalCurrentA: number, minAmpacityA = 0): BusbarResult {
+export function sizeBusbar(totalCurrentA: number, minAmpacityA = 0, minCsaMm2 = 0): BusbarResult {
   const requiredA = Math.max(totalCurrentA, minAmpacityA);
-  const match = COPPER_BUSBAR_TABLE.find((b) => b.ampacityA >= requiredA);
+  const match = COPPER_BUSBAR_TABLE.find((b) => b.ampacityA >= requiredA && b.csaMm2 >= minCsaMm2);
   if (match) {
     return {
       widthMm: match.widthMm,
@@ -23,7 +27,7 @@ export function sizeBusbar(totalCurrentA: number, minAmpacityA = 0): BusbarResul
       totalCurrentA: round(totalCurrentA, 1),
     };
   }
-  const csa = Math.ceil(requiredA / COPPER_CURRENT_DENSITY_A_PER_MM2);
+  const csa = Math.max(Math.ceil(requiredA / COPPER_CURRENT_DENSITY_A_PER_MM2), Math.ceil(minCsaMm2));
   return {
     widthMm: 0,
     thicknessMm: 0,
@@ -53,6 +57,8 @@ export interface SplitBusbarOptions {
   maxSectionCurrentA: number;
   /** Panel system — single-phase loads sum on one line; 3-phase use the worst phase. */
   system: SystemType;
+  /** Cross-section floor so each section bar meets the short-circuit withstand. */
+  minCsaMm2?: number;
 }
 
 /** Worst-loaded phase's line current for a group of ways (A). */
@@ -111,7 +117,7 @@ export function splitBusbarSections(
       circuitIds: group.map((w) => w.id),
       ways: group.length,
       sectionCurrentA: currentA,
-      busbar: sizeBusbar(currentA),
+      busbar: sizeBusbar(currentA, 0, opts.minCsaMm2 ?? 0),
       manualBreak: groupManual,
     });
     group = [];

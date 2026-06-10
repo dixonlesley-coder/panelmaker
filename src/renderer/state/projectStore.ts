@@ -121,6 +121,12 @@ export interface ProjectState {
    * relative order at the end; unknown ids are ignored. One undoable step.
    */
   reorderCircuits: (panelId: string, orderedIds: string[]) => void;
+  /**
+   * Pin each listed single-phase circuit to a line (L1/L2/L3) — the result of a
+   * one-click phase auto-balance. Circuits absent from the map are left as-is.
+   * One undoable step.
+   */
+  setPhaseAssignments: (panelId: string, assignment: Record<string, 'L1' | 'L2' | 'L3'>) => void;
   /** Append a fully-configured circuit (fresh id) to a panel — used by the wizard. */
   addCircuitConfigured: (panelId: string, circuit: Omit<CircuitInput, 'id'>) => void;
 
@@ -454,6 +460,19 @@ export const useProjectStore = create<ProjectState>((set) => ({
       );
     }),
 
+  setPhaseAssignments: (panelId, assignment) =>
+    set((s) => {
+      if (Object.keys(assignment).length === 0) return s;
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          circuits: panel.circuits.map((c) =>
+            assignment[c.id] ? { ...c, phaseOverride: assignment[c.id] } : c,
+          ),
+        })),
+      );
+    }),
+
   copyCircuit: (panelId, circuitId) =>
     set((s) => {
       const panel = s.project.panels.find((p) => p.id === panelId);
@@ -576,18 +595,19 @@ export const useProjectStore = create<ProjectState>((set) => ({
         demandFactor: 1,
         feedsPanelId: childId,
       };
-      return {
-        ...withHistory(s, (project) => ({
-          ...project,
-          panels: [
-            ...project.panels.map((p) =>
-              p.id === parentPanelId ? { ...p, circuits: [...p.circuits, feeder] } : p,
-            ),
-            child,
-          ],
-        })),
-        activePanelId: childId,
-      };
+      // Stay on the parent: the new feeder way appears in the parent's own
+      // single-line (the MCB that feeds the sub-panel), so the user sees the
+      // connection in place instead of being thrown into the empty child build.
+      // Drill into the child by double-clicking its feeder way.
+      return withHistory(s, (project) => ({
+        ...project,
+        panels: [
+          ...project.panels.map((p) =>
+            p.id === parentPanelId ? { ...p, circuits: [...p.circuits, feeder] } : p,
+          ),
+          child,
+        ],
+      }));
     }),
 
   connectPanelAsFeeder: (parentPanelId, childPanelId) =>
