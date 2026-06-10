@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeDb } from '../../src/main/db/connection';
+import { closeDb, getConnection } from '../../src/main/db/connection';
 import { migrate } from '../../src/main/db/migrate';
 import {
   saveProject,
@@ -160,6 +160,42 @@ describe('SQLite persistence', () => {
     deleteSchematic(starDelta.id);
     expect(loadSchematic(starDelta.id)).toBeNull();
 
+    deleteProject(project.id);
+  });
+
+  it('re-adds columns that an older database is missing (legacy upgrade)', () => {
+    // A fresh bootstrap creates the full panels table.
+    migrate();
+    const { sqlite } = getConnection();
+    const panelCols = () =>
+      (sqlite.prepare('PRAGMA table_info(panels)').all() as { name: string }[]).map((r) => r.name);
+
+    // Simulate a database first created by an EARLIER build, before these
+    // columns existed. On a real upgrade `CREATE TABLE IF NOT EXISTS` leaves the
+    // existing table untouched, so the columns stay missing — drop them to
+    // reproduce that exact starting state.
+    sqlite.exec('ALTER TABLE panels DROP COLUMN insulation');
+    sqlite.exec('ALTER TABLE panels DROP COLUMN material');
+    expect(panelCols()).not.toContain('insulation');
+    expect(panelCols()).not.toContain('material');
+
+    // Regression: the column back-fill used to be dead code (defined, never
+    // called), so migrate() left those columns missing and projects:load failed
+    // with `no such column: "insulation"`. migrate() must now add them back.
+    migrate();
+    expect(panelCols()).toContain('insulation');
+    expect(panelCols()).toContain('material');
+
+    // …and a project carrying those fields round-trips through the repo again.
+    const project = createSampleProject();
+    const lp = project.panels.find((p) => p.name.includes('LP-DB'))!;
+    lp.insulation = 'XLPE';
+    lp.material = 'Al';
+    saveProject(project);
+    const loaded = loadProject(project.id);
+    const loadedLp = loaded!.panels.find((p) => p.name.includes('LP-DB'))!;
+    expect(loadedLp.insulation).toBe('XLPE');
+    expect(loadedLp.material).toBe('Al');
     deleteProject(project.id);
   });
 });
