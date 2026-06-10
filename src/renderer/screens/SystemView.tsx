@@ -368,6 +368,38 @@ export function SystemView() {
         <Text size="xs" c="dimmed">
           {sup.note}
         </Text>
+        {system.metering && (
+          <>
+            <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="sm" mb="xs">
+              <KeyStat
+                k={t('system.plnService')}
+                v={
+                  system.metering.mvService
+                    ? t('system.plnServiceMv')
+                    : `${(system.metering.serviceVa / 1000).toLocaleString('en-US')} kVA`
+                }
+              />
+              <KeyStat k={t('system.serviceCurrent')} v={formatAmps(system.metering.serviceCurrentA)} />
+              <KeyStat
+                k={t('system.metering')}
+                v={
+                  system.metering.metering === 'direct'
+                    ? t('system.meteringDirect')
+                    : t('system.meteringCt')
+                }
+              />
+              {system.metering.ctRatio && (
+                <KeyStat
+                  k={t('system.ct')}
+                  v={`${system.metering.ctRatio} · ${system.metering.ctClass}`}
+                />
+              )}
+            </SimpleGrid>
+            <Text size="xs" c="dimmed">
+              {system.metering.note}
+            </Text>
+          </>
+        )}
       </Card>
 
       <FaultLevelsCard system={system} />

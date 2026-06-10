@@ -4,7 +4,14 @@
  * these shapes; the engine never imports DB or DOM code.
  */
 
-import type { SystemType, LoadKind, InstallMethod, EarthingSystem, OccupancyType } from './electrical';
+import type {
+  SystemType,
+  LoadKind,
+  InstallMethod,
+  Insulation,
+  EarthingSystem,
+  OccupancyType,
+} from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { LightFixture, SocketOutlet, SwitchGroup } from './fixtures';
 import type { SourcesConfig } from './sources';
@@ -66,6 +73,20 @@ export interface CircuitInput {
    */
   busbarBreakBefore?: boolean;
 
+  /**
+   * Pin a single-phase circuit to a specific line. Auto-balancing re-shuffles
+   * phases as loads change; an as-built schedule needs stable, locked phases.
+   * Ignored for three-phase circuits.
+   */
+  phaseOverride?: 'L1' | 'L2' | 'L3';
+
+  /**
+   * Per-circuit grouping count override (cables bunched on THIS route),
+   * replacing the panel-wide `groupingCount` in the derating product — grouping
+   * is a property of the containment route, not of the board.
+   */
+  groupingCountOverride?: number;
+
   /** Daily operating window; absent = continuous (24 h). Drives the load profile. */
   schedule?: LoadSchedule;
 
@@ -87,6 +108,12 @@ export interface PanelInput {
   voltageV: number;
   ambientTempC: number;
   installMethod: InstallMethod;
+  /**
+   * Cable insulation family for this panel's circuits: PVC (NYM/NYY, 70 °C) or
+   * XLPE (N2XY, 90 °C). Default PVC. Drives ampacity, ambient derating and the
+   * PE adiabatic constant.
+   */
+  insulation?: Insulation;
   groupingCount: number;
   /** Diversity factor applied to the aggregated load when feeding upstream. */
   diversityFactor: number;
@@ -159,6 +186,11 @@ export interface ProjectMeta {
   revisions?: ProjectRevision[];
   /** Commercial quotation settings (labor rate + mark-ups). */
   quotation?: QuotationSettings;
+  /**
+   * Power-factor correction target (0-1). Default 0.95 — comfortably above the
+   * 0.85 PLN penalty threshold. The capacitor bank is sized to reach this.
+   */
+  targetPf?: number;
 }
 
 /**
@@ -173,6 +205,11 @@ export interface SiteConditions {
   overheadSupply?: boolean;
   /** Measured/assumed soil resistivity (Ω·m) for earth-electrode sizing. */
   soilResistivityOhmM?: number;
+  /**
+   * Soil THERMAL resistivity (K·m/W) for buried-cable derating (IEC reference
+   * 2.5). Distinct from the electrical resistivity above.
+   */
+  soilThermalResistivityKmW?: number;
 }
 
 export interface ProjectInput {

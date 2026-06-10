@@ -18,8 +18,9 @@ import {
 import {
   CURVE_TRIP_MULTIPLE,
   DEFAULT_LV_UTILITY_FAULT_KA,
+  GENSET_SUSTAINED_FAULT_MULTIPLE,
   NOMINAL_PHASE_VOLTAGE_V,
-  PE_ADIABATIC_K,
+  PE_ADIABATIC_K_BY_INSULATION,
   PE_FAULT_CLEAR_TIME_S,
   SOURCE_XR_RATIO,
   ZS_FAULT_TEMP_FACTOR,
@@ -27,7 +28,7 @@ import {
   breakerKa,
 } from '../standards/fault';
 import type { BreakerCurve } from '../standards/protection';
-import type { EarthingSystem } from '../types/electrical';
+import type { EarthingSystem, Insulation } from '../types/electrical';
 import type { BreakerResult, SupplyResult } from '../types/results';
 import { round } from './util';
 
@@ -69,6 +70,19 @@ export function sourceImpedanceFromIsc(iscA: number, lineVoltageV: number): Impe
   // X/R = k ⇒ R = |Z| / √(1+k²), X = k·R, and √(R²+X²) = |Z|.
   const rOhm = z / Math.sqrt(1 + SOURCE_XR_RATIO * SOURCE_XR_RATIO);
   return { rOhm, xOhm: SOURCE_XR_RATIO * rOhm };
+}
+
+/**
+ * Sustained short-circuit current a standby generator can drive into the main
+ * bus (A): ~3× its rated FLC (AVR-forced). This is the ALTERNATE-source fault
+ * level — far below the utility's — and the worst case for automatic
+ * disconnection: loops verified against the stiff mains may never reach the
+ * breaker's magnetic threshold when running on the genset.
+ */
+export function generatorFaultA(ratingKva: number, lineVoltageV: number): number {
+  if (ratingKva <= 0 || lineVoltageV <= 0) return 0;
+  const flcA = (ratingKva * 1000) / (Math.sqrt(3) * lineVoltageV);
+  return GENSET_SUSTAINED_FAULT_MULTIPLE * flcA;
 }
 
 /**
@@ -139,6 +153,10 @@ export interface ZsInput {
   lengthM: number;
   curve: BreakerCurve;
   breakerRatingA: number;
+  /** Equal parallel runs per phase (each with its own PE) — divides the loop Z. */
+  runsPerPhase?: number;
+  /** Insulation family — picks the PE adiabatic k (PVC 115 / XLPE 143). */
+  insulation?: Insulation;
 }
 
 /**
@@ -151,11 +169,13 @@ export interface ZsInput {
  */
 export function checkZs(i: ZsInput): ZsCheck {
   // Evaluate the loop conductor R at the fault temperature (conservative for ADS):
-  // a higher Zs is the unfavourable case for guaranteed disconnection.
+  // a higher Zs is the unfavourable case for guaranteed disconnection. Equal
+  // parallel runs (each with its own PE) divide the conductor impedance.
+  const runs = i.runsPerPhase !== undefined && i.runsPerPhase > 1 ? i.runsPerPhase : 1;
   const phaseZ0 = conductorImpedance(i.phaseCsaMm2, i.lengthM);
   const peZ0 = conductorImpedance(i.peCsaMm2, i.lengthM);
-  const phaseZ = { rOhm: phaseZ0.rOhm * ZS_FAULT_TEMP_FACTOR, xOhm: phaseZ0.xOhm };
-  const peZ = { rOhm: peZ0.rOhm * ZS_FAULT_TEMP_FACTOR, xOhm: peZ0.xOhm };
+  const phaseZ = { rOhm: (phaseZ0.rOhm * ZS_FAULT_TEMP_FACTOR) / runs, xOhm: phaseZ0.xOhm / runs };
+  const peZ = { rOhm: (peZ0.rOhm * ZS_FAULT_TEMP_FACTOR) / runs, xOhm: peZ0.xOhm / runs };
   const loop = addImpedance(addImpedance(i.sourceZ, phaseZ), peZ);
   const zsOhm = impedanceMagnitude(loop);
 
@@ -170,7 +190,10 @@ export function checkZs(i: ZsInput): ZsCheck {
   // §543.1.2). The earth-fault current is U0/Zs; on TT the loop fault current is
   // electrode-limited and cleared by the RCD, so the check is relaxed (as for ADS).
   const earthFaultA = zsOhm > 0 ? NOMINAL_PHASE_VOLTAGE_V / zsOhm : 0;
-  const peMinAdiabaticMm2 = (earthFaultA * Math.sqrt(PE_FAULT_CLEAR_TIME_S)) / PE_ADIABATIC_K;
+  // With parallel runs the fault current splits between the per-run PEs, so the
+  // adiabatic minimum applies to each run's share.
+  const k = PE_ADIABATIC_K_BY_INSULATION[i.insulation ?? 'PVC'];
+  const peMinAdiabaticMm2 = ((earthFaultA / runs) * Math.sqrt(PE_FAULT_CLEAR_TIME_S)) / k;
   const peAdiabaticOk =
     i.earthingSystem === 'TT' ? true : i.peCsaMm2 + 1e-9 >= peMinAdiabaticMm2;
 

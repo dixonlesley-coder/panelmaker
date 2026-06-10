@@ -1,13 +1,14 @@
 import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
+import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
 import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
 import type { CircuitInput, PanelInput } from '../types/project';
 import type { SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
-import { motorFLC } from './control/motorFLC';
+import { motorFLC, motorFLC1ph } from './control/motorFLC';
 import { circuitDemandFactor } from './occupancy';
 import { derivedPointsLoadW, finalCircuitWarnings, summarizeFinalCircuit } from './fixtures';
 import { sizeCableTray, sizeCircuitConduit } from './containment';
@@ -37,6 +38,8 @@ export interface ComputePanelOptions {
   faultLevelA?: number;
   /** Per-phase source impedance up to this panel's bus (ohm), for Zs. */
   sourceZ?: Impedance;
+  /** Site soil thermal resistivity (K·m/W) — derates buried runs. */
+  soilThermalResistivityKmW?: number;
 }
 
 /**
@@ -88,17 +91,21 @@ function computeCircuit(
     hasStarter: Boolean(c.starterType),
     isFeeder,
   });
-  const isMotor =
-    (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined && threePhase;
+  const motorLike = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
+  const isMotor = motorLike && threePhase;
 
   // Single-phase circuits on a three-phase panel run at the phase voltage (~230 V).
   const phaseVoltage = panel.system === '3ph' ? round(panel.voltageV / Math.sqrt(3), 0) : panel.voltageV;
   const circuitSystem: SystemType = threePhase ? '3ph' : '1ph';
   const useVoltage = threePhase ? panel.voltageV : phaseVoltage;
 
+  // Motor FLC from the standard tables — including 1-phase machines, whose
+  // efficiency makes the electrical input markedly larger than the shaft kW.
   const ib = isMotor
     ? motorFLC(c.motorKw!, panel.voltageV)
-    : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
+    : motorLike
+      ? motorFLC1ph(c.motorKw!, phaseVoltage)
+      : loadCurrent({ powerW: loadW, voltageV: useVoltage, cosPhi: c.cosPhi, system: circuitSystem });
   const designCurrentA = round(ib, 1);
 
   const breaker = selectBreaker({
@@ -109,11 +116,13 @@ function computeCircuit(
   const isTrunk = c.role === 'incomer' || isFeeder;
   const baseMinSection = isTrunk ? 4 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
+  const insulation = panel.insulation ?? 'PVC';
   const cable = sizeCable({
     designCurrentA: ib,
     breakerRatingA: breaker.ratingA,
     deratingFactor: df,
     minSectionMm2: minSection,
+    insulation,
     // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the
     // resulting `vd` below is then within limit by construction in normal cases,
     // and any residual over-limit is the genuinely-impossible (max-section) case.
@@ -127,8 +136,10 @@ function computeCircuit(
   });
   // Mark a manually pinned cable minimum so the UI can color it as an override.
   if (c.cableOverrideMm2 !== undefined) cable.overridden = true;
+  // Equal parallel runs share the current, so the drop is per-run I over per-run CSA.
+  const runsPerPhase = cable.runsPerPhase ?? 1;
   const vd = voltageDrop({
-    currentA: ib,
+    currentA: ib / runsPerPhase,
     lengthM: c.lengthM,
     csaMm2: cable.csaMm2,
     cosPhi: c.cosPhi,
@@ -146,6 +157,9 @@ function computeCircuit(
     panelSystem: panel.system,
     threePhase,
     hasNeutral,
+    runsPerPhase,
+    // XLPE multicore is N2XY; PVC keeps the NYY (3ph) / NYM (1ph) defaults.
+    ...(insulation === 'XLPE' ? { cableType: 'N2XY' as const } : {}),
   });
   const rcd = circuitRcd({
     earthingSystem: opts.earthingSystem ?? 'TN-C-S',
@@ -211,6 +225,8 @@ function computeCircuit(
       lengthM: c.lengthM,
       curve: breaker.curve,
       breakerRatingA: breaker.ratingA,
+      runsPerPhase,
+      insulation,
     });
     result.zsOhm = zs.zsOhm;
     result.zsMaxOhm = zs.zsMaxOhm;
@@ -256,17 +272,33 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     ambientC: panel.ambientTempC,
     groupingCount: panel.groupingCount,
     installMethod: panel.installMethod,
+    insulation: panel.insulation,
+    soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
   });
 
   const branches = panel.circuits.filter((c) => c.role === 'branch');
-  const comps = branches.map((c) => computeCircuit(c, panel, df, opts));
+  // Grouping is a property of the containment route — a circuit may override
+  // the panel-wide count, getting its own derating factor.
+  const dfFor = (c: CircuitInput): number =>
+    c.groupingCountOverride !== undefined
+      ? deratingFactor({
+          ambientC: panel.ambientTempC,
+          groupingCount: c.groupingCountOverride,
+          installMethod: panel.installMethod,
+          insulation: panel.insulation,
+          soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
+        })
+      : df;
+  const comps = branches.map((c) => computeCircuit(c, panel, dfFor(c), opts));
 
-  // distribute single-phase circuits across phases and report imbalance
+  // distribute single-phase circuits across phases and report imbalance —
+  // user-pinned phases are honored verbatim and excluded from balancing
   const balance = balancePhases(
-    comps.map((cm) => ({
+    comps.map((cm, idx) => ({
       id: cm.result.circuitId,
       threePhase: cm.threePhase,
       currentA: cm.result.designCurrentA,
+      pinned: branches[idx]?.phaseOverride,
     })),
     panel.system,
   );
@@ -305,7 +337,24 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     panel.system === '3ph' ? Math.max(balance.L1, balance.L2, balance.L3) : balance.L1,
     1,
   );
-  const busbar = sizeBusbar(totalDemandCurrentA);
+  // Incoming device: the main breaker, snapped to a standard rating ≥ demand,
+  // with poles per the system and a kA check at the bus (when fault is known).
+  const incomerBreaker = selectBreaker({ designCurrentA: totalDemandCurrentA, loadKind: 'feeder' });
+  const incomer: PanelResult['incomer'] = {
+    breaker: incomerBreaker,
+    poles: panel.system === '3ph' ? 4 : 2,
+  };
+  if (incomerBreaker.ratingA + 1e-9 < totalDemandCurrentA) {
+    warnings.push({
+      code: 'incomer-exceeds-range',
+      severity: 'error',
+      message: `${panel.name}: demand ${totalDemandCurrentA} A exceeds the largest standard breaker frame (${incomerBreaker.ratingA} A) — split the board or feed it at MV.`,
+      panelId: panel.id,
+    });
+  }
+
+  // Main bus rated for the incoming device (IEC 61439-1), not just the demand.
+  const busbar = sizeBusbar(totalDemandCurrentA, incomerBreaker.ratingA);
   // Split the panel bus into capacity-bounded sections (max ways / max current),
   // so a panel with many ways gets several busbar lines instead of one giant bar.
   // Each section is sized for the worst-phase current of the ways it carries; the
@@ -335,9 +384,32 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   // main bus passes — warn per inadequate section.
   if (opts.faultLevelA !== undefined) {
     const faultKa = round(opts.faultLevelA / 1000, 1);
-    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, faultKa);
+    let incomerKa = checkBreakerKa(incomerBreaker, faultKa);
+    // An MCB-class incomer tops out at ~10 kA Icu; at a stiffer origin the
+    // incoming device must be an MCCB frame of the same rating.
+    if (!incomerKa.adequate && incomerBreaker.deviceClass === 'MCB') {
+      incomer.breaker = { ...incomerBreaker, deviceClass: 'MCCB' };
+      incomerKa = checkBreakerKa(incomer.breaker, faultKa);
+    }
+    incomer.breakerKa = incomerKa.breakerKa;
+    incomer.kaAdequate = incomerKa.adequate;
+    if (!incomerKa.adequate) {
+      warnings.push({
+        code: 'incomer-ka-inadequate',
+        severity: 'error',
+        message: `${panel.name}: incomer ${incomerBreaker.ratingA} A breaking capacity ${incomerKa.breakerKa} kA is below the ${faultKa} kA prospective fault at the bus — specify a higher-Icu frame.`,
+        panelId: panel.id,
+      });
+    }
+    busbar.withstand = checkBusbarWithstand(busbar.csaMm2, faultKa, undefined, {
+      widthMm: busbar.widthMm,
+      thicknessMm: busbar.thicknessMm,
+    });
     for (const section of busbarSections) {
-      section.busbar.withstand = checkBusbarWithstand(section.busbar.csaMm2, faultKa);
+      section.busbar.withstand = checkBusbarWithstand(section.busbar.csaMm2, faultKa, undefined, {
+        widthMm: section.busbar.widthMm,
+        thicknessMm: section.busbar.thicknessMm,
+      });
       if (!section.busbar.withstand.adequate) {
         const where =
           busbarSections.length > 1 ? `${panel.name} busbar section ${section.index}` : panel.name;
@@ -384,7 +456,12 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   };
 
   // Cable tray for all outgoing cables, laid side-by-side in a single layer.
-  const cableTray = sizeCableTray(circuits.map((c) => c.containment?.cableOdMm ?? 0));
+  // Parallel runs occupy one tray slot per run.
+  const cableTray = sizeCableTray(
+    circuits.flatMap((c) =>
+      Array.from({ length: c.cable.runsPerPhase ?? 1 }, () => c.containment?.cableOdMm ?? 0),
+    ),
+  );
 
   // Harmonics / power-quality estimate from the non-linear (VFD/soft-starter/
   // UPS/rectifier) load share. branches and comps are aligned by construction.
@@ -402,6 +479,20 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     largestNeutralCsaMm2,
   });
   if (harmonics) warnings.push(...harmonicsWarnings(harmonics, panel.id));
+  // APPLY the triplen-harmonic neutral oversize to the affected cable specs —
+  // a recommendation that never reaches the schedule doesn't get built.
+  if (harmonics && harmonics.neutralOversizeFactor > 1) {
+    for (const cm of comps) {
+      const g = cm.result.grounding;
+      if (g.neutralCsaMm2 <= 0) continue;
+      const targetN = cm.result.cable.csaMm2 * harmonics.neutralOversizeFactor;
+      const newN = STANDARD_SECTIONS_MM2.find((s) => s >= targetN) ?? STANDARD_SECTIONS_MM2[STANDARD_SECTIONS_MM2.length - 1]!;
+      if (newN > g.neutralCsaMm2) {
+        g.neutralCsaMm2 = newN;
+        g.cableSpec += ` · N ${newN} mm² (triplen)`;
+      }
+    }
+  }
 
   // Arc-flash incident-energy estimate at the bus (needs the prospective fault).
   // The clearing device is approximated by the panel's heaviest breaker class —
@@ -424,6 +515,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     name: panel.name,
     ...(panel.tag ? { tag: panel.tag } : {}),
     circuits,
+    incomer,
     busbar,
     busbarSections,
     enclosure,

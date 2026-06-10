@@ -84,6 +84,8 @@ export const panels = sqliteTable('panels', {
   ambientTempC: real('ambient_temp_c').notNull().default(30),
   /** InstallMethod. */
   installMethod: text('install_method').notNull().default('conduit'),
+  /** Insulation family: 'PVC' | 'XLPE' (null = PVC). */
+  insulation: text('insulation'),
   groupingCount: integer('grouping_count').notNull().default(1),
   activePricelistId: text('active_pricelist_id').references(() => pricelists.id, {
     onDelete: 'set null',
@@ -130,6 +132,10 @@ export const circuits = sqliteTable('circuits', {
   breakerOverrideA: real('breaker_override_a'),
   /** Force a new busbar section to start at this circuit (manual bus break). */
   busbarBreakBefore: integer('busbar_break_before', { mode: 'boolean' }),
+  /** Pin a 1-ph circuit to a line: 'L1' | 'L2' | 'L3' (null = auto-balance). */
+  phaseOverride: text('phase_override'),
+  /** Per-route grouping count override (null = panel-wide groupingCount). */
+  groupingOverride: integer('grouping_override'),
   // Daily operating window (absent = continuous) for the load profile.
   scheduleStartHour: integer('schedule_start_hour'),
   scheduleEndHour: integer('schedule_end_hour'),

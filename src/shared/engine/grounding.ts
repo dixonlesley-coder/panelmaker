@@ -21,12 +21,15 @@ export interface GroundingInput {
   hasNeutral?: boolean;
   cableType?: CableType;
   reducedNeutral?: boolean;
+  /** Equal parallel runs per phase; each run carries its own PE. */
+  runsPerPhase?: number;
 }
 
 /**
  * Size the protective-earth (PE) and neutral conductors and describe the cable
  * make-up: single-phase = L+N+PE; three-phase = 3L+N+PE (or 3L+PE without a
- * neutral, e.g. for motors).
+ * neutral, e.g. for motors). With parallel runs the make-up is per run, prefixed
+ * with the run count (each run carries its own PE/neutral core).
  */
 export function sizeGrounding(i: GroundingInput): GroundingResult {
   const pe = peConductorSize(i.phaseCsaMm2);
@@ -37,7 +40,9 @@ export function sizeGrounding(i: GroundingInput): GroundingResult {
   const cores = liveCores + (hasNeutral ? 1 : 0) + 1; // + PE
   const type = i.cableType ?? (i.threePhase ? 'NYY' : 'NYM');
 
-  const cableSpec = `${type} ${cores}×${i.phaseCsaMm2} mm² (+ ${pe} mm² PE)`;
+  const runs = i.runsPerPhase ?? 1;
+  const prefix = runs > 1 ? `${runs}× ` : '';
+  const cableSpec = `${prefix}${type} ${cores}×${i.phaseCsaMm2} mm² (+ ${pe} mm² PE)`;
 
   return { peCsaMm2: pe, neutralCsaMm2: neutral, cores, cableSpec };
 }

@@ -93,3 +93,17 @@ export function peakFactor(faultKa: number): number {
   const last = PEAK_FACTOR_TABLE[PEAK_FACTOR_TABLE.length - 1];
   return last ? last.n : 2.2;
 }
+
+/**
+ * Assumed centre-to-centre spacing between adjacent phase bars (mm) for the
+ * electromagnetic-force estimate — a common LV switchboard pitch. Closer bars
+ * see a larger force (F ∝ 1/d), so a tighter custom layout must be re-checked.
+ */
+export const BUSBAR_PHASE_SPACING_MM = 60;
+
+/**
+ * Permissible bending stress for hard-drawn copper bar under short-circuit
+ * forces (N/mm²) — a design value comfortably under Rp0.2 (~250 N/mm²), per
+ * common switchboard-builder practice and CDA publication 22 guidance.
+ */
+export const COPPER_BENDING_STRESS_N_MM2 = 120;

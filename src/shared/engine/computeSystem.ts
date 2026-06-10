@@ -8,13 +8,16 @@ import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
+import { computeMetering } from './metering';
 import { recommendSpd } from './spd';
 import {
   type Impedance,
   SELECTIVITY_RATIO,
   addImpedance,
+  checkZs,
   conductorImpedance,
   downstreamFaultA,
+  generatorFaultA,
   mainBusFaultA,
   nonSelective,
   sourceImpedanceFromIsc,
@@ -161,7 +164,9 @@ export function computeSystem(project: ProjectInput): SystemResult {
       const feeder = parent?.circuits.find((c) => c.feedsPanelId === id);
       const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
       if (feeder && feederResult) {
-        sourceZ = addImpedance(parentZ, conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM));
+        const feederRuns = feederResult.cable.runsPerPhase ?? 1;
+        const fz = conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM);
+        sourceZ = addImpedance(parentZ, { rOhm: fz.rOhm / feederRuns, xOhm: fz.xOhm / feederRuns });
         faultA = downstreamFaultA(panel.voltageV, sourceZ, parentFaultA);
       } else {
         sourceZ = parentZ;
@@ -176,6 +181,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
       earthingSystem,
       faultLevelA: faultA,
       sourceZ,
+      soilThermalResistivityKmW: project.site?.soilThermalResistivityKmW,
     });
     results[id] = pr;
     pr.warnings.forEach((w) => warnings.push(w));
@@ -224,6 +230,74 @@ export function computeSystem(project: ProjectInput): SystemResult {
     }
   }
 
+  // --- Alternate-source (generator) fault & ADS study. ---
+  // On genset supply the sustained fault collapses to ~3× generator FLC — the
+  // worst case for automatic disconnection: a loop verified against the stiff
+  // utility may never reach the breaker's magnetic threshold on the genset.
+  // Re-run the Zs check per TN circuit with the generator's source impedance and
+  // flag circuits that disconnect on mains but NOT on the generator.
+  let generatorFaultKa: number | undefined;
+  if (sources?.generator && earthingSystem !== 'TT') {
+    const genFaultA = generatorFaultA(sources.generator.ratingKva, lvVoltageV);
+    generatorFaultKa = round(genFaultA / 1000, 2);
+    const genRootZ = sourceImpedanceFromIsc(genFaultA, lvVoltageV);
+
+    // Source impedance per panel under generator supply (same feeder chain).
+    const panelGenZ = new Map<string, Impedance>();
+    for (const id of [...postOrder].reverse()) {
+      const parentId = parentOf.get(id);
+      let z = genRootZ;
+      if (parentId !== undefined) {
+        const parentZ = panelGenZ.get(parentId) ?? genRootZ;
+        const parent = byId.get(parentId);
+        const feeder = parent?.circuits.find((c) => c.feedsPanelId === id);
+        const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
+        if (feeder && feederResult) {
+          const feederRuns = feederResult.cable.runsPerPhase ?? 1;
+          const fz = conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM);
+          z = addImpedance(parentZ, { rOhm: fz.rOhm / feederRuns, xOhm: fz.xOhm / feederRuns });
+        } else {
+          z = parentZ;
+        }
+      }
+      panelGenZ.set(id, z);
+
+      const panel = byId.get(id);
+      const pr = results[id];
+      if (!panel || !pr) continue;
+      const genZ = panelGenZ.get(id)!;
+      for (const cr of pr.circuits) {
+        // Only re-check circuits that pass ADS on mains — a mains failure is
+        // already an error; this surfaces the genset-only regression.
+        if (cr.disconnectsInTime !== true) continue;
+        const input = panel.circuits.find((c) => c.id === cr.circuitId);
+        if (!input) continue;
+        const genZs = checkZs({
+          earthingSystem,
+          sourceZ: genZ,
+          phaseCsaMm2: cr.cable.csaMm2,
+          peCsaMm2: cr.grounding.peCsaMm2,
+          lengthM: input.lengthM,
+          curve: cr.breaker.curve,
+          breakerRatingA: cr.breaker.ratingA,
+          runsPerPhase: cr.cable.runsPerPhase ?? 1,
+          insulation: panel.insulation ?? 'PVC',
+        });
+        if (!genZs.disconnectsInTime) {
+          const w: Warning = {
+            code: 'ads-fails-on-generator',
+            severity: 'warning',
+            message: `${cr.name}: earth-fault disconnection is verified on mains but NOT on the ${sources.generator.ratingKva} kVA generator (Zs ${genZs.zsOhm} Ω > ${genZs.zsMaxOhm} Ω at the genset's ~${generatorFaultKa} kA sustained fault) — add an RCD to the circuit or lower the loop impedance.`,
+            panelId: id,
+            circuitId: cr.circuitId,
+          };
+          pr.warnings.push(w);
+          warnings.push(w);
+        }
+      }
+    }
+  }
+
   // Current-based selectivity between cascaded breakers (feeder vs sub-panel).
   const selectivity = selectivityReport(project, results, parentOf);
   for (const e of selectivity) {
@@ -263,7 +337,15 @@ export function computeSystem(project: ProjectInput): SystemResult {
     peConductorSize(mainCable.csaMm2),
     project.site?.soilResistivityOhmM,
   );
-  const powerFactor = computePowerFactor(project);
+  // PF correction sized to the project's target (meta override or 0.95). When
+  // any panel reports non-trivial harmonics, the bank must be detuned.
+  const harmonicRich = Object.values(results).some(
+    (pr) => pr.harmonics !== undefined && pr.harmonics.thdBand !== 'low',
+  );
+  const powerFactor = computePowerFactor(project, project.meta?.targetPf, harmonicRich);
+
+  // PLN service step + revenue metering at the origin (direct vs CT-operated).
+  const metering = computeMetering(totalDemandKva, lvVoltageV, roots[0]?.system ?? '3ph');
 
   // Surge-protection recommendation at the service origin (Type 1 under a
   // lightning/overhead exposure, else Type 2), keyed to the earthing system.
@@ -282,7 +364,9 @@ export function computeSystem(project: ProjectInput): SystemResult {
     earthing,
     powerFactor,
     spd,
+    metering,
     ...(sources ? { sources } : {}),
+    ...(generatorFaultKa !== undefined ? { generatorFaultKa } : {}),
     ...(selectivity.length > 0 ? { selectivity } : {}),
     totals: { connectedLoadW: Math.round(connectedLoadW), panelCount: panels.length },
     warnings,

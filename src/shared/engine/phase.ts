@@ -37,6 +37,8 @@ export interface PhaseCircuit {
   id: string;
   threePhase: boolean;
   currentA: number;
+  /** User-pinned line for a single-phase circuit — excluded from auto-balancing. */
+  pinned?: 'L1' | 'L2' | 'L3';
 }
 
 export interface PhaseBalance extends PhaseBalanceResult {
@@ -46,7 +48,9 @@ export interface PhaseBalance extends PhaseBalanceResult {
 /**
  * Distribute single-phase circuits across L1/L2/L3 (greedy least-loaded) while
  * three-phase circuits load all phases equally, then report per-phase line
- * current and the imbalance percentage.
+ * current and the imbalance percentage. User-pinned circuits keep their line —
+ * they are loaded first, and only the unpinned remainder is auto-balanced, so
+ * phase labels stay stable on an as-built schedule.
  */
 export function balancePhases(circuits: PhaseCircuit[], panelSystem: SystemType): PhaseBalance {
   const phases = { L1: 0, L2: 0, L3: 0 };
@@ -69,7 +73,16 @@ export function balancePhases(circuits: PhaseCircuit[], panelSystem: SystemType)
     }
   }
 
-  const singles = circuits.filter((c) => !c.threePhase).sort((a, b) => b.currentA - a.currentA);
+  // Pinned single-phase circuits load their line first, verbatim.
+  for (const c of circuits) {
+    if (c.threePhase || !c.pinned) continue;
+    phases[c.pinned] += c.currentA;
+    assignment[c.id] = c.pinned;
+  }
+
+  const singles = circuits
+    .filter((c) => !c.threePhase && !c.pinned)
+    .sort((a, b) => b.currentA - a.currentA);
   const keys = ['L1', 'L2', 'L3'] as const;
   for (const c of singles) {
     const min = keys.reduce((m, p) => (phases[p] < phases[m] ? p : m), 'L1' as 'L1' | 'L2' | 'L3');

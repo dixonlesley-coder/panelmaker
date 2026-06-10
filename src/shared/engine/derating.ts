@@ -1,14 +1,17 @@
 import {
   AMBIENT_TEMP_FACTORS,
+  AMBIENT_TEMP_FACTORS_XLPE,
   GROUPING_FACTORS,
   INSTALL_METHOD_FACTORS,
+  SOIL_THERMAL_RESISTIVITY_FACTORS,
 } from '../standards/conductors';
-import type { InstallMethod } from '../types/electrical';
+import type { InstallMethod, Insulation } from '../types/electrical';
 import { interpolateTable } from './util';
 
-/** Ambient temperature correction factor (interpolated). */
-export function ambientFactor(tempC: number): number {
-  return interpolateTable(AMBIENT_TEMP_FACTORS, tempC);
+/** Ambient temperature correction factor (interpolated), per insulation family. */
+export function ambientFactor(tempC: number, insulation: Insulation = 'PVC'): number {
+  const table = insulation === 'XLPE' ? AMBIENT_TEMP_FACTORS_XLPE : AMBIENT_TEMP_FACTORS;
+  return interpolateTable(table, tempC);
 }
 
 /** Grouping (bunching) correction factor for `count` grouped circuits. */
@@ -27,13 +30,40 @@ export function methodFactor(method: InstallMethod): number {
   return INSTALL_METHOD_FACTORS[method] ?? 1;
 }
 
+/**
+ * Soil thermal-resistivity correction — applies to BURIED runs only (IEC
+ * 60364-5-52 B.52.16). Other methods dissipate to air, so the soil is irrelevant.
+ */
+export function soilThermalFactor(
+  method: InstallMethod,
+  soilThermalResistivityKmW: number | undefined,
+): number {
+  if (method !== 'buried' || soilThermalResistivityKmW === undefined) return 1;
+  return interpolateTable(SOIL_THERMAL_RESISTIVITY_FACTORS, soilThermalResistivityKmW);
+}
+
 export interface DeratingInput {
   ambientC: number;
   groupingCount: number;
   installMethod: InstallMethod;
+  /** Insulation family — XLPE derates more gently with ambient. */
+  insulation?: Insulation;
+  /** Site soil thermal resistivity (K·m/W); only affects buried runs. */
+  soilThermalResistivityKmW?: number;
 }
 
-/** Combined derating factor = ambient x grouping x method. */
-export function deratingFactor({ ambientC, groupingCount, installMethod }: DeratingInput): number {
-  return ambientFactor(ambientC) * groupingFactor(groupingCount) * methodFactor(installMethod);
+/** Combined derating factor = ambient x grouping x method x soil (buried). */
+export function deratingFactor({
+  ambientC,
+  groupingCount,
+  installMethod,
+  insulation,
+  soilThermalResistivityKmW,
+}: DeratingInput): number {
+  return (
+    ambientFactor(ambientC, insulation ?? 'PVC') *
+    groupingFactor(groupingCount) *
+    methodFactor(installMethod) *
+    soilThermalFactor(installMethod, soilThermalResistivityKmW)
+  );
 }

@@ -310,6 +310,16 @@ export function Settings() {
               typeof v === 'number' && updatePanel(panel.id, { diversityFactor: v })
             }
           />
+          <NumberInput
+            label={t('settings.targetPf')}
+            description={t('settings.targetPfHint')}
+            min={0.85}
+            max={0.99}
+            step={0.01}
+            decimalScale={2}
+            value={meta.targetPf ?? 0.95}
+            onChange={(v) => typeof v === 'number' && setProjectMeta({ targetPf: v })}
+          />
         </SimpleGrid>
       </Card>
 
@@ -370,6 +380,20 @@ export function Settings() {
             allowDeselect={false}
             onChange={(v) => v && setSiteConditions({ soilResistivityOhmM: Number(v) })}
             maw={320}
+          />
+          <NumberInput
+            label={t('settings.soilThermal')}
+            description={t('settings.soilThermalHint')}
+            value={project.site?.soilThermalResistivityKmW ?? 2.5}
+            min={0.5}
+            max={4}
+            step={0.5}
+            decimalScale={1}
+            suffix=" K·m/W"
+            onChange={(v) =>
+              typeof v === 'number' && setSiteConditions({ soilThermalResistivityKmW: v })
+            }
+            maw={220}
           />
         </Group>
 

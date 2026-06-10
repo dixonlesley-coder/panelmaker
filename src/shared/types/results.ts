@@ -9,6 +9,7 @@ import type { SourcesResult } from './sources';
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
 import type { SpdResult } from '../engine/spd';
 import type { ElectrodeResult } from '../engine/electrode';
+import type { MeteringResult } from '../engine/metering';
 import type { BusbarWithstandResult } from '../engine/busbarFault';
 import type { EnclosureThermalResult } from '../engine/enclosureThermal';
 import type { FinalCircuitResult } from '../engine/fixtures';
@@ -76,10 +77,19 @@ export interface BreakerResult {
 }
 
 export interface CableResult {
+  /** Conductor section per run (mm²). With parallel runs this is the PER-RUN size. */
   csaMm2: number;
+  /** Base ampacity per run (A). */
   baseKhaA: number;
+  /** TOTAL derated ampacity of the circuit — per-run Iz × runsPerPhase (A). */
   deratedIzA: number;
   deratingFactor: number;
+  /**
+   * Parallel runs per phase (IEC 60364-5-52 §523.7, equal length/route). Absent
+   * or 1 = a single cable. Large feeders beyond one practical conductor are
+   * built as 2-4 equal parallel runs instead of erroring out.
+   */
+  runsPerPhase?: number;
   appliedRule: string;
   /**
    * True when the section was increased beyond the ampacity minimum to keep the
@@ -189,6 +199,22 @@ export interface BusbarSectionResult {
   busbar: BusbarResult;
   /** True when this section starts at a user-forced (manual) busbar break. */
   manualBreak: boolean;
+}
+
+/**
+ * The panel's incoming device: the main breaker the demand current is fed
+ * through, snapped to a standard rating ≥ the demand, with its pole count and a
+ * breaking-capacity check at the bus. A deliverable panel schedule must specify
+ * this device — the raw demand current alone is not an orderable part.
+ */
+export interface IncomerResult {
+  breaker: BreakerResult;
+  /** Pole count: 4P (3L+N) on a 3-phase panel, 2P (L+N) on single-phase. */
+  poles: number;
+  /** Specified breaking capacity (kA, Icu), when the bus fault level is known. */
+  breakerKa?: number;
+  /** True when the device's Icu covers the prospective fault at the bus. */
+  kaAdequate?: boolean;
 }
 
 /** Future-expansion headroom on a panel's busbar and ways. */
@@ -349,6 +375,8 @@ export interface PanelResult {
   /** Short panel designation / tag (e.g. "LP-1"), when set on the input. */
   tag?: string;
   circuits: CircuitResult[];
+  /** The panel's incoming device (main breaker), specified to a standard rating. */
+  incomer: IncomerResult;
   busbar: BusbarResult;
   /**
    * The panel bus split into capacity-bounded sections (always ≥ 1). With few
@@ -403,6 +431,8 @@ export interface CapacitorBankResult {
   bankKvar: number;
   steps: number;
   stepKvar: number;
+  /** True when the bank should be DETUNED (≈7% reactors) — harmonic-rich bus. */
+  detunedRecommended?: boolean;
   note: string;
 }
 
@@ -449,8 +479,16 @@ export interface SystemResult {
   powerFactor: CapacitorBankResult;
   /** Surge-protection (SPD) recommendation at the service origin. */
   spd?: SpdResult;
+  /** PLN service step + revenue metering (direct / CT) at the origin. */
+  metering?: MeteringResult;
   /** Distributed energy sources sizing, when configured. */
   sources?: SourcesResult;
+  /**
+   * Sustained fault level the standby generator can drive into the main bus
+   * (kA) — the alternate-source fault study's basis. Far below the utility's;
+   * circuits failing ADS only on the generator get 'ads-fails-on-generator'.
+   */
+  generatorFaultKa?: number;
   /** Current-based discrimination report per cascaded device pair. */
   selectivity?: SelectivityEntry[];
   totals: {

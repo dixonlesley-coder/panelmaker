@@ -92,6 +92,18 @@ export function PanelSettingsEditor({
             comboboxProps={{ withinPortal: true }}
             onChange={(v) => v && patch({ installMethod: v as InstallMethod })}
           />
+          <Select
+            label={t('panelSettings.insulation')}
+            description={t('panelSettings.insulationHint')}
+            data={[
+              { value: 'PVC', label: 'PVC 70 °C (NYM / NYY)' },
+              { value: 'XLPE', label: 'XLPE 90 °C (N2XY)' },
+            ]}
+            value={panel.insulation ?? 'PVC'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            onChange={(v) => v && patch({ insulation: v as PanelInput['insulation'] })}
+          />
           <NumberInput
             label={t('panelSettings.ambient')}
             value={panel.ambientTempC}

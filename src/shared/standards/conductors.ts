@@ -40,9 +40,34 @@ export const KHA_COPPER_PVC: Readonly<Record<number, number>> = {
   300: 477,
 };
 
-/** Base KHA for a standard section (A). Returns 0 for an unknown section. */
-export function baseKha(sectionMm2: number): number {
-  return KHA_COPPER_PVC[sectionMm2] ?? 0;
+/**
+ * Base KHA, copper / XLPE (90 °C), same reference method (in conduit, 30 degC).
+ * ~Aligned with IEC 60364-5-52 Table B.52.4 (method B1) — XLPE's higher
+ * operating temperature buys roughly 25-30% over PVC at equal section.
+ */
+export const KHA_COPPER_XLPE: Readonly<Record<number, number>> = {
+  1.5: 20,
+  2.5: 28,
+  4: 37,
+  6: 48,
+  10: 66,
+  16: 88,
+  25: 117,
+  35: 144,
+  50: 175,
+  70: 222,
+  95: 269,
+  120: 312,
+  150: 358,
+  185: 408,
+  240: 481,
+  300: 553,
+};
+
+/** Base KHA for a standard section (A) by insulation. Returns 0 if unknown. */
+export function baseKha(sectionMm2: number, insulation: 'PVC' | 'XLPE' = 'PVC'): number {
+  const table = insulation === 'XLPE' ? KHA_COPPER_XLPE : KHA_COPPER_PVC;
+  return table[sectionMm2] ?? 0;
 }
 
 /**
@@ -98,6 +123,25 @@ export const AMBIENT_TEMP_FACTORS: Readonly<Record<number, number>> = {
 };
 
 /**
+ * Ambient temperature correction factors for XLPE insulation (90 °C, base
+ * 30 degC), IEC 60364-5-52 Table B.52.14. XLPE's larger headroom to its limit
+ * temperature derates more gently than PVC.
+ */
+export const AMBIENT_TEMP_FACTORS_XLPE: Readonly<Record<number, number>> = {
+  10: 1.15,
+  15: 1.12,
+  20: 1.08,
+  25: 1.04,
+  30: 1.0,
+  35: 0.96,
+  40: 0.91,
+  45: 0.87,
+  50: 0.82,
+  55: 0.76,
+  60: 0.71,
+};
+
+/**
  * Grouping (bunching) correction factors for circuits grouped together in
  * conduit/trunking, IEC 60364-5-52 Table B.52.17.
  */
@@ -122,3 +166,20 @@ export const INSTALL_METHOD_FACTORS: Readonly<Record<string, number>> = {
   tray: 1.05,
   buried: 0.9,
 };
+
+/**
+ * Soil thermal-resistivity correction for BURIED cables (IEC 60364-5-52
+ * Table B.52.16, ducts in ground), applied on top of the `buried` method factor.
+ * The IEC reference is 2.5 K·m/W; wetter soil conducts heat better (>1), dry /
+ * volcanic ash soils insulate the cable and derate it (<1). Interpolated.
+ */
+export const SOIL_THERMAL_RESISTIVITY_FACTORS: Readonly<Record<number, number>> = {
+  1: 1.18,
+  1.5: 1.1,
+  2: 1.05,
+  2.5: 1.0,
+  3: 0.96,
+};
+
+/** IEC reference soil thermal resistivity (K·m/W) — factor 1.0. */
+export const SOIL_THERMAL_RESISTIVITY_REFERENCE_KMW = 2.5;

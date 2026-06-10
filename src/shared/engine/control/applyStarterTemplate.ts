@@ -1,5 +1,6 @@
 import { starterTemplate } from '../../standards/control/starters';
 import { coilBurdenForFrame } from '../../standards/control/controlGear';
+import { type2SetFor } from '../../standards/control/coordination';
 import type {
   AssemblyDevice,
   ControlAssembly,
@@ -171,6 +172,40 @@ export function applyStarterTemplate(input: ApplyStarterInput): ControlAssembly 
     note: spec.note,
   }));
 
+  // Type-2 coordination (IEC 60947-4-1): attach the verified DOL combination
+  // covering this motor for contactor-based starters. Independently sized
+  // devices are only a starting point — after a short circuit a type-2 set must
+  // remain serviceable, which only a tested combination guarantees.
+  let coordination: ControlAssembly['coordination'];
+  const contactorBased =
+    starterType === 'DOL' ||
+    starterType === 'STAR_DELTA' ||
+    starterType === 'REVERSING' ||
+    starterType === 'PUMP';
+  if (contactorBased) {
+    const set = type2SetFor(motorKw);
+    if (set) {
+      const mainContactor = devices.find(
+        (d) => d.category === 'contactor' && d.targetRatingA !== undefined,
+      );
+      const contactorMatches =
+        mainContactor?.targetRatingA === undefined ||
+        mainContactor.targetRatingA + 1e-9 >= Math.min(set.contactorAc3A, flcA);
+      coordination = {
+        breakerA: set.breakerA,
+        contactorAc3A: set.contactorAc3A,
+        olRangeA: set.olRangeA,
+        contactorMatches,
+        note: `Type-2 verified set (${set.kw} kW DOL basis): breaker ${set.breakerA} A + contactor ${set.contactorAc3A} A AC-3 + OL ${set.olRangeA[0]}–${set.olRangeA[1]} A — confirm against the chosen manufacturer's coordination table.`,
+      };
+      if (!contactorMatches) {
+        warnings.push(
+          `Contactor below the type-2 verified set (${set.contactorAc3A} A AC-3) for ${motorKw} kW — the combination may weld under short-circuit (IEC 60947-4-1 type 2).`,
+        );
+      }
+    }
+  }
+
   return {
     circuitId,
     starterType,
@@ -178,6 +213,7 @@ export function applyStarterTemplate(input: ApplyStarterInput): ControlAssembly 
     devices,
     interlocks,
     starting,
+    ...(coordination ? { coordination } : {}),
     warnings,
   };
 }
