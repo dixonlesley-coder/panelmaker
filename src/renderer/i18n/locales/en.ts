@@ -14,6 +14,10 @@ export const en = {
   },
 
   nav: {
+    sectionDesign: 'Design',
+    sectionInsight: 'Insight',
+    sectionCommercial: 'Commercial',
+    sectionSetup: 'Setup',
     projects: 'Projects',
     system: 'System',
     dashboard: 'Dashboard',

@@ -38,6 +38,25 @@ describe('SQLite persistence', () => {
 
     const project = createSampleProject();
     project.earthingSystem = 'TT';
+    project.site = { externalLps: true, overheadSupply: false, soilResistivityOhmM: 150 };
+    // Panel tag/occupancy + point-level detail must survive the SQLite round-trip
+    // (these were silently dropped by the column-wise mapping before).
+    const lp = project.panels.find((p) => p.name.includes('LP-DB'))!;
+    lp.tag = 'LP-1';
+    lp.occupancy = 'office';
+    const lighting = lp.circuits.find((c) => c.loadKind === 'lighting')!;
+    lighting.fixtures = [
+      { id: 'fx-1', name: 'LED downlight 12 W', wattsPerFitting: 12, qty: 10, switchGroupId: 'sw-1' },
+    ];
+    lighting.switchGroups = [
+      { id: 'sw-1', label: 'SW1', kind: 'smart', protocol: 'zigbee', neutralAtSwitch: true },
+    ];
+    const socketsCircuit = lp.circuits.find((c) => c.loadKind === 'socket');
+    const socketHost = socketsCircuit ?? lp.circuits.find((c) => c.loadKind === 'general')!;
+    socketHost.sockets = [
+      { id: 'so-1', name: 'Wall east', qty: 4 },
+      { id: 'so-2', name: 'Oven', qty: 1, type: 'dedicated', vaPerPoint: 2200 },
+    ];
     project.meta = {
       client: 'PT Contoh',
       location: 'Jakarta',
@@ -84,6 +103,24 @@ describe('SQLite persistence', () => {
     const lpdb = loaded!.panels.find((p) => p.name.includes('LP-DB'))!;
     const ev = lpdb.circuits.find((c) => c.loadKind === 'ev_charger')!;
     expect(ev.schedule).toEqual({ startHour: 22, endHour: 6 });
+
+    // site conditions round-trip via site_json
+    expect(loaded!.site).toEqual({ externalLps: true, overheadSupply: false, soilResistivityOhmM: 150 });
+
+    // panel tag + occupancy round-trip as columns
+    expect(lpdb.tag).toBe('LP-1');
+    expect(lpdb.occupancy).toBe('office');
+
+    // point-level detail (fixtures / switch groups / sockets) round-trips via points_json
+    const loadedLighting = lpdb.circuits.find((c) => c.loadKind === 'lighting')!;
+    expect(loadedLighting.fixtures).toEqual(lighting.fixtures);
+    expect(loadedLighting.switchGroups).toEqual(lighting.switchGroups);
+    const loadedSocketHost = lpdb.circuits.find((c) => (c.sockets ?? []).length > 0)!;
+    expect(loadedSocketHost.sockets).toEqual(socketHost.sockets);
+    // a circuit without point detail keeps the fields absent (no empty arrays)
+    const plain = lpdb.circuits.find((c) => c.loadKind === 'hvac')!;
+    expect(plain.fixtures).toBeUndefined();
+    expect(plain.sockets).toBeUndefined();
 
     // appears in the project list, then deletes cleanly
     expect(listProjects().some((p) => p.id === project.id)).toBe(true);

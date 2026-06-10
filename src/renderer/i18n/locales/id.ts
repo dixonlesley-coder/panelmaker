@@ -17,6 +17,10 @@ export const id: TranslationKeys = {
   },
 
   nav: {
+    sectionDesign: 'Desain',
+    sectionInsight: 'Wawasan',
+    sectionCommercial: 'Komersial',
+    sectionSetup: 'Pengaturan',
     projects: 'Proyek',
     system: 'Sistem',
     dashboard: 'Dasbor',

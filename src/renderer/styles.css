@@ -1,0 +1,69 @@
+/*
+ * Global finishing touches on top of the Mantine theme: crisp text rendering,
+ * a calm focus ring, slim scrollbars and gentle motion. No external assets —
+ * fully offline.
+ */
+
+html,
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* A single, consistent focus treatment (keyboard only — not on click). */
+:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+/* Slim, unobtrusive scrollbars that match both color schemes. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-default-border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-dimmed);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Text selection in the brand color. */
+::selection {
+  background: var(--mantine-primary-color-light);
+}
+
+/* Gentle, fast transitions on interactive surfaces (respects reduced motion). */
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  [role='button'],
+  a,
+  .mantine-NavLink-root,
+  .mantine-Card-root,
+  .mantine-ActionIcon-root {
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      box-shadow 160ms ease,
+      transform 120ms ease;
+  }
+  .mantine-Button-root:active,
+  .mantine-ActionIcon-root:active {
+    transform: translateY(0.5px);
+  }
+}
+
+/* React Flow nodes inherit the app font (default ships its own stack). */
+.react-flow {
+  font-family: inherit;
+}

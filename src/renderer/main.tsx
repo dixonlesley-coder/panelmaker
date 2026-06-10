@@ -7,6 +7,7 @@ import '@mantine/core/styles.css';
 import '@mantine/charts/styles.css';
 import '@mantine/notifications/styles.css';
 import '@xyflow/react/dist/style.css';
+import './styles.css';
 
 // Initialize i18next before the first render (statically imported locales —
 // no network; see i18n/index.ts).

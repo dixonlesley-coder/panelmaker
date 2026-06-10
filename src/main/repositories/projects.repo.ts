@@ -49,6 +49,7 @@ export function saveProject(project: ProjectInput, db: Db = getDb()): { id: stri
           earthingSystem: project.earthingSystem ?? null,
           sourcesJson: project.sources ? JSON.stringify(project.sources) : null,
           metaJson: project.meta ? JSON.stringify(project.meta) : null,
+          siteJson: project.site ? JSON.stringify(project.site) : null,
         })
         .run();
     } else {
@@ -59,6 +60,7 @@ export function saveProject(project: ProjectInput, db: Db = getDb()): { id: stri
           earthingSystem: project.earthingSystem ?? null,
           sourcesJson: project.sources ? JSON.stringify(project.sources) : null,
           metaJson: project.meta ? JSON.stringify(project.meta) : null,
+          siteJson: project.site ? JSON.stringify(project.site) : null,
         })
         .where(eq(projects.id, project.id))
         .run();
@@ -104,6 +106,7 @@ export function loadProject(id: string, db: Db = getDb()): ProjectInput | null {
     projectRow.earthingSystem,
     projectRow.sourcesJson,
     projectRow.metaJson,
+    projectRow.siteJson,
   );
 }
 

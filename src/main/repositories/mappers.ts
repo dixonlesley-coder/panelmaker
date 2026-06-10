@@ -103,7 +103,21 @@ export function circuitToRow(
     chosenCablePartId: null,
     chosenBreakerPartId: null,
     computedJson: null,
+    pointsJson: encodePoints(c),
   };
+}
+
+/** Point-level detail ({fixtures, switchGroups, sockets}) as a JSON blob, or null. */
+function encodePoints(c: CircuitInput): string | null {
+  const fixtures = c.fixtures ?? [];
+  const switchGroups = c.switchGroups ?? [];
+  const sockets = c.sockets ?? [];
+  if (fixtures.length === 0 && switchGroups.length === 0 && sockets.length === 0) return null;
+  return JSON.stringify({
+    ...(fixtures.length > 0 ? { fixtures } : {}),
+    ...(switchGroups.length > 0 ? { switchGroups } : {}),
+    ...(sockets.length > 0 ? { sockets } : {}),
+  });
 }
 
 export function rowToCircuit(r: CircuitRow): CircuitInput {
@@ -137,6 +151,19 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   if (ssh !== undefined && seh !== undefined) c.schedule = { startHour: ssh, endHour: seh };
   const feedsPanelId = nullToUndef(r.feedsPanelId);
   if (feedsPanelId !== undefined) c.feedsPanelId = feedsPanelId;
+  if (r.pointsJson) {
+    try {
+      const points = JSON.parse(r.pointsJson) as Pick<
+        CircuitInput,
+        'fixtures' | 'switchGroups' | 'sockets'
+      >;
+      if (points.fixtures) c.fixtures = points.fixtures;
+      if (points.switchGroups) c.switchGroups = points.switchGroups;
+      if (points.sockets) c.sockets = points.sockets;
+    } catch {
+      /* corrupt points blob — drop the detail, keep the circuit */
+    }
+  }
   return c;
 }
 
@@ -157,6 +184,8 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     id: p.id,
     projectId,
     name: p.name,
+    tag: undefToNull(p.tag),
+    occupancy: undefToNull(p.occupancy),
     system: p.system,
     voltageV: p.voltageV,
     // frequency is fixed at 50 Hz in the engine model; persist the default.
@@ -186,6 +215,10 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   };
   const fedBy = nullToUndef(r.fedByCircuitId);
   if (fedBy !== undefined) p.fedByCircuitId = fedBy;
+  const tag = nullToUndef(r.tag);
+  if (tag !== undefined) p.tag = tag;
+  const occupancy = nullToUndef(r.occupancy);
+  if (occupancy !== undefined) p.occupancy = occupancy as PanelInput['occupancy'];
   return p;
 }
 
@@ -198,6 +231,7 @@ export function assembleProject(
   earthingSystem?: string | null,
   sourcesJson?: string | null,
   metaJson?: string | null,
+  siteJson?: string | null,
 ): ProjectInput {
   const project: ProjectInput = { id, name, panels };
   const es = nullToUndef(earthingSystem);
@@ -216,6 +250,14 @@ export function assembleProject(
       project.meta = JSON.parse(mj) as ProjectInput['meta'];
     } catch {
       /* corrupt meta blob — ignore */
+    }
+  }
+  const stj = nullToUndef(siteJson);
+  if (stj) {
+    try {
+      project.site = JSON.parse(stj) as ProjectInput['site'];
+    } catch {
+      /* corrupt site blob — ignore */
     }
   }
   return project;
