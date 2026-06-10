@@ -28,7 +28,7 @@ import type {
   Warning,
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
-import { panelGaSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
+import { panelGaSvg, panelPointsSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
 import {
   buildSystemBom,
   consolidateBom,
@@ -157,12 +157,26 @@ function panelDiagramsBlock(
   result: PanelResult,
   project: ProjectInput,
 ): Content[] {
-  return [
+  const blocks: Content[] = [
     heading('Single-line diagram'),
     { svg: panelSldSvg(panel, result, titleStripFor(project, 'Single-line diagram')), width: 515 },
     { text: 'General arrangement', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
     { svg: panelGaSvg(panel, result, titleStripFor(project, 'General arrangement')), fit: [515, 360] },
   ];
+  // Lighting & small-power points diagram — only when circuits carry point detail.
+  const hasPoints = panel.circuits.some(
+    (c) => (c.fixtures ?? []).length > 0 || (c.sockets ?? []).length > 0,
+  );
+  if (hasPoints) {
+    blocks.push(
+      { text: 'Lighting & switching', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
+      {
+        svg: panelPointsSvg(panel, result, titleStripFor(project, 'Lighting & switching')),
+        fit: [515, 640],
+      },
+    );
+  }
+  return blocks;
 }
 
 /**

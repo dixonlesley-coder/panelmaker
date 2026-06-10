@@ -278,6 +278,7 @@ export const id: TranslationKeys = {
     tabSingleLine: 'Satu garis',
     tabSchematic: 'Skema kontrol',
     tabLayout: 'Tata letak',
+    tabSwitching: 'Sakelar',
     tabSchedule: 'Daftar kabel',
     tabResults: 'Hasil',
     tabIssues: 'Masalah',
@@ -722,6 +723,12 @@ export const id: TranslationKeys = {
     derivedHint: 'Beban sirkuit diturunkan dari titik-titik ini dan menggantikan kW datar.',
     cancel: 'Batal',
     save: 'Simpan titik',
+  },
+  switching: {
+    title: 'Titik penerangan & sakelar',
+    hint: 'Simbol: lingkaran silang = armatur, lingkaran bertangkai = stop kontak, tuas = sakelar konvensional (tuas ganda = 2-arah), kotak S = modul pintar. Ekspor SVG/DXF dan PDF panel memuat gambar yang sama.',
+    emptyTitle: 'Belum ada titik yang dimodelkan',
+    emptyBody: 'Buka editor titik pada sirkuit penerangan/stop kontak (ikon bohlam/colokan di tabel sirkuit) untuk menambah armatur, sakelar, dan stop kontak \u2014 semuanya akan digambar di sini.',
   },
   coordination: {
     eyebrow: 'Proteksi',

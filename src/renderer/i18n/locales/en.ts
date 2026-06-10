@@ -275,6 +275,7 @@ export const en = {
     tabSingleLine: 'Single-line',
     tabSchematic: 'Control schematic',
     tabLayout: 'Layout',
+    tabSwitching: 'Switching',
     tabSchedule: 'Cable schedule',
     tabResults: 'Results',
     tabIssues: 'Issues',
@@ -717,6 +718,12 @@ export const en = {
     derivedHint: 'The circuit load is derived from these points and supersedes the flat kW.',
     cancel: 'Cancel',
     save: 'Save points',
+  },
+  switching: {
+    title: 'Lighting & switching points',
+    hint: 'Symbols: crossed circle = luminaire, half-stub circle = socket outlet, lever = conventional switch (double lever = 2-way), boxed S = smart module. Exported SVG/DXF and the panel PDF carry the same drawing.',
+    emptyTitle: 'No points modelled yet',
+    emptyBody: 'Open a lighting or socket circuit\u2019s points editor (bulb/plug icon in the circuit table) to add fixtures, switches and outlets \u2014 they will be drawn here.',
   },
   coordination: {
     eyebrow: 'Protection',

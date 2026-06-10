@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, Title } from '@mantine/core';
 import {
   IconAlertTriangle,
+  IconBulb,
   IconColumns,
   IconCpu,
   IconLayoutGrid,
@@ -16,6 +17,7 @@ import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
 import { SchematicView } from '@renderer/features/schematic/SchematicView';
 import { PanelLayout } from '@renderer/features/layout/PanelLayout';
+import { SwitchingDiagram } from '@renderer/features/layout/SwitchingDiagram';
 import { CableSchedule } from '@renderer/features/schedule/CableSchedule';
 import { PanelSld } from '@renderer/screens/sld/PanelSld';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -112,6 +114,9 @@ export function PanelEditor() {
                 <Tabs.Tab value="layout" leftSection={<IconLayoutGrid size={16} />}>
                   {t('panel.tabLayout')}
                 </Tabs.Tab>
+                <Tabs.Tab value="switching" leftSection={<IconBulb size={16} />}>
+                  {t('panel.tabSwitching')}
+                </Tabs.Tab>
                 <Tabs.Tab value="schedule" leftSection={<IconColumns size={16} />}>
                   {t('panel.tabSchedule')}
                 </Tabs.Tab>
@@ -141,6 +146,9 @@ export function PanelEditor() {
               </Tabs.Panel>
               <Tabs.Panel value="layout">
                 <PanelLayout panel={panel} result={result} />
+              </Tabs.Panel>
+              <Tabs.Panel value="switching">
+                <SwitchingDiagram panel={panel} result={result} />
               </Tabs.Panel>
               <Tabs.Panel value="schedule">
                 <CableSchedule panel={panel} result={result} />
