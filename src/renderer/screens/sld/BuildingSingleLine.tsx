@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Background,
   Controls,
@@ -11,13 +11,15 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react';
-import { Badge, Box, Group, Text } from '@mantine/core';
+import { Badge, Box, Drawer, Group, Text } from '@mantine/core';
 import { IconPlugConnected } from '@tabler/icons-react';
 import type { LoadKind, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
 import { useProjectStore } from '@renderer/state/projectStore';
+import { PanelEditor } from '@renderer/screens/PanelEditor';
+import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
 
 /**
  * Unified building single-line: every panel on ONE canvas. Zoomed out, a panel
@@ -103,6 +105,8 @@ interface UnifiedPanelData {
   supply?: SupplyHead; // service-entrance equipment — root panel
   feederIds: string[];
   issues?: NodeIssue[];
+  /** Edit a specific way's circuit inline (double-click a component). */
+  onEditCircuit?: (circuitId: string) => void;
   [key: string]: unknown;
 }
 
@@ -445,8 +449,17 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
         const cx = colX(i);
         const taps = w.phase === '3ph' ? phaseKeys : [w.phase];
         return (
-          <g key={w.id}>
-            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''}`}</title>
+          <g
+            key={w.id}
+            style={{ cursor: 'pointer' }}
+            onDoubleClick={(e) => {
+              // Edit this circuit inline; don't let it bubble to the panel-level
+              // double-click (which opens the panel inspector).
+              e.stopPropagation();
+              d.onEditCircuit?.(w.id);
+            }}
+          >
+            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''} — double-click to edit`}</title>
             {taps.map((k, j) => {
               const ox = cx + (taps.length > 1 ? (j - 1) * 5 : 0);
               return <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={L.brkTop} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.6} />;
@@ -587,7 +600,11 @@ function cableLabel(csaMm2: number, cores: number, runs?: number): string {
 
 const THERMAL_OVERLOAD_STARTERS = new Set(['DOL', 'STAR_DELTA', 'REVERSING', 'PUMP']);
 
-function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Node[]; edges: Edge[] } {
+function buildUnified(
+  project: ProjectInput,
+  system: SystemResult,
+  onEditCircuit: (panelId: string, circuitId: string) => void,
+): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
   const parentOf = new Map<string, string>();
@@ -712,6 +729,7 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
         ...(supply ? { supply } : {}),
         feederIds: ways.filter((wy) => wy.feeds).map((wy) => wy.id),
         issues: toNodeIssues(res.warnings),
+        onEditCircuit: (cid) => onEditCircuit(id, cid),
       };
       nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, draggable: false });
       x += w + GAP;
@@ -746,8 +764,33 @@ function buildUnified(project: ProjectInput, system: SystemResult): { nodes: Nod
 export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const project = useProjectStore((s) => s.project);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
-  const setScreen = useProjectStore((s) => s.setScreen);
-  const { nodes, edges } = useMemo(() => buildUnified(project, system), [project, system]);
+
+  // Edit on the canvas: double-click a component → its circuit editor; double-
+  // click a panel → its full toolset in a side inspector (no screen change).
+  const [editing, setEditing] = useState<{ panelId: string; circuitId: string } | null>(null);
+  const [inspectPanelId, setInspectPanelId] = useState<string | null>(null);
+
+  const openCircuit = useCallback((panelId: string, circuitId: string) => {
+    setEditing({ panelId, circuitId });
+  }, []);
+  const openInspector = useCallback(
+    (panelId: string) => {
+      setActivePanel(panelId);
+      setInspectPanelId(panelId);
+    },
+    [setActivePanel],
+  );
+
+  const { nodes, edges } = useMemo(
+    () => buildUnified(project, system, openCircuit),
+    [project, system, openCircuit],
+  );
+
+  const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
+  const editingCircuit = editingPanel?.circuits.find((c) => c.id === editing?.circuitId);
+  const editingResult = editing
+    ? system.panels[editing.panelId]?.circuits.find((c) => c.circuitId === editing.circuitId)
+    : undefined;
 
   return (
     <Box h={560}>
@@ -765,15 +808,36 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           nodesDraggable={false}
           elementsSelectable={false}
           zoomOnDoubleClick={false}
-          onNodeDoubleClick={(_, node) => {
-            setActivePanel(node.id);
-            setScreen('panel');
-          }}
+          onNodeDoubleClick={(_, node) => openInspector(node.id)}
         >
           <Background gap={18} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </ReactFlowProvider>
+
+      {/* Inline circuit editor (double-click a component on the diagram). */}
+      {editing && editingCircuit && (
+        <CircuitEditor
+          panelId={editing.panelId}
+          circuit={editingCircuit}
+          result={editingResult}
+          focus="device"
+          opened
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {/* Side inspector: the focused panel's full toolset, on the single-line. */}
+      <Drawer
+        opened={inspectPanelId !== null}
+        onClose={() => setInspectPanelId(null)}
+        position="right"
+        size="82%"
+        title={project.panels.find((p) => p.id === inspectPanelId)?.name ?? 'Panel'}
+        keepMounted={false}
+      >
+        {inspectPanelId !== null && <PanelEditor />}
+      </Drawer>
     </Box>
   );
 }
