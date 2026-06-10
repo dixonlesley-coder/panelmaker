@@ -30,6 +30,7 @@ import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { NODE_TYPES, OVERRIDE_MIME, type BranchNodeData } from '@renderer/screens/sld/nodes';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps } from '@renderer/lib/format';
+import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
 
 /* ------------------------------- palette model ----------------------------- */
 
@@ -312,6 +313,10 @@ function buildGraph(
       changed: changes.get(c.circuitId),
       breakerOverridden: c.breaker.overridden === true,
       cableOverridden: input?.cableOverrideMm2 !== undefined,
+      utilPct:
+        c.cable.deratedIzA > 0
+          ? Math.round((c.designCurrentA / c.cable.deratedIzA) * 100)
+          : undefined,
       onDropOverride: (kind, value) => onOverride(c.circuitId, kind, value),
     };
     nodes.push({ id: c.circuitId, type: 'branch', position: { x, y: BRANCH_Y }, data, draggable: false });
@@ -442,6 +447,15 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
     [allPanels, panel.id],
   );
 
+  // Double-click a node or its cable edge to edit that circuit inline.
+  const [editing, setEditing] = useState<{ circuitId: string; focus: 'device' | 'cable' } | null>(
+    null,
+  );
+  const editingCircuit = editing ? panel.circuits.find((c) => c.id === editing.circuitId) : undefined;
+  const editingResult = editing
+    ? result.circuits.find((c) => c.circuitId === editing.circuitId)
+    : undefined;
+
   /** Pin a manual breaker rating / cable minimum onto a specific circuit. */
   const applyOverride = (circuitId: string, kind: 'breaker' | 'cable', value: number) => {
     updateCircuit(
@@ -545,7 +559,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
         <Group gap={6}>
           <IconHandMove size={16} color="var(--mantine-color-dimmed)" />
           <Text size="xs" c="dimmed">
-            {t('vbuilder.hint')}
+            {t('vbuilder.hint')} {t('vbuilder.editHint')}
           </Text>
         </Group>
         {changes.size > 0 && (
@@ -666,6 +680,13 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
               nodesConnectable={false}
               nodesDraggable={false}
               elementsSelectable={false}
+              onNodeDoubleClick={(_, node) => {
+                if (node.type === 'branch') setEditing({ circuitId: node.id, focus: 'device' });
+              }}
+              onEdgeDoubleClick={(_, edge) => {
+                const id = edge.id.startsWith('e-busbar-') ? edge.id.slice('e-busbar-'.length) : '';
+                if (id) setEditing({ circuitId: id, focus: 'cable' });
+              }}
             >
               <Background gap={16} />
               <Controls showInteractive={false} />
@@ -673,6 +694,17 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
           </ReactFlowProvider>
         </Box>
       </Group>
+
+      {editing && editingCircuit && (
+        <CircuitEditor
+          panelId={panel.id}
+          circuit={editingCircuit}
+          result={editingResult}
+          focus={editing.focus}
+          opened
+          onClose={() => setEditing(null)}
+        />
+      )}
     </Stack>
   );
 }

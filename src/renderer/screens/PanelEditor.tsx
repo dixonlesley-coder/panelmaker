@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Alert, Card, Grid, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
+import { Alert, Card, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconBulb,
@@ -8,6 +8,7 @@ import {
   IconCpu,
   IconLayoutGrid,
   IconListDetails,
+  IconListNumbers,
   IconSitemap,
   IconTable,
 } from '@tabler/icons-react';
@@ -26,7 +27,11 @@ import { PanelSld } from '@renderer/screens/sld/PanelSld';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
 
-/** The single-panel editor: structured builder on the left, views on the right. */
+/**
+ * The single-panel editor: a full-width tabbed workspace led by the drag-and-drop
+ * visual builder (double-click a circuit/cable to edit), with the structured
+ * circuit table, diagrams, schedules and results as further tabs.
+ */
 export function PanelEditor() {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
@@ -122,9 +127,52 @@ export function PanelEditor() {
         </Group>
       </Group>
 
-      <Grid gutter="md" align="stretch">
-        <Grid.Col span={{ base: 12, lg: 5 }}>
-          <Card withBorder radius="md" padding="md" h="100%">
+      <Card withBorder radius="md" padding="md">
+        <Tabs defaultValue="build" keepMounted={false}>
+          <Tabs.List mb="md">
+            <Tabs.Tab value="build" leftSection={<IconDragDrop size={16} />}>
+              {t('panel.tabBuild')}
+            </Tabs.Tab>
+            <Tabs.Tab value="circuits" leftSection={<IconListNumbers size={16} />}>
+              {t('panel.tabCircuits')}
+            </Tabs.Tab>
+            <Tabs.Tab value="sld" leftSection={<IconSitemap size={16} />}>
+              {t('panel.tabSingleLine')}
+            </Tabs.Tab>
+            <Tabs.Tab value="schematic" leftSection={<IconCpu size={16} />}>
+              {t('panel.tabSchematic')}
+            </Tabs.Tab>
+            <Tabs.Tab value="layout" leftSection={<IconLayoutGrid size={16} />}>
+              {t('panel.tabLayout')}
+            </Tabs.Tab>
+            <Tabs.Tab value="switching" leftSection={<IconBulb size={16} />}>
+              {t('panel.tabSwitching')}
+            </Tabs.Tab>
+            <Tabs.Tab value="schedule" leftSection={<IconColumns size={16} />}>
+              {t('panel.tabSchedule')}
+            </Tabs.Tab>
+            <Tabs.Tab value="results" leftSection={<IconTable size={16} />}>
+              {t('panel.tabResults')}
+            </Tabs.Tab>
+            <Tabs.Tab
+              value="issues"
+              leftSection={<IconListDetails size={16} />}
+              rightSection={
+                issueCount > 0 ? (
+                  <Text size="xs" c="orange" fw={700}>
+                    {issueCount}
+                  </Text>
+                ) : null
+              }
+            >
+              {t('panel.tabIssues')}
+            </Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="build">
+            <VisualBuilder panel={panel} result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="circuits">
             <Group justify="space-between" mb="xs">
               <Text fw={600}>{t('panel.circuitBuilder')}</Text>
               <Text size="xs" c="dimmed">
@@ -132,77 +180,30 @@ export function PanelEditor() {
               </Text>
             </Group>
             <CircuitTable panelId={panel.id} />
-          </Card>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, lg: 7 }}>
-          <Card withBorder radius="md" padding="md" h="100%">
-            <Tabs defaultValue="build" keepMounted={false}>
-              <Tabs.List mb="md">
-                <Tabs.Tab value="build" leftSection={<IconDragDrop size={16} />}>
-                  {t('panel.tabBuild')}
-                </Tabs.Tab>
-                <Tabs.Tab value="sld" leftSection={<IconSitemap size={16} />}>
-                  {t('panel.tabSingleLine')}
-                </Tabs.Tab>
-                <Tabs.Tab value="schematic" leftSection={<IconCpu size={16} />}>
-                  {t('panel.tabSchematic')}
-                </Tabs.Tab>
-                <Tabs.Tab value="layout" leftSection={<IconLayoutGrid size={16} />}>
-                  {t('panel.tabLayout')}
-                </Tabs.Tab>
-                <Tabs.Tab value="switching" leftSection={<IconBulb size={16} />}>
-                  {t('panel.tabSwitching')}
-                </Tabs.Tab>
-                <Tabs.Tab value="schedule" leftSection={<IconColumns size={16} />}>
-                  {t('panel.tabSchedule')}
-                </Tabs.Tab>
-                <Tabs.Tab value="results" leftSection={<IconTable size={16} />}>
-                  {t('panel.tabResults')}
-                </Tabs.Tab>
-                <Tabs.Tab
-                  value="issues"
-                  leftSection={<IconListDetails size={16} />}
-                  rightSection={
-                    issueCount > 0 ? (
-                      <Text size="xs" c="orange" fw={700}>
-                        {issueCount}
-                      </Text>
-                    ) : null
-                  }
-                >
-                  {t('panel.tabIssues')}
-                </Tabs.Tab>
-              </Tabs.List>
-
-              <Tabs.Panel value="build">
-                <VisualBuilder panel={panel} result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="sld">
-                <PanelSld panel={panel} result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="schematic">
-                <SchematicView panel={panel} result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="layout">
-                <PanelLayout panel={panel} result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="switching">
-                <SwitchingDiagram panel={panel} result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="schedule">
-                <CableSchedule panel={panel} result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="results">
-                <ResultsPanel result={result} />
-              </Tabs.Panel>
-              <Tabs.Panel value="issues">
-                <IssuesPanel result={result} />
-              </Tabs.Panel>
-            </Tabs>
-          </Card>
-        </Grid.Col>
-      </Grid>
+          </Tabs.Panel>
+          <Tabs.Panel value="sld">
+            <PanelSld panel={panel} result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="schematic">
+            <SchematicView panel={panel} result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="layout">
+            <PanelLayout panel={panel} result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="switching">
+            <SwitchingDiagram panel={panel} result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="schedule">
+            <CableSchedule panel={panel} result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="results">
+            <ResultsPanel result={result} />
+          </Tabs.Panel>
+          <Tabs.Panel value="issues">
+            <IssuesPanel result={result} />
+          </Tabs.Panel>
+        </Tabs>
+      </Card>
     </Stack>
   );
 }

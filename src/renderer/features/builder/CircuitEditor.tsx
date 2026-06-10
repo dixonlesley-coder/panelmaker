@@ -1,0 +1,309 @@
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  Divider,
+  Group,
+  Modal,
+  NumberInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
+import { IconTrash } from '@tabler/icons-react';
+import type { CircuitInput, CircuitResult, LoadKind, StarterType } from '@shared/types';
+import {
+  LOAD_KINDS,
+  LOAD_DEFAULTS,
+  SCHEDULE_PRESETS,
+  STANDARD_BREAKER_RATINGS_A,
+  presetKeyFor,
+} from '@shared/standards';
+import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
+import { useProjectStore } from '@renderer/state/projectStore';
+import { formatAmps, formatPercent } from '@renderer/lib/format';
+
+const LOAD_KIND_OPTIONS = LOAD_KINDS.map((k) => ({ value: k, label: LOAD_DEFAULTS[k].label }));
+const SCHEDULE_OPTIONS = SCHEDULE_PRESETS.map((p) => ({ value: p.key, label: p.label }));
+const STARTER_OPTIONS: { value: StarterType; label: string }[] = [
+  { value: 'DOL', label: 'DOL (direct on-line)' },
+  { value: 'STAR_DELTA', label: 'Star-delta (Y-Δ)' },
+  { value: 'REVERSING', label: 'Reversing' },
+  { value: 'SOFT_STARTER', label: 'Soft starter' },
+  { value: 'VFD', label: 'VFD' },
+  { value: 'PUMP', label: 'Pump controller' },
+];
+const BREAKER_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  ...STANDARD_BREAKER_RATINGS_A.map((r) => ({ value: String(r), label: `${r} A` })),
+];
+const CABLE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  ...STANDARD_SECTIONS_MM2.map((s) => ({ value: String(s), label: `${s} mm²` })),
+];
+
+function isMotorKind(kind: LoadKind): boolean {
+  return kind === 'motor' || kind === 'pump';
+}
+
+/** Cable loading colour: calm < 80%, warm 80–100%, hot ≥ 100%. */
+function utilColor(pct: number): string {
+  if (pct >= 100) return 'red';
+  if (pct >= 80) return 'orange';
+  return 'teal';
+}
+
+interface Props {
+  panelId: string;
+  /** The live circuit input (looked up fresh by the parent each recompute). */
+  circuit: CircuitInput;
+  /** The computed result for this circuit, for the read-only sizing summary. */
+  result?: CircuitResult;
+  /** Open on the cable section (edge double-click) vs the device section. */
+  focus: 'device' | 'cable';
+  opened: boolean;
+  onClose: () => void;
+}
+
+/**
+ * Edit one circuit straight from the single-line: device kind/load/starter and
+ * the cable run (length, manual section/breaker overrides), with the live sizing
+ * summary — breaker, cable, Iz and the **cable utilisation %** of its ampacity.
+ * Edits dispatch immediately, so the canvas and this panel recompute live.
+ */
+export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose }: Props) {
+  const { t } = useTranslation();
+  const updateCircuit = useProjectStore((s) => s.updateCircuit);
+  const removeCircuit = useProjectStore((s) => s.removeCircuit);
+  const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
+  const motor = isMotorKind(circuit.loadKind);
+
+  const util =
+    result && result.cable.deratedIzA > 0
+      ? Math.round((result.designCurrentA / result.cable.deratedIzA) * 100)
+      : undefined;
+
+  return (
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      size="lg"
+      title={
+        <Group gap="xs">
+          <TextInput
+            variant="unstyled"
+            size="md"
+            value={circuit.name}
+            aria-label={t('builder.colName')}
+            onChange={(e) => patch({ name: e.currentTarget.value })}
+            styles={{ input: { fontWeight: 700, fontSize: 'var(--mantine-font-size-lg)' } }}
+          />
+        </Group>
+      }
+    >
+      <Stack gap="md">
+        {/* Live sizing summary (read-only) — leads with utilisation. */}
+        {result && (
+          <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
+            <Stat label={t('circuitEditor.design')} value={formatAmps(result.designCurrentA)} />
+            <Stat
+              label={t('circuitEditor.breaker')}
+              value={`${result.breaker.ratingA} A ${result.breaker.curve}`}
+              color={result.breaker.overridden ? 'violet' : undefined}
+            />
+            <Stat
+              label={t('circuitEditor.cable')}
+              value={`${result.cable.csaMm2} mm²`}
+              color={result.cable.overridden ? 'violet' : undefined}
+            />
+            <Stat
+              label={t('circuitEditor.utilisation')}
+              value={util !== undefined ? `${util}%` : '—'}
+              color={util !== undefined ? utilColor(util) : undefined}
+              hint={`Iz ${formatAmps(result.cable.deratedIzA)}`}
+            />
+          </SimpleGrid>
+        )}
+        {result && (
+          <Text size="xs" c={result.voltageDrop.withinLimit ? 'dimmed' : 'red'}>
+            {t('circuitEditor.vdrop', {
+              pct: formatPercent(result.voltageDrop.dropPercent),
+              limit: result.voltageDrop.limitPercent,
+            })}
+            {result.cumulativeDropPercent !== undefined
+              ? ` · ${t('circuitEditor.cumulative', { pct: formatPercent(result.cumulativeDropPercent) })}`
+              : ''}
+          </Text>
+        )}
+
+        <Divider label={focus === 'cable' ? t('circuitEditor.cableSection') : t('circuitEditor.device')} />
+
+        {/* Device */}
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <Select
+            label={t('builder.colKind')}
+            data={LOAD_KIND_OPTIONS}
+            value={circuit.loadKind}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            onChange={(v) => {
+              if (!v) return;
+              const kind = v as LoadKind;
+              patch({
+                loadKind: kind,
+                isLighting: kind === 'lighting',
+                ...(isMotorKind(kind)
+                  ? { motorKw: circuit.motorKw ?? 5.5, starterType: circuit.starterType ?? 'DOL' }
+                  : {}),
+              });
+            }}
+          />
+          {motor ? (
+            <NumberInput
+              label={t('circuitEditor.motorKw')}
+              value={circuit.motorKw ?? 0}
+              min={0}
+              step={0.5}
+              decimalScale={1}
+              suffix=" kW"
+              onChange={(v) => patch({ motorKw: typeof v === 'number' ? v : 0 })}
+            />
+          ) : (
+            <NumberInput
+              label={t('builder.colLoad')}
+              value={circuit.loadW / 1000}
+              min={0}
+              step={0.5}
+              decimalScale={2}
+              suffix=" kW"
+              onChange={(v) => patch({ loadW: (typeof v === 'number' ? v : 0) * 1000 })}
+            />
+          )}
+          <NumberInput
+            label={t('builder.colPf')}
+            value={circuit.cosPhi}
+            min={0.1}
+            max={1}
+            step={0.05}
+            decimalScale={2}
+            onChange={(v) => patch({ cosPhi: typeof v === 'number' ? v : circuit.cosPhi })}
+          />
+          {motor && (
+            <Select
+              label={t('builder.colStarter')}
+              data={STARTER_OPTIONS}
+              value={circuit.starterType ?? 'DOL'}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true }}
+              onChange={(v) => v && patch({ starterType: v as StarterType })}
+            />
+          )}
+          <Select
+            label={t('builder.colUsage')}
+            data={SCHEDULE_OPTIONS}
+            value={presetKeyFor(circuit.schedule)}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            onChange={(v) => patch({ schedule: SCHEDULE_PRESETS.find((p) => p.key === v)?.schedule })}
+          />
+        </SimpleGrid>
+
+        <Divider label={t('circuitEditor.cableSection')} />
+
+        {/* Cable run */}
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+          <NumberInput
+            label={t('builder.colLength')}
+            value={circuit.lengthM}
+            min={0}
+            step={5}
+            suffix=" m"
+            onChange={(v) => patch({ lengthM: typeof v === 'number' ? v : 0 })}
+          />
+          <Select
+            label={t('builder.overrideCable')}
+            data={CABLE_OPTIONS}
+            value={circuit.cableOverrideMm2 !== undefined ? String(circuit.cableOverrideMm2) : 'auto'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            styles={
+              circuit.cableOverrideMm2 !== undefined
+                ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                : undefined
+            }
+            onChange={(v) => patch({ cableOverrideMm2: v && v !== 'auto' ? Number(v) : undefined })}
+          />
+          <Select
+            label={t('builder.overrideBreaker')}
+            data={BREAKER_OPTIONS}
+            value={circuit.breakerOverrideA !== undefined ? String(circuit.breakerOverrideA) : 'auto'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            styles={
+              circuit.breakerOverrideA !== undefined
+                ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                : undefined
+            }
+            onChange={(v) => patch({ breakerOverrideA: v && v !== 'auto' ? Number(v) : undefined })}
+          />
+        </SimpleGrid>
+        {result && (
+          <Text size="xs" c="dimmed">
+            {t('circuitEditor.makeup', {
+              spec: result.grounding.cableSpec,
+              iz: formatAmps(result.cable.deratedIzA),
+            })}
+          </Text>
+        )}
+
+        <Group justify="space-between" mt="xs">
+          <Button
+            variant="subtle"
+            color="red"
+            size="xs"
+            leftSection={<IconTrash size={14} />}
+            onClick={() => {
+              removeCircuit(panelId, circuit.id);
+              onClose();
+            }}
+          >
+            {t('builder.deleteCircuit')}
+          </Button>
+          <Button size="xs" onClick={onClose}>
+            {t('circuitEditor.done')}
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+}
+
+/** Compact label/value stat used in the editor's sizing summary. */
+function Stat({
+  label,
+  value,
+  color,
+  hint,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {label}
+      </Text>
+      <Text size="sm" fw={700} c={color}>
+        {value}
+      </Text>
+      {hint && (
+        <Text size="xs" c="dimmed">
+          {hint}
+        </Text>
+      )}
+    </div>
+  );
+}
