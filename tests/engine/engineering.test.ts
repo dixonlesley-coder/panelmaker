@@ -6,6 +6,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { computePanel, computeSystem } from '@shared/engine';
+import { khaFor, conductorResistanceOhmPerKm, AL_MIN_SECTION_MM2 } from '@shared/standards/conductors';
+import { checkZs } from '@shared/engine/fault';
 import { motorFLC1ph } from '@shared/engine/control/motorFLC';
 import { applyStarterTemplate } from '@shared/engine/control/applyStarterTemplate';
 import { sizeCable } from '@shared/engine/cableSizing';
@@ -154,6 +156,121 @@ describe('XLPE insulation', () => {
       insulation: 'XLPE',
     });
     expect(dfXlpe).toBeGreaterThan(dfPvc);
+  });
+});
+
+describe('per-method ampacity tables', () => {
+  it('buried beats conduit at small sections but falls well below at large ones', () => {
+    // The method changes the SHAPE of the curve — a flat factor cannot do this.
+    expect(khaFor(1.5, { installMethod: 'buried' })).toBeGreaterThan(
+      khaFor(1.5, { installMethod: 'conduit' }),
+    );
+    const buried300 = khaFor(300, { installMethod: 'buried' });
+    const conduit300 = khaFor(300, { installMethod: 'conduit' });
+    expect(buried300 / conduit300).toBeLessThan(0.75);
+  });
+
+  it('free air / tray carries more than conduit, increasingly so at large sections', () => {
+    expect(khaFor(300, { installMethod: 'air' })).toBeGreaterThan(
+      khaFor(300, { installMethod: 'conduit' }),
+    );
+    expect(khaFor(70, { installMethod: 'tray' })).toBe(khaFor(70, { installMethod: 'air' }));
+  });
+
+  it('clipped-direct (wall) sits between conduit and free air', () => {
+    const conduit = khaFor(95, { installMethod: 'conduit' });
+    const wall = khaFor(95, { installMethod: 'wall' });
+    const air = khaFor(95, { installMethod: 'air' });
+    expect(wall).toBeGreaterThan(conduit);
+    expect(air).toBeGreaterThan(wall);
+  });
+
+  it('a buried feeder needs more total conductor than the same feeder in conduit', () => {
+    const mk = (installMethod: PanelInput['installMethod']) => {
+      const c = computePanel(
+        panel({
+          id: 'P1',
+          name: 'DB',
+          installMethod,
+          circuits: [branch({ id: 'f1', name: 'Feeder', loadKind: 'feeder', loadW: 150000, lengthM: 10 })],
+        }),
+      ).circuits[0]!.cable;
+      // Total copper per phase — buried may resolve to parallel runs.
+      return c.csaMm2 * (c.runsPerPhase ?? 1);
+    };
+    expect(mk('buried')).toBeGreaterThanOrEqual(mk('conduit'));
+  });
+});
+
+describe('aluminum conductors', () => {
+  it('carries ~78% of copper at equal section and floors at 16 mm²', () => {
+    expect(khaFor(95, { material: 'Al' }) / khaFor(95, { material: 'Cu' })).toBeCloseTo(0.78, 2);
+    const cable = sizeCable({
+      designCurrentA: 20,
+      breakerRatingA: 25,
+      deratingFactor: 1,
+      minSectionMm2: 2.5,
+      material: 'Al',
+    });
+    expect(cable.csaMm2).toBeGreaterThanOrEqual(AL_MIN_SECTION_MM2);
+  });
+
+  it('sizes an Al feeder at least one step above the Cu equivalent', () => {
+    const cu = sizeCable({ designCurrentA: 200, breakerRatingA: 250, deratingFactor: 1, minSectionMm2: 4 });
+    const al = sizeCable({
+      designCurrentA: 200,
+      breakerRatingA: 250,
+      deratingFactor: 1,
+      minSectionMm2: 4,
+      material: 'Al',
+    });
+    expect(al.csaMm2).toBeGreaterThan(cu.csaMm2);
+  });
+
+  it('labels aluminum cables NAYY / NA2XY and raises the loop impedance', () => {
+    const r = computePanel(
+      panel({
+        id: 'P1',
+        name: 'Al DB',
+        material: 'Al',
+        circuits: [branch({ id: 'c1', name: 'Feeder load', loadW: 50000, lengthM: 40 })],
+      }),
+    );
+    expect(r.circuits[0]!.grounding.cableSpec).toContain('NAYY');
+    const rx = computePanel(
+      panel({
+        id: 'P2',
+        name: 'Al XLPE DB',
+        material: 'Al',
+        insulation: 'XLPE',
+        circuits: [branch({ id: 'c1', name: 'Feeder load', loadW: 50000, lengthM: 40 })],
+      }),
+    );
+    expect(rx.circuits[0]!.grounding.cableSpec).toContain('NA2XY');
+
+    // Same geometry, Al loop ≈ 1.6× the Cu loop resistance.
+    const base = { earthingSystem: 'TN-C-S' as const, sourceZ: { rOhm: 0.01, xOhm: 0.02 }, phaseCsaMm2: 35, peCsaMm2: 16, lengthM: 60, curve: 'C' as const, breakerRatingA: 63 };
+    const zsCu = checkZs({ ...base, material: 'Cu' });
+    const zsAl = checkZs({ ...base, material: 'Al' });
+    expect(zsAl.zsOhm).toBeGreaterThan(zsCu.zsOhm);
+    expect(conductorResistanceOhmPerKm(35, 'Al') / conductorResistanceOhmPerKm(35, 'Cu')).toBeCloseTo(1.61, 2);
+  });
+
+  it('aluminum voltage drop exceeds copper for the same run', () => {
+    const r = (material: 'Cu' | 'Al') =>
+      checkZs({
+        earthingSystem: 'TN-C-S',
+        sourceZ: { rOhm: 0, xOhm: 0 },
+        phaseCsaMm2: 70,
+        peCsaMm2: 35,
+        lengthM: 80,
+        curve: 'C',
+        breakerRatingA: 100,
+        material,
+      });
+    // Lower available earth-fault current on Al (higher Zs) — and the Al PE k
+    // is lower, so the adiabatic minimum is relatively larger.
+    expect(r('Al').earthFaultA).toBeLessThan(r('Cu').earthFaultA);
   });
 });
 

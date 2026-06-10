@@ -9,6 +9,7 @@ import type {
   LoadKind,
   InstallMethod,
   Insulation,
+  ConductorMaterial,
   EarthingSystem,
   OccupancyType,
 } from './electrical';
@@ -114,6 +115,12 @@ export interface PanelInput {
    * PE adiabatic constant.
    */
   insulation?: Insulation;
+  /**
+   * Conductor material for this panel's circuits (default Cu). Aluminum is
+   * floored at 16 mm² and carries its own ampacity ratio, resistance and
+   * adiabatic k; cables label NAYY / NA2XY.
+   */
+  material?: ConductorMaterial;
   groupingCount: number;
   /** Diversity factor applied to the aggregated load when feeding upstream. */
   diversityFactor: number;

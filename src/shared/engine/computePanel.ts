@@ -4,7 +4,7 @@ import { LOAD_DEFAULTS } from '../standards/loads';
 import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
 import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
 import type { CircuitInput, PanelInput } from '../types/project';
-import type { SystemType, EarthingSystem } from '../types/electrical';
+import type { CableType, SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
@@ -117,12 +117,15 @@ function computeCircuit(
   const baseMinSection = isTrunk ? 4 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const insulation = panel.insulation ?? 'PVC';
+  const material = panel.material ?? 'Cu';
   const cable = sizeCable({
     designCurrentA: ib,
     breakerRatingA: breaker.ratingA,
     deratingFactor: df,
     minSectionMm2: minSection,
     insulation,
+    material,
+    installMethod: panel.installMethod,
     // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the
     // resulting `vd` below is then within limit by construction in normal cases,
     // and any residual over-limit is the genuinely-impossible (max-section) case.
@@ -146,6 +149,7 @@ function computeCircuit(
     system: circuitSystem,
     voltageV: useVoltage,
     isLighting: c.isLighting,
+    material,
   });
   // Cores follow the load's neutral need: single-phase lighting fixtures and
   // line-only loads = 2-core (L+PE); items with a neutral = 3-core (L+N+PE).
@@ -158,8 +162,13 @@ function computeCircuit(
     threePhase,
     hasNeutral,
     runsPerPhase,
-    // XLPE multicore is N2XY; PVC keeps the NYY (3ph) / NYM (1ph) defaults.
-    ...(insulation === 'XLPE' ? { cableType: 'N2XY' as const } : {}),
+    // Cable family: Cu/PVC keeps the NYY (3ph) / NYM (1ph) defaults; XLPE is
+    // N2XY; aluminum maps to NAYY (PVC) / NA2XY (XLPE).
+    ...(material === 'Al'
+      ? { cableType: (insulation === 'XLPE' ? 'NA2XY' : 'NAYY') as CableType }
+      : insulation === 'XLPE'
+        ? { cableType: 'N2XY' as CableType }
+        : {}),
   });
   const rcd = circuitRcd({
     earthingSystem: opts.earthingSystem ?? 'TN-C-S',
@@ -227,6 +236,7 @@ function computeCircuit(
       breakerRatingA: breaker.ratingA,
       runsPerPhase,
       insulation,
+      material,
     });
     result.zsOhm = zs.zsOhm;
     result.zsMaxOhm = zs.zsMaxOhm;

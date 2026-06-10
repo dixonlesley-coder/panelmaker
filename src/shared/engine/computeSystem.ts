@@ -165,7 +165,11 @@ export function computeSystem(project: ProjectInput): SystemResult {
       const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
       if (feeder && feederResult) {
         const feederRuns = feederResult.cable.runsPerPhase ?? 1;
-        const fz = conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM);
+        const fz = conductorImpedance(
+          feederResult.cable.csaMm2,
+          feeder.lengthM,
+          byId.get(parentId)?.material ?? 'Cu',
+        );
         sourceZ = addImpedance(parentZ, { rOhm: fz.rOhm / feederRuns, xOhm: fz.xOhm / feederRuns });
         faultA = downstreamFaultA(panel.voltageV, sourceZ, parentFaultA);
       } else {
@@ -254,7 +258,11 @@ export function computeSystem(project: ProjectInput): SystemResult {
         const feederResult = results[parentId]?.circuits.find((c) => c.circuitId === feeder?.id);
         if (feeder && feederResult) {
           const feederRuns = feederResult.cable.runsPerPhase ?? 1;
-          const fz = conductorImpedance(feederResult.cable.csaMm2, feeder.lengthM);
+          const fz = conductorImpedance(
+            feederResult.cable.csaMm2,
+            feeder.lengthM,
+            byId.get(parentId)?.material ?? 'Cu',
+          );
           z = addImpedance(parentZ, { rOhm: fz.rOhm / feederRuns, xOhm: fz.xOhm / feederRuns });
         } else {
           z = parentZ;
@@ -282,6 +290,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
           breakerRatingA: cr.breaker.ratingA,
           runsPerPhase: cr.cable.runsPerPhase ?? 1,
           insulation: panel.insulation ?? 'PVC',
+          material: panel.material ?? 'Cu',
         });
         if (!genZs.disconnectsInTime) {
           const w: Warning = {

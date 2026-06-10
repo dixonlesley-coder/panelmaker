@@ -20,7 +20,7 @@ import {
   DEFAULT_LV_UTILITY_FAULT_KA,
   GENSET_SUSTAINED_FAULT_MULTIPLE,
   NOMINAL_PHASE_VOLTAGE_V,
-  PE_ADIABATIC_K_BY_INSULATION,
+  PE_ADIABATIC_K_TABLE,
   PE_FAULT_CLEAR_TIME_S,
   SOURCE_XR_RATIO,
   ZS_FAULT_TEMP_FACTOR,
@@ -28,7 +28,7 @@ import {
   breakerKa,
 } from '../standards/fault';
 import type { BreakerCurve } from '../standards/protection';
-import type { EarthingSystem, Insulation } from '../types/electrical';
+import type { ConductorMaterial, EarthingSystem, Insulation } from '../types/electrical';
 import type { BreakerResult, SupplyResult } from '../types/results';
 import { round } from './util';
 
@@ -48,11 +48,15 @@ export function addImpedance(a: Impedance, b: Impedance): Impedance {
   return { rOhm: a.rOhm + b.rOhm, xOhm: a.xOhm + b.xOhm };
 }
 
-/** Phase-conductor impedance of a run: R from the CSA table, X a flat per-km value. */
-export function conductorImpedance(csaMm2: number, lengthM: number): Impedance {
+/** Phase-conductor impedance of a run: R from the CSA table (per material), X flat per-km. */
+export function conductorImpedance(
+  csaMm2: number,
+  lengthM: number,
+  material: 'Cu' | 'Al' = 'Cu',
+): Impedance {
   const km = lengthM / 1000;
   return {
-    rOhm: conductorResistanceOhmPerKm(csaMm2) * km,
+    rOhm: conductorResistanceOhmPerKm(csaMm2, material) * km,
     xOhm: CONDUCTOR_X_OHM_PER_KM * km,
   };
 }
@@ -155,8 +159,10 @@ export interface ZsInput {
   breakerRatingA: number;
   /** Equal parallel runs per phase (each with its own PE) — divides the loop Z. */
   runsPerPhase?: number;
-  /** Insulation family — picks the PE adiabatic k (PVC 115 / XLPE 143). */
+  /** Insulation family — picks the PE adiabatic k row. */
   insulation?: Insulation;
+  /** Conductor material — Al raises the loop R ~1.6× and lowers k. */
+  material?: ConductorMaterial;
 }
 
 /**
@@ -172,8 +178,9 @@ export function checkZs(i: ZsInput): ZsCheck {
   // a higher Zs is the unfavourable case for guaranteed disconnection. Equal
   // parallel runs (each with its own PE) divide the conductor impedance.
   const runs = i.runsPerPhase !== undefined && i.runsPerPhase > 1 ? i.runsPerPhase : 1;
-  const phaseZ0 = conductorImpedance(i.phaseCsaMm2, i.lengthM);
-  const peZ0 = conductorImpedance(i.peCsaMm2, i.lengthM);
+  const material = i.material ?? 'Cu';
+  const phaseZ0 = conductorImpedance(i.phaseCsaMm2, i.lengthM, material);
+  const peZ0 = conductorImpedance(i.peCsaMm2, i.lengthM, material);
   const phaseZ = { rOhm: (phaseZ0.rOhm * ZS_FAULT_TEMP_FACTOR) / runs, xOhm: phaseZ0.xOhm / runs };
   const peZ = { rOhm: (peZ0.rOhm * ZS_FAULT_TEMP_FACTOR) / runs, xOhm: peZ0.xOhm / runs };
   const loop = addImpedance(addImpedance(i.sourceZ, phaseZ), peZ);
@@ -192,7 +199,7 @@ export function checkZs(i: ZsInput): ZsCheck {
   const earthFaultA = zsOhm > 0 ? NOMINAL_PHASE_VOLTAGE_V / zsOhm : 0;
   // With parallel runs the fault current splits between the per-run PEs, so the
   // adiabatic minimum applies to each run's share.
-  const k = PE_ADIABATIC_K_BY_INSULATION[i.insulation ?? 'PVC'];
+  const k = PE_ADIABATIC_K_TABLE[material][i.insulation ?? 'PVC'];
   const peMinAdiabaticMm2 = ((earthFaultA / runs) * Math.sqrt(PE_FAULT_CLEAR_TIME_S)) / k;
   const peAdiabaticOk =
     i.earthingSystem === 'TT' ? true : i.peCsaMm2 + 1e-9 >= peMinAdiabaticMm2;

@@ -104,6 +104,18 @@ export function PanelSettingsEditor({
             comboboxProps={{ withinPortal: true }}
             onChange={(v) => v && patch({ insulation: v as PanelInput['insulation'] })}
           />
+          <Select
+            label={t('panelSettings.material')}
+            description={t('panelSettings.materialHint')}
+            data={[
+              { value: 'Cu', label: t('panelSettings.materialCu') },
+              { value: 'Al', label: t('panelSettings.materialAl') },
+            ]}
+            value={panel.material ?? 'Cu'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            onChange={(v) => v && patch({ material: v as PanelInput['material'] })}
+          />
           <NumberInput
             label={t('panelSettings.ambient')}
             value={panel.ambientTempC}

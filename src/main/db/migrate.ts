@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS panels (
   ambient_temp_c REAL NOT NULL DEFAULT 30,
   install_method TEXT NOT NULL DEFAULT 'conduit',
   insulation TEXT,
+  material TEXT,
   grouping_count INTEGER NOT NULL DEFAULT 1,
   active_pricelist_id TEXT REFERENCES pricelists(id) ON DELETE SET NULL,
   diversity_factor REAL NOT NULL DEFAULT 0.8,
@@ -222,6 +223,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   // Pinned phase + per-route grouping override.
   { table: 'circuits', column: 'phase_override', ddl: 'ALTER TABLE circuits ADD COLUMN phase_override TEXT' },
   { table: 'circuits', column: 'grouping_override', ddl: 'ALTER TABLE circuits ADD COLUMN grouping_override INTEGER' },
+  // Conductor material (Cu / Al).
+  { table: 'panels', column: 'material', ddl: 'ALTER TABLE panels ADD COLUMN material TEXT' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

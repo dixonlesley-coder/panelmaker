@@ -1,5 +1,5 @@
-import { STANDARD_SECTIONS_MM2, baseKha } from '../standards/conductors';
-import type { Insulation, SystemType } from '../types/electrical';
+import { AL_MIN_SECTION_MM2, STANDARD_SECTIONS_MM2, khaFor } from '../standards/conductors';
+import type { ConductorMaterial, InstallMethod, Insulation, SystemType } from '../types/electrical';
 import type { CableResult } from '../types/results';
 import { round } from './util';
 import { voltageDrop } from './voltageDrop';
@@ -25,8 +25,12 @@ export interface CableSizingInput {
   deratingFactor: number;
   /** PUIL minimum section (final circuit 2.5, main/trunk 4). */
   minSectionMm2: number;
-  /** Insulation family driving the base ampacity table (default PVC). */
+  /** Insulation family driving the ampacity table (default PVC). */
   insulation?: Insulation;
+  /** Conductor material (default Cu). Aluminum floors the section at 16 mm². */
+  material?: ConductorMaterial;
+  /** Installation method — selects the per-method IEC ampacity table. */
+  installMethod?: InstallMethod;
   /** When set, also upsize the cable to hold voltage drop within its limit. */
   vd?: CableVoltageDropConstraint;
 }
@@ -58,8 +62,13 @@ export function sizeCable({
   deratingFactor,
   minSectionMm2,
   insulation = 'PVC',
+  material = 'Cu',
+  installMethod = 'conduit',
   vd,
 }: CableSizingInput): CableResult {
+  const kha = (section: number): number => khaFor(section, { insulation, material, installMethod });
+  // Aluminum is only practical from 16 mm² (NAYY / NA2XY).
+  const minByMaterial = material === 'Al' ? Math.max(minSectionMm2, AL_MIN_SECTION_MM2) : minSectionMm2;
   const izRequired = Math.max(breakerRatingA, CONTINUOUS_FACTOR * designCurrentA);
   const df = deratingFactor > 0 ? deratingFactor : 1;
 
@@ -75,6 +84,7 @@ export function sizeCable({
       system: vd.system,
       voltageV: vd.voltageV,
       isLighting: vd.isLighting,
+      material,
     }).withinLimit;
 
   const ampacityRule = `Iz {iz}A >= max(In ${breakerRatingA}A, 1.25*Ib ${round(
@@ -87,13 +97,13 @@ export function sizeCable({
   // so a larger pick can be flagged as voltage-drop-driven.
   let anyAmpacityReached = false;
   for (let runs = 1; runs <= PARALLEL_MAX_RUNS; runs++) {
-    const minSec = runs === 1 ? minSectionMm2 : Math.max(minSectionMm2, PARALLEL_MIN_SECTION_MM2);
+    const minSec = runs === 1 ? minByMaterial : Math.max(minByMaterial, PARALLEL_MIN_SECTION_MM2);
     const izRequiredPerRun = izRequired / runs;
     let ampacityMinSection: number | undefined;
 
     for (const section of STANDARD_SECTIONS_MM2) {
       if (section < minSec) continue;
-      const deratedRun = baseKha(section, insulation) * df;
+      const deratedRun = kha(section) * df;
       if (deratedRun < izRequiredPerRun) continue;
       if (ampacityMinSection === undefined) ampacityMinSection = section;
       anyAmpacityReached = true;
@@ -104,7 +114,7 @@ export function sizeCable({
       const rule = ampacityRule.replace('{iz}', String(totalIz));
       return {
         csaMm2: section,
-        baseKhaA: baseKha(section, insulation),
+        baseKhaA: kha(section),
         deratedIzA: totalIz,
         deratingFactor: round(df, 3),
         ...(runs > 1 ? { runsPerPhase: runs } : {}),
@@ -124,8 +134,8 @@ export function sizeCable({
   const ampacityImpossible = !anyAmpacityReached;
   return {
     csaMm2: largest,
-    baseKhaA: baseKha(largest, insulation),
-    deratedIzA: round(baseKha(largest, insulation) * df * PARALLEL_MAX_RUNS, 1),
+    baseKhaA: kha(largest),
+    deratedIzA: round(kha(largest) * df * PARALLEL_MAX_RUNS, 1),
     deratingFactor: round(df, 3),
     runsPerPhase: PARALLEL_MAX_RUNS,
     vdDriven: !ampacityImpossible,
