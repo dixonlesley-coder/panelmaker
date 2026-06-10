@@ -12,6 +12,7 @@ import { Badge, Box, Card, Group, Paper, Select, SimpleGrid, Stack, Text, ThemeI
 import { notifications } from '@mantine/notifications';
 import {
   IconAirConditioning,
+  IconBattery2,
   IconBolt,
   IconBulb,
   IconChargingPile,
@@ -22,15 +23,25 @@ import {
   IconPlug,
   IconPlugConnected,
   IconSitemap,
+  IconSolarPanel,
   IconSparkles,
 } from '@tabler/icons-react';
-import type { CircuitInput, LoadKind, PanelInput, PanelResult } from '@shared/types';
+import type { CircuitInput, LoadKind, PanelInput, PanelResult, SourcesResult } from '@shared/types';
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { NODE_TYPES, OVERRIDE_MIME, type BranchNodeData } from '@renderer/screens/sld/nodes';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps } from '@renderer/lib/format';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
+import { PanelSettingsEditor } from '@renderer/features/builder/PanelSettingsEditor';
+import {
+  SourceEditor,
+  DEFAULT_SOLAR,
+  DEFAULT_BATTERY,
+  DEFAULT_GENERATOR,
+  type SourceKind,
+} from '@renderer/features/builder/SourceEditor';
+import { useSystemResult } from '@renderer/state/useSystemResult';
 
 /* ------------------------------- palette model ----------------------------- */
 
@@ -40,6 +51,7 @@ type PaletteAction =
   | { type: 'spare' }
   | { type: 'subpanel' }
   | { type: 'connectPanel'; childPanelId: string }
+  | { type: 'source'; kind: SourceKind }
   | { type: 'supply'; sourceType: PanelInput['sourceType'] };
 
 interface PaletteItem {
@@ -264,21 +276,33 @@ const BRANCH_GAP = 24;
 const BUSBAR_Y = 110;
 const BRANCH_Y = 200;
 
+function sourceNodeLines(kind: SourceKind, sized: SourcesResult | undefined): string[] {
+  if (kind === 'solar' && sized?.solar) return [`${sized.solar.arrayKwp} kWp`, `Inv ${sized.solar.inverterKw} kW`];
+  if (kind === 'battery' && sized?.battery)
+    return [`${sized.battery.installedKwh} kWh`, `Inv ${sized.battery.inverterKw} kW`];
+  if (kind === 'generator' && sized?.generator)
+    return [`${sized.generator.ratingKva} kVA`, sized.generator.mode];
+  return ['sized vs demand'];
+}
+
 function buildGraph(
   panel: PanelInput,
   result: PanelResult,
   changes: Map<string, string[]>,
   onOverride: (circuitId: string, kind: 'breaker' | 'cable', value: number) => void,
+  enabledSources: SourceKind[],
+  sizedSources: SourcesResult | undefined,
 ): { nodes: Node[]; edges: Edge[] } {
   const branches = result.circuits;
   const totalWidth = Math.max(branches.length, 1) * (BRANCH_W + BRANCH_GAP) - BRANCH_GAP;
   const busbarCenterX = totalWidth / 2;
+  const incomerX = busbarCenterX - 90;
 
   const nodes: Node[] = [
     {
       id: 'incomer',
       type: 'incomer',
-      position: { x: busbarCenterX - 90, y: 0 },
+      position: { x: incomerX, y: 0 },
       data: {
         label: panel.tag ? `${panel.tag} — ${panel.name}` : panel.name,
         ratingA: formatAmps(result.totalDemandCurrentA),
@@ -300,6 +324,32 @@ function buildGraph(
   const edges: Edge[] = [
     { id: 'e-incomer-busbar', source: 'incomer', target: 'busbar', type: 'smoothstep' },
   ];
+
+  // Distributed energy sources sit above the incomer and feed into it.
+  const SRC_GAP = 168;
+  const srcRowW = Math.max(enabledSources.length, 1) * SRC_GAP - SRC_GAP;
+  enabledSources.forEach((kind, i) => {
+    const id = `source-${kind}`;
+    nodes.push({
+      id,
+      type: 'source',
+      position: { x: incomerX + 90 - srcRowW / 2 - 75 + i * SRC_GAP, y: -150 },
+      data: {
+        kind,
+        title: kind === 'solar' ? 'Solar PV' : kind === 'battery' ? 'Battery' : 'Generator',
+        lines: sourceNodeLines(kind, sizedSources),
+      },
+      draggable: false,
+    });
+    edges.push({
+      id: `e-${id}-incomer`,
+      source: id,
+      target: 'incomer',
+      type: 'smoothstep',
+      animated: true,
+      style: { stroke: 'var(--mantine-color-yellow-6)', strokeDasharray: '4 3' },
+    });
+  });
 
   branches.forEach((c, i) => {
     const x = i * (BRANCH_W + BRANCH_GAP);
@@ -456,6 +506,32 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
     ? result.circuits.find((c) => c.circuitId === editing.circuitId)
     : undefined;
 
+  // Energy sources (project-level) — shown on a building-entry (utility) panel.
+  const isRoot = panel.sourceType === 'utility';
+  const sourcesConfig = useProjectStore((s) => s.project.sources);
+  const updateSources = useProjectStore((s) => s.updateSources);
+  const sizedSources = useSystemResult().sources;
+  const enabledSources = useMemo<SourceKind[]>(() => {
+    if (!isRoot) return [];
+    const out: SourceKind[] = [];
+    if (sourcesConfig?.solar?.enabled) out.push('solar');
+    if (sourcesConfig?.battery?.enabled) out.push('battery');
+    if (sourcesConfig?.generator?.enabled) out.push('generator');
+    return out;
+  }, [isRoot, sourcesConfig]);
+
+  // Which secondary editor is open (panel settings, or a source).
+  const [panelSettingsOpen, setPanelSettingsOpen] = useState(false);
+  const [editingSource, setEditingSource] = useState<SourceKind | null>(null);
+
+  const enableSource = (kind: SourceKind) => {
+    if (kind === 'solar') updateSources({ solar: { ...DEFAULT_SOLAR, ...sourcesConfig?.solar, enabled: true } });
+    else if (kind === 'battery')
+      updateSources({ battery: { ...DEFAULT_BATTERY, ...sourcesConfig?.battery, enabled: true } });
+    else updateSources({ generator: { ...DEFAULT_GENERATOR, ...sourcesConfig?.generator, enabled: true } });
+    setEditingSource(kind);
+  };
+
   /** Pin a manual breaker rating / cable minimum onto a specific circuit. */
   const applyOverride = (circuitId: string, kind: 'breaker' | 'cable', value: number) => {
     updateCircuit(
@@ -482,9 +558,9 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
   }, [result, panel.id]);
 
   const { nodes, edges } = useMemo(
-    () => buildGraph(panel, result, changes, applyOverride),
+    () => buildGraph(panel, result, changes, applyOverride, enabledSources, sizedSources),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panel, result, changes],
+    [panel, result, changes, enabledSources, sizedSources],
   );
 
   const onDrop = (e: React.DragEvent) => {
@@ -550,6 +626,9 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
         updatePanel(panel.id, { sourceType: action.sourceType });
         notifications.show({ message: t('vbuilder.supplySet'), color: 'teal' });
         break;
+      case 'source':
+        enableSource(action.kind);
+        break;
     }
   };
 
@@ -607,6 +686,48 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
                 {t('vbuilder.overrideHint')}
               </Text>
             </div>
+            {isRoot && (
+              <div>
+                <Text size="xs" c="dimmed" fw={600} tt="uppercase" mb={6} style={{ letterSpacing: '0.04em' }}>
+                  {t('vbuilder.groupSources')}
+                </Text>
+                <SimpleGrid cols={1} spacing={6}>
+                  {([
+                    { kind: 'solar', icon: <IconSolarPanel size={16} />, label: t('vbuilder.solar') },
+                    { kind: 'battery', icon: <IconBattery2 size={16} />, label: t('vbuilder.battery') },
+                    { kind: 'generator', icon: <IconBolt size={16} />, label: t('vbuilder.generator') },
+                  ] as const).map((src) => (
+                    <Paper
+                      key={src.kind}
+                      withBorder
+                      radius="md"
+                      p={6}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          DND_MIME,
+                          JSON.stringify({ type: 'source', kind: src.kind }),
+                        );
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      style={{ cursor: 'grab', userSelect: 'none' }}
+                    >
+                      <Group gap={8} wrap="nowrap">
+                        <ThemeIcon size="sm" variant="light" color="yellow">
+                          {src.icon}
+                        </ThemeIcon>
+                        <Text size="xs" fw={500} lineClamp={1}>
+                          {src.label}
+                        </Text>
+                      </Group>
+                    </Paper>
+                  ))}
+                </SimpleGrid>
+                <Text size="xs" c="dimmed" mt={6}>
+                  {t('vbuilder.sourcesHint')}
+                </Text>
+              </div>
+            )}
             {orphanPanels.length > 0 && (
               <div>
                 <Text size="xs" c="dimmed" fw={600} tt="uppercase" mb={6} style={{ letterSpacing: '0.04em' }}>
@@ -682,6 +803,10 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
               elementsSelectable={false}
               onNodeDoubleClick={(_, node) => {
                 if (node.type === 'branch') setEditing({ circuitId: node.id, focus: 'device' });
+                else if (node.type === 'incomer' || node.type === 'busbar') setPanelSettingsOpen(true);
+                else if (node.type === 'source') {
+                  setEditingSource((node.data as { kind: SourceKind }).kind);
+                }
               }}
               onEdgeDoubleClick={(_, edge) => {
                 const id = edge.id.startsWith('e-busbar-') ? edge.id.slice('e-busbar-'.length) : '';
@@ -704,6 +829,10 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
           opened
           onClose={() => setEditing(null)}
         />
+      )}
+      <PanelSettingsEditor panel={panel} opened={panelSettingsOpen} onClose={() => setPanelSettingsOpen(false)} />
+      {editingSource && (
+        <SourceEditor kind={editingSource} opened onClose={() => setEditingSource(null)} />
       )}
     </Stack>
   );

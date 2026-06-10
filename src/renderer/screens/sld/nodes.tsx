@@ -1,6 +1,6 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Badge, Box, Group, Paper, Text } from '@mantine/core';
-import { IconBolt, IconCpu, IconPlugConnected } from '@tabler/icons-react';
+import { Badge, Box, Group, Paper, Text, ThemeIcon } from '@mantine/core';
+import { IconBattery2, IconBolt, IconCpu, IconPlugConnected, IconSolarPanel } from '@tabler/icons-react';
 
 /**
  * Custom React Flow node renderers for the single-line diagrams. Nodes carry a
@@ -63,7 +63,8 @@ export interface PanelNodeData {
 export function IncomerNode({ data }: NodeProps) {
   const d = data as IncomerNodeData;
   return (
-    <Paper withBorder radius="md" p="xs" shadow="sm" style={{ width: 180 }}>
+    <Paper withBorder radius="md" p="xs" shadow="sm" style={{ width: 180, cursor: 'pointer' }}>
+      <Handle type="target" position={Position.Top} />
       <Group gap={6} wrap="nowrap">
         <IconPlugConnected size={18} color="var(--mantine-color-indigo-5)" />
         <Box>
@@ -211,6 +212,50 @@ export function BranchNode({ data }: NodeProps) {
   );
 }
 
+/** A distributed energy source (solar / battery / generator) tied to the supply. */
+export interface SourceNodeData {
+  kind: 'solar' | 'battery' | 'generator';
+  title: string;
+  lines: string[];
+  [key: string]: unknown;
+}
+
+const SOURCE_ICON = {
+  solar: <IconSolarPanel size={16} />,
+  battery: <IconBattery2 size={16} />,
+  generator: <IconBolt size={16} />,
+};
+const SOURCE_COLOR = { solar: 'yellow', battery: 'teal', generator: 'orange' } as const;
+
+export function SourceNode({ data }: NodeProps) {
+  const d = data as SourceNodeData;
+  const color = SOURCE_COLOR[d.kind];
+  return (
+    <Paper
+      withBorder
+      radius="md"
+      p="xs"
+      shadow="xs"
+      style={{ width: 150, cursor: 'pointer', borderColor: `var(--mantine-color-${color}-5)` }}
+    >
+      <Group gap={6} wrap="nowrap" mb={2}>
+        <ThemeIcon size="sm" variant="light" color={color}>
+          {SOURCE_ICON[d.kind]}
+        </ThemeIcon>
+        <Text size="xs" fw={700} lineClamp={1}>
+          {d.title}
+        </Text>
+      </Group>
+      {d.lines.map((l, i) => (
+        <Text key={i} size="xs" c="dimmed" lineClamp={1}>
+          {l}
+        </Text>
+      ))}
+      <Handle type="source" position={Position.Bottom} />
+    </Paper>
+  );
+}
+
 /** Panel: a node in the building-level diagram. */
 export function PanelNode({ data }: NodeProps) {
   const d = data as PanelNodeData;
@@ -270,4 +315,5 @@ export const NODE_TYPES = {
   busbar: BusbarNode,
   branch: BranchNode,
   panel: PanelNode,
+  source: SourceNode,
 };
