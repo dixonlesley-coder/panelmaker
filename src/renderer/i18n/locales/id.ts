@@ -555,6 +555,7 @@ export const id: TranslationKeys = {
     solarPv: 'PV Surya',
     battery: 'Baterai',
     tabSingleLine: 'Satu garis',
+    dragToPanel: 'Seret ke panel',
     tabBuilding: 'Bangunan',
     tabPower: 'Satu garis daya',
     clickPanelHint: 'Klik dua kali panel untuk membukanya di editor',

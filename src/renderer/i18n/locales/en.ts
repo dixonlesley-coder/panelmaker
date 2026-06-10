@@ -551,6 +551,7 @@ export const en = {
     solarPv: 'Solar PV',
     battery: 'Battery',
     tabSingleLine: 'Single-line',
+    dragToPanel: 'Drag onto a panel',
     tabBuilding: 'Building',
     tabPower: 'Power one-line',
     clickPanelHint: 'Double-click a panel to open it in the editor',

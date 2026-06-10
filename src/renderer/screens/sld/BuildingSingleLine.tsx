@@ -11,15 +11,44 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react';
-import { Badge, Box, Drawer, Group, Text } from '@mantine/core';
-import { IconPlugConnected } from '@tabler/icons-react';
-import type { LoadKind, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import { Badge, Box, Card, Drawer, Group, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { useTranslation } from 'react-i18next';
+import {
+  IconAirConditioning,
+  IconBolt,
+  IconBulb,
+  IconChargingPile,
+  IconDroplet,
+  IconEngine,
+  IconHandMove,
+  IconPlug,
+  IconPlugConnected,
+  IconSitemap,
+} from '@tabler/icons-react';
+import type { CircuitInput, LoadKind, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
+
+/* Palette: drag a card onto a panel to add the way/sub-panel there. */
+const SLD_DND = 'application/x-panelmaker-sld-add';
+type SldAdd =
+  | { type: 'load'; loadKind: LoadKind; nameKey: string; defaults: Partial<CircuitInput> }
+  | { type: 'subpanel' };
+const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd }[] = [
+  { key: 'lighting', labelKey: 'vbuilder.lighting', icon: <IconBulb size={14} />, action: { type: 'load', loadKind: 'lighting', nameKey: 'vbuilder.lighting', defaults: { loadW: 1200, isLighting: true, cosPhi: 0.9 } } },
+  { key: 'socket', labelKey: 'vbuilder.sockets', icon: <IconPlug size={14} />, action: { type: 'load', loadKind: 'socket', nameKey: 'vbuilder.sockets', defaults: { loadW: 2000, cosPhi: 0.95 } } },
+  { key: 'hvac', labelKey: 'vbuilder.hvac', icon: <IconAirConditioning size={14} />, action: { type: 'load', loadKind: 'hvac', nameKey: 'vbuilder.hvac', defaults: { loadW: 5500, cosPhi: 0.9 } } },
+  { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: { type: 'load', loadKind: 'motor', nameKey: 'vbuilder.motor', defaults: { loadW: 0, motorKw: 5.5, starterType: 'DOL', cosPhi: 0.85 } } },
+  { key: 'pump', labelKey: 'vbuilder.pump', icon: <IconDroplet size={14} />, action: { type: 'load', loadKind: 'pump', nameKey: 'vbuilder.pump', defaults: { loadW: 0, motorKw: 4, starterType: 'DOL', cosPhi: 0.85 } } },
+  { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: { type: 'load', loadKind: 'ev_charger', nameKey: 'vbuilder.ev', defaults: { loadW: 7400, cosPhi: 0.98 } } },
+  { key: 'general', labelKey: 'vbuilder.general', icon: <IconBolt size={14} />, action: { type: 'load', loadKind: 'general', nameKey: 'vbuilder.general', defaults: { loadW: 2000, cosPhi: 0.85 } } },
+  { key: 'subpanel', labelKey: 'vbuilder.subpanel', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
+];
 
 /**
  * Unified building single-line: every panel on ONE canvas. Zoomed out, a panel
@@ -107,6 +136,8 @@ interface UnifiedPanelData {
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
   onEditCircuit?: (circuitId: string) => void;
+  /** Add a way / sub-panel here (palette card dropped on this panel). */
+  onAddItem?: (action: SldAdd) => void;
   [key: string]: unknown;
 }
 
@@ -538,6 +569,22 @@ function UnifiedPanelNode({ data }: NodeProps) {
         boxShadow: 'var(--mantine-shadow-sm)',
         padding: 10,
       }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(SLD_DND)) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }
+      }}
+      onDrop={(e) => {
+        const raw = e.dataTransfer.getData(SLD_DND);
+        if (!raw) return;
+        e.preventDefault();
+        try {
+          d.onAddItem?.(JSON.parse(raw) as SldAdd);
+        } catch {
+          /* malformed payload — ignore */
+        }
+      }}
     >
       <Handle type="target" position={Position.Top} id="in" />
 
@@ -604,6 +651,7 @@ function buildUnified(
   project: ProjectInput,
   system: SystemResult,
   onEditCircuit: (panelId: string, circuitId: string) => void,
+  onAddItem: (panelId: string, action: SldAdd) => void,
 ): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
@@ -730,6 +778,7 @@ function buildUnified(
         feederIds: ways.filter((wy) => wy.feeds).map((wy) => wy.id),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
+        onAddItem: (action) => onAddItem(id, action),
       };
       nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, draggable: false });
       x += w + GAP;
@@ -762,8 +811,11 @@ function buildUnified(
 }
 
 export function BuildingSingleLine({ system }: { system: SystemResult }) {
+  const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
+  const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
+  const addSubPanel = useProjectStore((s) => s.addSubPanel);
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
@@ -781,9 +833,35 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     [setActivePanel],
   );
 
+  // Drop a palette card on a panel → add the way / sub-panel there.
+  const addItem = useCallback(
+    (panelId: string, action: SldAdd) => {
+      if (action.type === 'subpanel') {
+        addSubPanel(panelId);
+        notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
+        return;
+      }
+      const panel = project.panels.find((p) => p.id === panelId);
+      const count = (panel?.circuits.length ?? 0) + 1;
+      addCircuitConfigured(panelId, {
+        name: `${t(action.nameKey)} ${count}`,
+        role: 'branch',
+        loadW: 0,
+        cosPhi: 0.85,
+        lengthM: 20,
+        loadKind: action.loadKind,
+        isLighting: action.loadKind === 'lighting',
+        demandFactor: 1,
+        ...action.defaults,
+      });
+      notifications.show({ message: t('vbuilder.added', { name: t(action.nameKey) }), color: 'teal' });
+    },
+    [project, addCircuitConfigured, addSubPanel, t],
+  );
+
   const { nodes, edges } = useMemo(
-    () => buildUnified(project, system, openCircuit),
-    [project, system, openCircuit],
+    () => buildUnified(project, system, openCircuit, addItem),
+    [project, system, openCircuit, addItem],
   );
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
@@ -793,27 +871,64 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     : undefined;
 
   return (
-    <Box h={560}>
-      <ReactFlowProvider>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={UNIFIED_NODE_TYPES}
-          fitView
-          fitViewOptions={{ padding: 0.15 }}
-          proOptions={{ hideAttribution: true }}
-          minZoom={0.2}
-          maxZoom={2.5}
-          nodesConnectable={false}
-          nodesDraggable={false}
-          elementsSelectable={false}
-          zoomOnDoubleClick={false}
-          onNodeDoubleClick={(_, node) => openInspector(node.id)}
-        >
-          <Background gap={18} />
-          <Controls showInteractive={false} />
-        </ReactFlow>
-      </ReactFlowProvider>
+    <Group align="stretch" gap="sm" wrap="nowrap" h={560}>
+      {/* Palette — drag a card onto a panel to add it there */}
+      <Card withBorder radius="md" padding="xs" w={140} style={{ flexShrink: 0, overflowY: 'auto' }}>
+        <Group gap={4} mb={6} wrap="nowrap">
+          <IconHandMove size={13} color="var(--mantine-color-dimmed)" />
+          <Text size="xs" c="dimmed" fw={600}>
+            {t('system.dragToPanel')}
+          </Text>
+        </Group>
+        <Stack gap={5}>
+          {SLD_PALETTE.map((item) => (
+            <Paper
+              key={item.key}
+              withBorder
+              radius="sm"
+              p={5}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(SLD_DND, JSON.stringify(item.action));
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+              style={{ cursor: 'grab', userSelect: 'none' }}
+            >
+              <Group gap={6} wrap="nowrap">
+                <ThemeIcon size="sm" variant="light" color={item.action.type === 'subpanel' ? 'teal' : 'indigo'}>
+                  {item.icon}
+                </ThemeIcon>
+                <Text size="xs" fw={500} lineClamp={1}>
+                  {t(item.labelKey)}
+                </Text>
+              </Group>
+            </Paper>
+          ))}
+        </Stack>
+      </Card>
+
+      <Box style={{ flex: 1, minWidth: 0 }}>
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={UNIFIED_NODE_TYPES}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            proOptions={{ hideAttribution: true }}
+            minZoom={0.2}
+            maxZoom={2.5}
+            nodesConnectable={false}
+            nodesDraggable={false}
+            elementsSelectable={false}
+            zoomOnDoubleClick={false}
+            onNodeDoubleClick={(_, node) => openInspector(node.id)}
+          >
+            <Background gap={18} />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </Box>
 
       {/* Inline circuit editor (double-click a component on the diagram). */}
       {editing && editingCircuit && (
@@ -838,6 +953,6 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       >
         {inspectPanelId !== null && <PanelEditor />}
       </Drawer>
-    </Box>
+    </Group>
   );
 }
