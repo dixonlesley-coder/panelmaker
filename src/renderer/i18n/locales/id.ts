@@ -596,6 +596,10 @@ export const id: TranslationKeys = {
     hasParent: '{{name}} sudah disuplai panel lain — putuskan feeder itu lebih dulu.',
     cycle: 'Sambungan itu akan membuat lingkaran pada pohon feeder (panel tidak bisa menyuplai induknya sendiri).',
   },
+  sldSources: {
+    enabled: '{{name}} diaktifkan — tampil di kepala layanan; atur ukurannya di Sumber energi.',
+    already: '{{name}} sudah aktif — atur di Sumber energi.',
+  },
   sldDelete: {
     title: 'Hapus panel distribusi?',
     body_one: '{{panel}} menyuplai {{count}} sub-panel. Menghapusnya akan membuang feedernya; sub-panel di bawah tetap ada tetapi terputus (kembali menjadi root mandiri):',
@@ -915,6 +919,8 @@ export const id: TranslationKeys = {
     lighting: 'Penerangan',
     sockets: 'Stop kontak',
     hvac: 'Pendingin udara',
+    heating: 'Pemanas air',
+    ups: 'UPS / beban TI',
     motor: 'Motor (DOL)',
     pump: 'Pompa',
     ev: 'Pengisi EV',

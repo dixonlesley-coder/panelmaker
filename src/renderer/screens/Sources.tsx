@@ -16,10 +16,11 @@ import { IconBattery, IconBolt, IconSun } from '@tabler/icons-react';
 import type { BatteryConfig, GeneratorConfig, GeneratorMode, SolarConfig } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
-
-const DEFAULT_GEN: GeneratorConfig = { enabled: false, backupFraction: 1, mode: 'standby' };
-const DEFAULT_SOLAR: SolarConfig = { enabled: false, targetKwp: 50, panelWp: 550, dcAcRatio: 1.2 };
-const DEFAULT_BATT: BatteryConfig = { enabled: false, backupKw: 10, autonomyHours: 4, chemistry: 'lifepo4' };
+import {
+  DEFAULT_BATTERY as DEFAULT_BATT,
+  DEFAULT_GENERATOR as DEFAULT_GEN,
+  DEFAULT_SOLAR,
+} from '@renderer/data/sourceDefaults';
 
 /** Computed-result strip shown under an enabled source. */
 function ResultBlock({ stats, note }: { stats: [string, string][]; note: string }) {

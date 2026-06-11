@@ -592,6 +592,10 @@ export const en = {
     hasParent: '{{name}} is already fed by another panel — disconnect that feeder first.',
     cycle: 'That connection would loop the feeder tree (a panel cannot feed its own parent).',
   },
+  sldSources: {
+    enabled: '{{name}} enabled — it shows at the service head; size and tune it under Energy sources.',
+    already: '{{name}} is already enabled — configure it under Energy sources.',
+  },
   sldDelete: {
     title: 'Delete a distribution panel?',
     body_one: '{{panel}} feeds {{count}} sub-panel. Deleting it removes its feeders; the sub-panel below stays but is disconnected (back to a standalone root):',
@@ -910,6 +914,8 @@ export const en = {
     lighting: 'Lighting',
     sockets: 'Sockets',
     hvac: 'Air conditioning',
+    heating: 'Water heater',
+    ups: 'UPS / IT load',
     motor: 'Motor (DOL)',
     pump: 'Pump',
     ev: 'EV charger',

@@ -63,6 +63,27 @@ describe('canvas workflow store behavior', () => {
     expect(panelOf().circuits).toHaveLength(3);
   });
 
+  it('attachFloatingLoad preserves the demand factor (drop-on-canvas path)', () => {
+    const { addPanel, addFloatingLoad, attachFloatingLoad } = useProjectStore.getState();
+    const panelId = addPanel();
+    const floatId = addFloatingLoad({
+      name: 'Sockets',
+      loadKind: 'socket',
+      loadW: 2000,
+      cosPhi: 0.9,
+      demandFactor: 0.7,
+      isLighting: false,
+      position: { x: 0, y: 0 },
+    });
+    attachFloatingLoad(floatId, panelId);
+    const circuit = useProjectStore
+      .getState()
+      .project.panels.find((p) => p.id === panelId)!
+      .circuits.find((c) => c.name === 'Sockets')!;
+    expect(circuit.demandFactor).toBe(0.7);
+    expect(useProjectStore.getState().floatingLoads).toHaveLength(0);
+  });
+
   it('addSubPanel names stay unique after deletions too', () => {
     const { addPanel, addSubPanel, removePanel } = useProjectStore.getState();
     const root = addPanel();

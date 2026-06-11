@@ -26,6 +26,8 @@ export interface FloatingLoad {
   loadKind: LoadKind;
   loadW: number;
   cosPhi: number;
+  /** Kind demand factor — preserved when the float is wired into a panel. */
+  demandFactor: number;
   isLighting: boolean;
   motorKw?: number;
   starterType?: StarterType;
@@ -668,7 +670,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         lengthM: 20,
         loadKind: load.loadKind,
         isLighting: load.isLighting,
-        demandFactor: 1,
+        demandFactor: load.demandFactor,
         ...(load.motorKw !== undefined ? { motorKw: load.motorKw } : {}),
         ...(load.starterType !== undefined ? { starterType: load.starterType } : {}),
       };

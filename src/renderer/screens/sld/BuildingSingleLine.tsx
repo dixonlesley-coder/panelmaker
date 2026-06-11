@@ -22,20 +22,24 @@ import {
 import { Badge, Box, Button, Card, Drawer, Group, List, Menu, Modal, Paper, Stack, Text, TextInput, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
-import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
+import { LOAD_DEFAULTS, STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import {
   IconAirConditioning,
+  IconBattery2,
   IconBolt,
   IconBulb,
   IconChargingPile,
   IconCircuitSwitchOpen,
   IconDroplet,
   IconEngine,
+  IconFlame,
   IconHandMove,
   IconPlug,
   IconPlugConnected,
+  IconServer,
   IconSitemap,
+  IconSolarPanel,
 } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { circuitOrderCodes } from '@shared/engine/bom';
@@ -51,23 +55,64 @@ import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CanvasHelp } from '@renderer/screens/sld/CanvasHelp';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
 import { PanelSettingsEditor } from '@renderer/features/builder/PanelSettingsEditor';
+import { DEFAULT_BATTERY, DEFAULT_GENERATOR, DEFAULT_SOLAR } from '@renderer/data/sourceDefaults';
 
 /* Palette: drag a card onto a panel to add the way/sub-panel there. */
 const SLD_DND = 'application/x-panelmaker-sld-add';
+type SourceKind = 'generator' | 'solar' | 'battery';
 type SldAdd =
   | { type: 'load'; loadKind: LoadKind; nameKey: string; defaults: Partial<CircuitInput> }
-  | { type: 'subpanel' };
+  | { type: 'subpanel' }
+  | { type: 'source'; source: SourceKind };
+
+/**
+ * A load card: a typical connected size plus the standards-library cos φ and
+ * demand factor for its kind — ONE source of truth with the circuit wizard and
+ * table, so a "Sockets" circuit sizes identically (e.g. df 0.7, not 1.0)
+ * no matter which entry point created it.
+ */
+function loadCard(kind: LoadKind, nameKey: string, extra: Partial<CircuitInput> = {}): SldAdd {
+  return {
+    type: 'load',
+    loadKind: kind,
+    nameKey,
+    defaults: {
+      cosPhi: LOAD_DEFAULTS[kind].cosPhi,
+      demandFactor: LOAD_DEFAULTS[kind].demandFactor,
+      ...(kind === 'lighting' ? { isLighting: true } : {}),
+      ...extra,
+    },
+  };
+}
+
 const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd }[] = [
-  { key: 'lighting', labelKey: 'vbuilder.lighting', icon: <IconBulb size={14} />, action: { type: 'load', loadKind: 'lighting', nameKey: 'vbuilder.lighting', defaults: { loadW: 1200, isLighting: true, cosPhi: 0.9 } } },
-  { key: 'socket', labelKey: 'vbuilder.sockets', icon: <IconPlug size={14} />, action: { type: 'load', loadKind: 'socket', nameKey: 'vbuilder.sockets', defaults: { loadW: 2000, cosPhi: 0.95 } } },
-  { key: 'hvac', labelKey: 'vbuilder.hvac', icon: <IconAirConditioning size={14} />, action: { type: 'load', loadKind: 'hvac', nameKey: 'vbuilder.hvac', defaults: { loadW: 5500, cosPhi: 0.9 } } },
-  { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: { type: 'load', loadKind: 'motor', nameKey: 'vbuilder.motor', defaults: { loadW: 0, motorKw: 5.5, starterType: 'DOL', cosPhi: 0.85 } } },
-  { key: 'pump', labelKey: 'vbuilder.pump', icon: <IconDroplet size={14} />, action: { type: 'load', loadKind: 'pump', nameKey: 'vbuilder.pump', defaults: { loadW: 0, motorKw: 4, starterType: 'DOL', cosPhi: 0.85 } } },
-  { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: { type: 'load', loadKind: 'ev_charger', nameKey: 'vbuilder.ev', defaults: { loadW: 7400, cosPhi: 0.98 } } },
-  { key: 'general', labelKey: 'vbuilder.general', icon: <IconBolt size={14} />, action: { type: 'load', loadKind: 'general', nameKey: 'vbuilder.general', defaults: { loadW: 2000, cosPhi: 0.85 } } },
+  { key: 'lighting', labelKey: 'vbuilder.lighting', icon: <IconBulb size={14} />, action: loadCard('lighting', 'vbuilder.lighting', { loadW: 1200 }) },
+  { key: 'socket', labelKey: 'vbuilder.sockets', icon: <IconPlug size={14} />, action: loadCard('socket', 'vbuilder.sockets', { loadW: 2000 }) },
+  { key: 'hvac', labelKey: 'vbuilder.hvac', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac', { loadW: 5500 }) },
+  // Resistive water heater — hotels/apartments/restaurants; no-neutral when 3φ.
+  { key: 'heating', labelKey: 'vbuilder.heating', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.heating', { loadW: 2000 }) },
+  { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.motor', { loadW: 0, motorKw: 5.5, starterType: 'DOL' }) },
+  { key: 'pump', labelKey: 'vbuilder.pump', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump', { loadW: 0, motorKw: 4, starterType: 'DOL' }) },
+  { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
+  // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
+  { key: 'ups', labelKey: 'vbuilder.ups', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
+  { key: 'general', labelKey: 'vbuilder.general', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general', { loadW: 2000 }) },
   // A spare way: installed breaker, no load/cable — boards keep 20-30% spare.
-  { key: 'spare', labelKey: 'vbuilder.spare', icon: <IconCircuitSwitchOpen size={14} />, action: { type: 'load', loadKind: 'spare', nameKey: 'vbuilder.spareName', defaults: { loadW: 0, demandFactor: 0, lengthM: 1, cosPhi: 1 } } },
+  { key: 'spare', labelKey: 'vbuilder.spare', icon: <IconCircuitSwitchOpen size={14} />, action: loadCard('spare', 'vbuilder.spareName', { loadW: 0, lengthM: 1 }) },
   { key: 'subpanel', labelKey: 'vbuilder.subpanel', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
+];
+
+/**
+ * Energy-source cards: dropping one anywhere enables that source with the
+ * shared defaults (it appears on the service head + the power one-line; tune
+ * it on the Sources screen). PLN itself is not a card — the grid intake is
+ * automatic on the service root — and the inverter is auto-sized within the
+ * solar/battery designs, not placed by hand.
+ */
+const SOURCE_PALETTE: { key: SourceKind; labelKey: string; icon: React.ReactNode }[] = [
+  { key: 'generator', labelKey: 'vbuilder.generator', icon: <IconEngine size={14} /> },
+  { key: 'solar', labelKey: 'vbuilder.solar', icon: <IconSolarPanel size={14} /> },
+  { key: 'battery', labelKey: 'vbuilder.battery', icon: <IconBattery2 size={14} /> },
 ];
 
 /**
@@ -131,6 +176,8 @@ interface SupplyHead {
   generator?: boolean;
   ats?: boolean;
   meter?: string; // "kWh" or "CT 300/5"
+  solar?: string; // "PV 40 kWp"
+  battery?: string; // "Batt 20 kWh"
 }
 interface BusDevice {
   kind: 'spd' | 'cap';
@@ -931,6 +978,8 @@ interface GridSourceData {
   transformer?: string; // "630 kVA" — shown when fed at MV
   meter?: string; // "kWh" or "CT 300/5"
   generator?: boolean;
+  solar?: string; // "PV 40 kWp"
+  battery?: string; // "Batt 20 kWh"
   [key: string]: unknown;
 }
 
@@ -964,8 +1013,8 @@ function GridSourceNode({ data }: NodeProps) {
           </Text>
         </Box>
       </Group>
-      {(d.meter || d.generator) && (
-        <Group gap={4} mt={3} wrap="nowrap">
+      {(d.meter || d.generator || d.solar || d.battery) && (
+        <Group gap={4} mt={3} wrap="wrap">
           {d.meter && (
             <Badge size="xs" variant="light" color="indigo">
               {d.meter}
@@ -974,6 +1023,16 @@ function GridSourceNode({ data }: NodeProps) {
           {d.generator && (
             <Badge size="xs" variant="light" color="orange">
               ATS
+            </Badge>
+          )}
+          {d.solar && (
+            <Badge size="xs" variant="light" color="teal">
+              {d.solar}
+            </Badge>
+          )}
+          {d.battery && (
+            <Badge size="xs" variant="light" color="grape">
+              {d.battery}
             </Badge>
           )}
         </Group>
@@ -1103,6 +1162,10 @@ function buildUnified(
       head.generator = true;
       head.ats = true;
     }
+    // Solar / battery hang off the main bus too — show them at the service
+    // head so an enabled source is visible right where it was dropped.
+    if (system.sources?.solar) head.solar = `PV ${system.sources.solar.arrayKwp} kWp`;
+    if (system.sources?.battery) head.battery = `Batt ${system.sources.battery.installedKwh} kWh`;
     if (system.metering) head.meter = system.metering.metering === 'ct' ? `CT ${system.metering.ctRatio ?? ''}`.trim() : 'kWh';
     return Object.keys(head).length > 0 ? head : undefined;
   };
@@ -1220,6 +1283,8 @@ function buildUnified(
             ...(data.supply?.transformer ? { transformer: data.supply.transformer } : {}),
             ...(data.supply?.meter ? { meter: data.supply.meter } : {}),
             ...(data.supply?.generator ? { generator: true } : {}),
+            ...(data.supply?.solar ? { solar: data.supply.solar } : {}),
+            ...(data.supply?.battery ? { battery: data.supply.battery } : {}),
           } satisfies GridSourceData,
         });
         edges.push({
@@ -1444,9 +1509,36 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     [setActivePanel],
   );
 
+  // Source cards enable a PROJECT-level energy source (shown on the service
+  // head + the power one-line); the Sources screen is where it's tuned.
+  const updateSources = useProjectStore((s) => s.updateSources);
+  const enableSource = useCallback(
+    (kind: SourceKind) => {
+      const sources = useProjectStore.getState().project.sources;
+      const name = t(`vbuilder.${kind}`);
+      if (sources?.[kind]?.enabled) {
+        notifications.show({ message: t('sldSources.already', { name }), color: 'blue' });
+        return;
+      }
+      if (kind === 'generator') {
+        updateSources({ generator: { ...DEFAULT_GENERATOR, ...sources?.generator, enabled: true } });
+      } else if (kind === 'solar') {
+        updateSources({ solar: { ...DEFAULT_SOLAR, ...sources?.solar, enabled: true } });
+      } else {
+        updateSources({ battery: { ...DEFAULT_BATTERY, ...sources?.battery, enabled: true } });
+      }
+      notifications.show({ message: t('sldSources.enabled', { name }), color: 'teal' });
+    },
+    [updateSources, t],
+  );
+
   // Drop a palette card on a panel → add the way / sub-panel there.
   const addItem = useCallback(
     (panelId: string, action: SldAdd) => {
+      if (action.type === 'source') {
+        enableSource(action.source);
+        return;
+      }
       if (action.type === 'subpanel') {
         addSubPanel(panelId);
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
@@ -1467,7 +1559,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       });
       notifications.show({ message: t('vbuilder.added', { name: t(action.nameKey) }), color: 'teal' });
     },
-    [project, addCircuitConfigured, addSubPanel, t],
+    [project, addCircuitConfigured, addSubPanel, enableSource, t],
   );
 
   // Drop on the empty canvas (not on a panel): a sub-panel becomes a new
@@ -1484,6 +1576,11 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         return;
       }
       const p = rfRef.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY }) ?? { x: 80, y: 80 };
+      if (action.type === 'source') {
+        // Sources are project-level — same effect wherever the card lands.
+        enableSource(action.source);
+        return;
+      }
       if (action.type === 'subpanel') {
         // A panel dropped on empty canvas is a STANDALONE panel (nothing feeds
         // it yet) — say so, and put it where it was dropped, not where the
@@ -1499,6 +1596,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         loadKind: action.loadKind,
         loadW: action.defaults.loadW ?? 1000,
         cosPhi: action.defaults.cosPhi ?? 0.85,
+        // Keep the kind's demand factor: losing it here would make the same
+        // card size differently via drop-on-canvas vs drop-on-panel.
+        demandFactor: action.defaults.demandFactor ?? 1,
         isLighting: action.loadKind === 'lighting',
         ...(action.defaults.motorKw !== undefined ? { motorKw: action.defaults.motorKw } : {}),
         ...(action.defaults.starterType !== undefined ? { starterType: action.defaults.starterType } : {}),
@@ -1506,7 +1606,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       });
       notifications.show({ message: t('system.loadDropped'), color: 'teal' });
     },
-    [addPanel, addFloatingLoad, t],
+    [addPanel, addFloatingLoad, enableSource, t],
   );
 
   const built = useMemo(
@@ -1682,6 +1782,34 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             >
               <Group gap={6} wrap="nowrap">
                 <ThemeIcon size="sm" variant="light" color={item.action.type === 'subpanel' ? 'teal' : 'indigo'}>
+                  {item.icon}
+                </ThemeIcon>
+                <Text size="xs" fw={500} lineClamp={1}>
+                  {t(item.labelKey)}
+                </Text>
+              </Group>
+            </Paper>
+          ))}
+
+          {/* Energy sources: dropping a card enables the source project-wide. */}
+          <Text size="xs" c="dimmed" fw={600} tt="uppercase" mt={6} style={{ letterSpacing: '0.04em' }}>
+            {t('vbuilder.groupSources')}
+          </Text>
+          {SOURCE_PALETTE.map((item) => (
+            <Paper
+              key={item.key}
+              withBorder
+              radius="sm"
+              p={5}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(SLD_DND, JSON.stringify({ type: 'source', source: item.key } satisfies SldAdd));
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+              style={{ cursor: 'grab', userSelect: 'none' }}
+            >
+              <Group gap={6} wrap="nowrap">
+                <ThemeIcon size="sm" variant="light" color="orange">
                   {item.icon}
                 </ThemeIcon>
                 <Text size="xs" fw={500} lineClamp={1}>
