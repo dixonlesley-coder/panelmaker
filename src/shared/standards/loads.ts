@@ -39,6 +39,7 @@ export const LOAD_DEFAULTS: Readonly<Record<LoadKind, LoadDefaults>> = {
   welding: { label: 'Welding', cosPhi: 0.7, demandFactor: 0.5, curve: 'D', threePhasePreferred: true, motorLike: false, needsNeutral: true },
   capacitor: { label: 'Capacitor bank', cosPhi: 1.0, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: false },
   ups: { label: 'UPS', cosPhi: 0.9, demandFactor: 1, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
+  spare: { label: 'Spare way', cosPhi: 1.0, demandFactor: 0, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
   feeder: { label: 'Feeder (sub-panel)', cosPhi: 0.85, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: true },
 };
 
@@ -55,6 +56,7 @@ export const LOAD_KINDS: readonly LoadKind[] = [
   'welding',
   'capacitor',
   'ups',
+  'spare',
   'feeder',
 ];
 

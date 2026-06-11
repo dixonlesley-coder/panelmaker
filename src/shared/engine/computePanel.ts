@@ -208,11 +208,14 @@ function computeCircuit(
     warnings.push(...validateInterlocks(control, panel.id));
   }
 
-  const containment = sizeCircuitConduit(cable.csaMm2, grounding.cores);
+  // A spare way is breaker provision only — there is no outgoing cable run, so
+  // conduit sizing for it would just be noise on the schedule.
+  const containment = c.loadKind === 'spare' ? undefined : sizeCircuitConduit(cable.csaMm2, grounding.cores);
 
   const result: CircuitResult = {
     circuitId: c.id,
     name: c.name,
+    loadKind: c.loadKind,
     designCurrentA,
     phase: threePhase ? '3ph' : 'L1', // single-phase assignment finalised after balancing
     breaker,
@@ -324,12 +327,16 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   const warnings: Warning[] = [];
   let totalConnectedLoadW = 0;
   let totalModules = panel.system === '3ph' ? 4 : 2; // incomer breaker
+  let activeModules = totalModules; // modules excluding spare ways
+  let spareWaysPresent = 0;
   let totalHeatW = 0;
   let hasFloorGear = false;
 
   for (const cm of comps) {
     totalConnectedLoadW += cm.effectiveLoadW;
     totalModules += cm.modules;
+    if (cm.result.loadKind === 'spare') spareWaysPresent += 1;
+    else activeModules += cm.modules;
     totalHeatW += cm.heatW;
     if (cm.floorGear) hasFloorGear = true;
     warnings.push(...cm.warnings);
@@ -479,7 +486,10 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   const spare = {
     busbarHeadroomPct,
     meetsReserveTarget: busbarHeadroomPct >= 25,
-    recommendedSpareWays: Math.max(3, Math.ceil(totalModules * 0.2)),
+    // Based on ACTIVE modules so the target stays put as spares are added —
+    // otherwise each added spare would grow the recommendation it satisfies.
+    recommendedSpareWays: Math.max(3, Math.ceil(activeModules * 0.2)),
+    spareWaysPresent,
   };
 
   // Cable tray for all outgoing cables, laid side-by-side in a single layer.

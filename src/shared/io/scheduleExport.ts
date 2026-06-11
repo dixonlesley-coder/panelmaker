@@ -28,6 +28,8 @@ const CABLE_SCHEDULE_HEADER: readonly string[] = [
 
 /** Build one cable-schedule row for a circuit within a panel. */
 function cableRow(panel: PanelResult, c: CircuitResult): (string | number)[] {
+  // A spare way is breaker provision only — no cable run to schedule.
+  const isSpare = c.loadKind === 'spare';
   return [
     panel.name ?? '',
     panel.tag ?? '',
@@ -35,11 +37,11 @@ function cableRow(panel: PanelResult, c: CircuitResult): (string | number)[] {
     c.designCurrentA ?? '',
     c.phase ?? '',
     c.breaker?.ratingA ?? '',
-    c.cable?.csaMm2 ?? '',
-    c.grounding?.cores ?? '',
-    c.grounding?.cableSpec ?? '',
-    c.voltageDrop?.dropPercent ?? '',
-    c.cumulativeDropPercent ?? '',
+    isSpare ? '' : (c.cable?.csaMm2 ?? ''),
+    isSpare ? '' : (c.grounding?.cores ?? ''),
+    isSpare ? 'SPARE' : (c.grounding?.cableSpec ?? ''),
+    isSpare ? '' : (c.voltageDrop?.dropPercent ?? ''),
+    isSpare ? '' : (c.cumulativeDropPercent ?? ''),
   ];
 }
 

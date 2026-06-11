@@ -29,6 +29,7 @@ import {
   IconBolt,
   IconBulb,
   IconChargingPile,
+  IconCircuitSwitchOpen,
   IconDroplet,
   IconEngine,
   IconHandMove,
@@ -62,6 +63,8 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   { key: 'pump', labelKey: 'vbuilder.pump', icon: <IconDroplet size={14} />, action: { type: 'load', loadKind: 'pump', nameKey: 'vbuilder.pump', defaults: { loadW: 0, motorKw: 4, starterType: 'DOL', cosPhi: 0.85 } } },
   { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: { type: 'load', loadKind: 'ev_charger', nameKey: 'vbuilder.ev', defaults: { loadW: 7400, cosPhi: 0.98 } } },
   { key: 'general', labelKey: 'vbuilder.general', icon: <IconBolt size={14} />, action: { type: 'load', loadKind: 'general', nameKey: 'vbuilder.general', defaults: { loadW: 2000, cosPhi: 0.85 } } },
+  // A spare way: installed breaker, no load/cable — boards keep 20-30% spare.
+  { key: 'spare', labelKey: 'vbuilder.spare', icon: <IconCircuitSwitchOpen size={14} />, action: { type: 'load', loadKind: 'spare', nameKey: 'vbuilder.spareName', defaults: { loadW: 0, demandFactor: 0, lengthM: 1, cosPhi: 1 } } },
   { key: 'subpanel', labelKey: 'vbuilder.subpanel', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
 ];
 
@@ -1236,6 +1239,9 @@ function buildUnified(
       const panelH = heightFor(id);
       ways.forEach((wy, i) => {
         if (wy.feeds) return;
+        // A spare way has nothing connected: its breaker + open terminal in the
+        // panel schematic IS the representation — no external load node.
+        if (wy.kind === 'spare') return;
         const loadId = `load-${wy.id}`;
         const wayCx = LEFT + i * WAY_W + WAY_W / 2;
         nodes.push({
@@ -1362,6 +1368,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const saveAsTemplate = useProjectStore((s) => s.saveAsTemplate);
+  const addSpareWays = useProjectStore((s) => s.addSpareWays);
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
@@ -1608,6 +1615,14 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     if (ctx) updateCircuit(ctx.panelId, ctx.circuitId, patch);
     setCtx(null);
   };
+
+  // Spare ways still missing vs the engine's ~20% recommendation, for the
+  // right-clicked panel — drives the one-click "add recommended spares".
+  const ctxSpares = (() => {
+    if (!nodeCtx) return 0;
+    const sp = system.panels[nodeCtx.panelId]?.spare;
+    return sp ? Math.max(0, sp.recommendedSpareWays - sp.spareWaysPresent) : 0;
+  })();
 
   return (
     <Group align="stretch" gap="sm" wrap="nowrap" h="clamp(560px, calc(100vh - 220px), 880px)">
@@ -1896,6 +1911,22 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           >
             {t('sldMenu.openPanel')}
           </Menu.Item>
+          {ctxSpares > 0 && (
+            <Menu.Item
+              onClick={() => {
+                const panelId = nodeCtx?.panelId;
+                setNodeCtx(null);
+                if (!panelId) return;
+                addSpareWays(panelId, ctxSpares);
+                notifications.show({
+                  message: t('sldMenu.sparesAdded', { count: ctxSpares }),
+                  color: 'teal',
+                });
+              }}
+            >
+              {t('sldMenu.addSpares', { count: ctxSpares })}
+            </Menu.Item>
+          )}
           <Menu.Item
             onClick={() => {
               const panelId = nodeCtx?.panelId;

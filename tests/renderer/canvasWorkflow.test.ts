@@ -41,6 +41,28 @@ describe('canvas workflow store behavior', () => {
     expect(useProjectStore.getState().project.panels.some((p) => p.id === second)).toBe(true);
   });
 
+  it('addSpareWays appends N spares as one undoable step with continued numbering', () => {
+    const { addPanel, addSpareWays, undo } = useProjectStore.getState();
+    const id = addPanel();
+    addSpareWays(id, 3);
+    const panelOf = () => useProjectStore.getState().project.panels.find((p) => p.id === id)!;
+    expect(panelOf().circuits.map((c) => c.name)).toEqual(['Spare 1', 'Spare 2', 'Spare 3']);
+    expect(panelOf().circuits.every((c) => c.loadKind === 'spare' && c.demandFactor === 0)).toBe(true);
+
+    addSpareWays(id, 2);
+    expect(panelOf().circuits.map((c) => c.name)).toEqual([
+      'Spare 1',
+      'Spare 2',
+      'Spare 3',
+      'Spare 4',
+      'Spare 5',
+    ]);
+
+    // One undo removes the whole second batch.
+    undo();
+    expect(panelOf().circuits).toHaveLength(3);
+  });
+
   it('addSubPanel names stay unique after deletions too', () => {
     const { addPanel, addSubPanel, removePanel } = useProjectStore.getState();
     const root = addPanel();

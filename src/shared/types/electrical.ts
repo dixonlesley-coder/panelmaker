@@ -29,6 +29,9 @@ export type LoadKind =
   | 'welding'
   | 'capacitor'
   | 'ups'
+  // A reserved way: an installed breaker with no load (good practice keeps
+  // 20-30% of a board spare). Contributes no demand; no cable run or RCD.
+  | 'spare'
   | 'feeder';
 
 /** Which phase(s) a circuit is connected to. */

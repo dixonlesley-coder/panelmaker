@@ -88,6 +88,8 @@ export interface CircuitRcdInput {
 
 /** Decide whether a circuit needs an RCD and at what sensitivity. */
 export function circuitRcd(i: CircuitRcdInput): RcdSpec {
+  // A spare way has no load and no cable run — nothing for an RCD to protect.
+  if (i.loadKind === 'spare') return { required: false, ratingMa: 0, reason: '' };
   if (i.earthingSystem === 'TT' && i.isFinalCircuit) {
     return {
       required: true,

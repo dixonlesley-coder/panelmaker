@@ -3,7 +3,7 @@
 import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
-import type { PhaseAssignment, EarthingSystem, CableType } from './electrical';
+import type { PhaseAssignment, EarthingSystem, CableType, LoadKind } from './electrical';
 import type { SourcesResult } from './sources';
 // Type-only imports of result shapes defined alongside their engine modules
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
@@ -117,6 +117,8 @@ export interface VoltageDropResult {
 export interface CircuitResult {
   circuitId: string;
   name: string;
+  /** The input circuit's load kind — lets schedules/BOM treat spares/feeders specially. */
+  loadKind: LoadKind;
   designCurrentA: number;
   /** 1-phase circuits report their assigned phase; 3-phase report '3ph'. */
   phase: PhaseAssignment;
@@ -235,8 +237,10 @@ export interface SpareCapacityResult {
   busbarHeadroomPct: number;
   /** True when the busbar reserve meets the recommended ≥ 25% future allowance. */
   meetsReserveTarget: boolean;
-  /** Recommended spare DIN ways to leave for future circuits (≈ 20%, min 3). */
+  /** Recommended spare DIN ways for future circuits (≈ 20% of active modules, min 3). */
   recommendedSpareWays: number;
+  /** Spare ways already on the board (circuits of kind 'spare'). */
+  spareWaysPresent: number;
 }
 
 export interface EnclosureResult {

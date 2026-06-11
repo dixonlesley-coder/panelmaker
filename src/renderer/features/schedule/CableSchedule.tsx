@@ -22,6 +22,7 @@ function fileStem(name: string): string {
 
 /** Cable make-up text for a circuit: prefer the explicit spec, else size × cores. */
 function cableMakeUp(circuit: CircuitResult): string {
+  if (circuit.loadKind === 'spare') return ''; // rendered as a SPARE marker instead
   const g = circuit.grounding;
   if (g.cableSpec) return g.cableSpec;
   return `${circuit.cable.csaMm2} mm² · ${g.cores}-core`;
@@ -135,7 +136,15 @@ export function CableSchedule({ panel, result }: { panel: PanelInput; result: Pa
                     <Table.Td>
                       {c.breaker.deviceClass} {c.breaker.ratingA}A · {c.breaker.curve}
                     </Table.Td>
-                    <Table.Td>{cableMakeUp(c)}</Table.Td>
+                    <Table.Td>
+                      {c.loadKind === 'spare' ? (
+                        <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+                          {t('schedule.spare')}
+                        </Text>
+                      ) : (
+                        cableMakeUp(c)
+                      )}
+                    </Table.Td>
                     <Table.Td>
                       {c.containment
                         ? `${c.containment.conduitSizeMm} mm (${c.containment.fillPct}%)`

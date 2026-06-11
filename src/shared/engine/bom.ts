@@ -111,12 +111,15 @@ export function circuitOrderCodes(
     },
     parts,
   );
-  const cableId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
   const out: { breaker?: string; cable?: string } = {};
   const breaker = skuOf(parts, breakerId);
-  const cable = skuOf(parts, cableId);
   if (breaker) out.breaker = breaker;
-  if (cable) out.cable = cable;
+  // A spare way has no cable run, so there is no cable order code to surface.
+  if (circuit.loadKind !== 'spare') {
+    const cableId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
+    const cable = skuOf(parts, cableId);
+    if (cable) out.cable = cable;
+  }
   return out;
 }
 
@@ -146,15 +149,18 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
 
     // Cable run (priced per metre — qty 1 here as the run length is not modelled
     // as a separate quantity in the result; kept as one line for the summary).
-    const cablePartId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
-    lines.push({
-      partId: cablePartId,
-      sku: skuOf(parts, cablePartId),
-      description: `Cable ${circuit.grounding.cableType} ${circuit.cable.csaMm2} mm² — ${circuit.name}`,
-      category: 'cable',
-      qty: 1,
-      matched: cablePartId !== undefined,
-    });
+    // Spare ways are breaker provision only: no cable is installed for them.
+    if (circuit.loadKind !== 'spare') {
+      const cablePartId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
+      lines.push({
+        partId: cablePartId,
+        sku: skuOf(parts, cablePartId),
+        description: `Cable ${circuit.grounding.cableType} ${circuit.cable.csaMm2} mm² — ${circuit.name}`,
+        category: 'cable',
+        qty: 1,
+        matched: cablePartId !== undefined,
+      });
+    }
 
     // Control gear, if any.
     if (circuit.control) {

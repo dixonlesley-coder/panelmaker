@@ -175,6 +175,11 @@ export interface ProjectState {
   setPhaseAssignments: (panelId: string, assignment: Record<string, 'L1' | 'L2' | 'L3'>) => void;
   /** Append a fully-configured circuit (fresh id) to a panel — used by the wizard. */
   addCircuitConfigured: (panelId: string, circuit: Omit<CircuitInput, 'id'>) => void;
+  /**
+   * Append `count` spare ways (breaker provision, no load/cable) to a panel as
+   * ONE undoable step — the one-click "reserve recommended spares" action.
+   */
+  addSpareWays: (panelId: string, count: number) => void;
 
   // floating loads (on the canvas, before they're wired to a panel)
   /** Drop a load on the canvas; returns its id. */
@@ -612,6 +617,29 @@ export const useProjectStore = create<ProjectState>((set) => ({
         })),
       ),
     ),
+
+  addSpareWays: (panelId, count) =>
+    set((s) => {
+      if (count <= 0) return s;
+      return withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          // Continue the spare numbering from what's already on the board.
+          let n = panel.circuits.filter((c) => c.loadKind === 'spare').length;
+          const spares: CircuitInput[] = Array.from({ length: count }, () => ({
+            id: nextId('c'),
+            name: `Spare ${(n += 1)}`,
+            role: 'branch',
+            loadW: 0,
+            cosPhi: 1,
+            lengthM: 1,
+            loadKind: 'spare',
+            isLighting: false,
+            demandFactor: 0,
+          }));
+          return { ...panel, circuits: [...panel.circuits, ...spares] };
+        }),
+      );
+    }),
 
   addFloatingLoad: (load) => {
     const id = nextId('fl');
