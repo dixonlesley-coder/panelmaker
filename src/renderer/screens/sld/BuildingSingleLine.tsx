@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  getSmoothStepPath,
   useNodesState,
   useViewport,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
 } from '@xyflow/react';
@@ -699,6 +703,49 @@ function UnifiedPanelNode({ data }: NodeProps) {
 
 const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode };
 
+/**
+ * Feeder edge between panels. Sibling feeders from the same parent share a
+ * mid-height, so their horizontal runs (and labels) overlap. `data.offset`
+ * staggers each sibling's centre line so the cables and labels separate out.
+ */
+function FeederEdge({
+  sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, data,
+}: EdgeProps) {
+  const offset = (data?.offset as number | undefined) ?? 0;
+  const label = data?.label as string | undefined;
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
+    centerY: (sourceY + targetY) / 2 + offset,
+    borderRadius: 8,
+  });
+  return (
+    <>
+      <BaseEdge path={path} markerEnd={markerEnd} style={style} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan"
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              fontSize: 10,
+              fontWeight: 700,
+              background: 'var(--mantine-color-body)',
+              padding: '0 4px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const UNIFIED_EDGE_TYPES = { feeder: FeederEdge };
+
 /** Outgoing-cable size, e.g. "4×16 mm²" or "2×(4×95) mm²" for parallel runs. */
 function cableLabel(csaMm2: number, cores: number, runs?: number): string {
   return runs && runs > 1 ? `${runs}×(${cores}×${csaMm2}) mm²` : `${cores}×${csaMm2} mm²`;
@@ -850,25 +897,35 @@ function buildUnified(
     });
   }
 
-  const edges: Edge[] = [];
+  // Group feeders by parent so sibling cables can be staggered apart.
+  const feedersByParent = new Map<string, { circuitId: string; childId: string }[]>();
   for (const [circuitId, childId] of feederWayToChild) {
     const parentId = parentOf.get(childId);
     if (!parentId || !system.panels[childId] || !system.panels[parentId]) continue;
-    const feederWay = system.panels[parentId]?.circuits.find((c) => c.circuitId === circuitId);
-    const feederLabel = feederWay
-      ? `${feederWay.breaker.ratingA}A · ${cableLabel(feederWay.cable.csaMm2, feederWay.grounding.cores, feederWay.cable.runsPerPhase)}`
-      : undefined;
-    edges.push({
-      id: `feed-${circuitId}`,
-      source: parentId,
-      sourceHandle: circuitId,
-      target: childId,
-      targetHandle: 'in',
-      type: 'smoothstep',
-      label: feederLabel,
-      labelStyle: { fontSize: 10, fontWeight: 700 },
-      labelBgStyle: { fill: 'var(--mantine-color-body)' },
-      style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
+    const list = feedersByParent.get(parentId) ?? [];
+    list.push({ circuitId, childId });
+    feedersByParent.set(parentId, list);
+  }
+
+  const edges: Edge[] = [];
+  for (const [parentId, list] of feedersByParent) {
+    list.forEach(({ circuitId, childId }, i) => {
+      const feederWay = system.panels[parentId]?.circuits.find((c) => c.circuitId === circuitId);
+      const feederLabel = feederWay
+        ? `${feederWay.breaker.ratingA}A · ${cableLabel(feederWay.cable.csaMm2, feederWay.grounding.cores, feederWay.cable.runsPerPhase)}`
+        : undefined;
+      // Spread sibling centre-lines around the midpoint so cables + labels don't stack.
+      const offset = (i - (list.length - 1) / 2) * 26;
+      edges.push({
+        id: `feed-${circuitId}`,
+        source: parentId,
+        sourceHandle: circuitId,
+        target: childId,
+        targetHandle: 'in',
+        type: 'feeder',
+        data: { label: feederLabel, offset },
+        style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
+      });
     });
   }
 
@@ -1050,6 +1107,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             edges={edges}
             onNodesChange={onNodesChange}
             nodeTypes={UNIFIED_NODE_TYPES}
+            edgeTypes={UNIFIED_EDGE_TYPES}
             fitView
             fitViewOptions={{ padding: 0.15 }}
             proOptions={{ hideAttribution: true }}

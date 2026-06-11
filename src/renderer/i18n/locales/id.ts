@@ -525,8 +525,10 @@ export const id: TranslationKeys = {
   catalogPdf: {
     button: 'Impor dari PDF',
     title: 'Impor katalog dari PDF',
-    hint: 'Pilih PDF katalog; ekstraktor bawaan membaca tabel pemesanannya, lalu Anda tinjau dan impor. Persempit ke halaman kode pesanan untuk hasil terbaik.',
+    hint: 'Pilih PDF katalog; semua kode pesanan diekstrak, dikategorikan otomatis dari judul halaman, dan harga (Rp) ditangkap. Kosongkan halaman untuk seluruh buku, lalu tinjau dan impor.',
     pages: 'Halaman (opsional)',
+    pagesAll: 'semua halaman (kosong)',
+    defaultCategoryHint: 'Cadangan saja — sebagian besar otomatis',
     choose: 'Pilih PDF & ekstrak',
     pagesWord: 'halaman',
     detected: '{{tables}} tabel → {{parts}} kandidat komponen',
