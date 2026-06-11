@@ -6,7 +6,7 @@
 
 import type { Part } from '@shared/types/parts';
 import { STANDARDS_VERSION } from '@shared/standards/version';
-import { SCHNEIDER_CATALOG_PARTS } from '@shared/data/catalog';
+import { CATALOG_PARTS } from '@shared/data/catalog';
 import { getDb, type Db } from './connection';
 import { insertPartsIfAbsent, partsCount } from '../repositories/parts.repo';
 import { importPricelist, listPricelists } from '../repositories/pricelists.repo';
@@ -245,10 +245,10 @@ const SEED_PRICES: Readonly<Record<string, number>> = {
 
 /**
  * Seed the catalogue. The small starter set + default pricelist seed only into a
- * fresh (empty) DB. The committed manufacturer catalogue
- * ({@link SCHNEIDER_CATALOG_PARTS}) is then upserted on *every* launch — idempotent
- * by SKU — so updating the committed JSON propagates new parts to existing
- * installs without ever clobbering parts/prices the user added themselves.
+ * fresh (empty) DB. The committed manufacturer catalogues
+ * ({@link CATALOG_PARTS} — every brand) are then upserted on *every* launch —
+ * idempotent by SKU — so updating the committed JSON propagates new parts to
+ * existing installs without ever clobbering parts/prices the user added themselves.
  */
 export function seed(db: Db = getDb()): { partsInserted: number; pricelistCreated: boolean } {
   let partsInserted = 0;
@@ -269,8 +269,8 @@ export function seed(db: Db = getDb()): { partsInserted: number; pricelistCreate
     }
   }
 
-  // Manufacturer catalogue: idempotent top-up on every launch (skips existing ids).
-  partsInserted += insertPartsIfAbsent([...SCHNEIDER_CATALOG_PARTS], db);
+  // Manufacturer catalogues (all brands): idempotent top-up on every launch.
+  partsInserted += insertPartsIfAbsent([...CATALOG_PARTS], db);
 
   return { partsInserted, pricelistCreated };
 }

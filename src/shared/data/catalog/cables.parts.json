@@ -1,0 +1,23 @@
+{
+  "catalogVersion": "cables-sni-1",
+  "manufacturer": "Generic",
+  "source": "Standard Indonesian LV power-cable constructions (NYY 0.6/1 kV copper, SNI/IEC) across the standard conductor ladder. These are generic type+size references — NOT brand-specific order codes — so the BOM can match and price cable runs; substitute a specific maker (Supreme, Kabelindo, Jembo, Voksel, KMI, Prysmian) and verify the KHA/derating against the datasheet and PUIL 2011 table 7.3.",
+  "parts": [
+    { "sku": "NYY-1.5", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 1.5 mm² Cu", "unit": "m", "attributes": { "csaMm2": 1.5, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-2.5", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 2.5 mm² Cu", "unit": "m", "attributes": { "csaMm2": 2.5, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-4", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 4 mm² Cu", "unit": "m", "attributes": { "csaMm2": 4, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-6", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 6 mm² Cu", "unit": "m", "attributes": { "csaMm2": 6, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-10", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 10 mm² Cu", "unit": "m", "attributes": { "csaMm2": 10, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-16", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 16 mm² Cu", "unit": "m", "attributes": { "csaMm2": 16, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-25", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 25 mm² Cu", "unit": "m", "attributes": { "csaMm2": 25, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-35", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 35 mm² Cu", "unit": "m", "attributes": { "csaMm2": 35, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-50", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 50 mm² Cu", "unit": "m", "attributes": { "csaMm2": 50, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-70", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 70 mm² Cu", "unit": "m", "attributes": { "csaMm2": 70, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-95", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 95 mm² Cu", "unit": "m", "attributes": { "csaMm2": 95, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-120", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 120 mm² Cu", "unit": "m", "attributes": { "csaMm2": 120, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-150", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 150 mm² Cu", "unit": "m", "attributes": { "csaMm2": 150, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-185", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 185 mm² Cu", "unit": "m", "attributes": { "csaMm2": 185, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-240", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 240 mm² Cu", "unit": "m", "attributes": { "csaMm2": 240, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+    { "sku": "NYY-300", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 300 mm² Cu", "unit": "m", "attributes": { "csaMm2": 300, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } }
+  ]
+}

@@ -16,6 +16,9 @@
 import { PART_CATEGORIES, type Part, type PartCategory } from '@shared/types/parts';
 import { parseCsv } from '@shared/io/csv';
 import schneiderRaw from './schneider.parts.json';
+import mitsubishiRaw from './mitsubishi.parts.json';
+import lsRaw from './ls.parts.json';
+import cablesRaw from './cables.parts.json';
 
 /** One ordering-table row as it appears in the committed JSON. */
 export interface CatalogEntry {
@@ -26,6 +29,8 @@ export interface CatalogEntry {
   series: string;
   /** Human-readable model description, e.g. "iC60N 3P C32". */
   model: string;
+  /** Brand override for this row; falls back to the loader's `brand` argument. */
+  manufacturer?: string;
   /** Source page in the catalogue PDF (provenance; optional). */
   page?: number;
   /** Category-specific electrical attributes (ratingA, poles, curve, …). */
@@ -62,6 +67,7 @@ export interface CatalogIssue {
  */
 export function loadCatalog(
   file: CatalogFile,
+  brand = 'Schneider',
 ): { parts: Part[]; issues: CatalogIssue[]; prices: Record<string, number> } {
   const parts: Part[] = [];
   const issues: CatalogIssue[] = [];
@@ -96,7 +102,7 @@ export function loadCatalog(
     parts.push({
       id: e.sku,
       category: e.category,
-      manufacturer: 'Schneider',
+      manufacturer: e.manufacturer ?? brand,
       model: e.model,
       attributes: { ...a, sku: e.sku, series: e.series },
       defaultUnit: e.unit ?? 'pcs',
@@ -107,31 +113,73 @@ export function loadCatalog(
   return { parts, issues, prices };
 }
 
-const schneiderFile = schneiderRaw as unknown as CatalogFile;
-const schneider = loadCatalog(schneiderFile);
+/**
+ * The committed catalogue datasets, one per manufacturer/source. Each is loaded
+ * with its `brand` (the `Part.manufacturer` value, unless a row overrides it) and
+ * the merged result is de-duplicated by SKU in source order — so adding a brand is
+ * just a new JSON file + a line here. Schneider stays first for back-compat.
+ */
+const CATALOG_SOURCES: { brand: string; file: CatalogFile }[] = [
+  { brand: 'Schneider', file: schneiderRaw as unknown as CatalogFile },
+  { brand: 'Mitsubishi Electric', file: mitsubishiRaw as unknown as CatalogFile },
+  { brand: 'LS Electric', file: lsRaw as unknown as CatalogFile },
+  { brand: 'Generic', file: cablesRaw as unknown as CatalogFile },
+];
 
-/** Catalogue dataset version (bumped when the JSON is regenerated). */
-export const SCHNEIDER_CATALOG_VERSION = schneiderFile.catalogVersion;
+const LOADED = CATALOG_SOURCES.map((s) => ({
+  brand: s.brand,
+  version: s.file.catalogVersion,
+  ...loadCatalog(s.file, s.brand),
+}));
+
+const schneider = LOADED[0]!;
+
+/** Schneider dataset version (bumped when that JSON is regenerated). */
+export const SCHNEIDER_CATALOG_VERSION = schneider.version;
 
 /** The validated Schneider catalogue as ready-to-seed {@link Part}s. */
 export const SCHNEIDER_CATALOG_PARTS: readonly Part[] = schneider.parts;
 
-/** Validation issues in the committed dataset — asserted empty by the test. */
+/** Validation issues in the Schneider dataset — asserted empty by the test. */
 export const SCHNEIDER_CATALOG_ISSUES: readonly CatalogIssue[] = schneider.issues;
 
+const merged = (() => {
+  const seen = new Set<string>();
+  const parts: Part[] = [];
+  const issues: CatalogIssue[] = [];
+  for (const l of LOADED) {
+    issues.push(...l.issues);
+    for (const p of l.parts) {
+      if (seen.has(p.id)) continue; // first source wins on a cross-brand SKU clash
+      seen.add(p.id);
+      parts.push(p);
+    }
+  }
+  return { parts, issues };
+})();
+
+/** Every manufacturer's validated parts, de-duplicated by SKU (Schneider first). */
+export const CATALOG_PARTS: readonly Part[] = merged.parts;
+
+/** Validation issues across ALL committed datasets — asserted empty by the test. */
+export const CATALOG_ISSUES: readonly CatalogIssue[] = merged.issues;
+
 /**
- * Merge the catalogue onto a base parts list, de-duplicating by SKU so the
- * illustrative sample parts don't double up with their catalogue equivalents.
- * The catalogue entry wins.
+ * Merge the whole catalogue (all manufacturers) onto a base parts list,
+ * de-duplicating by SKU so the illustrative sample parts don't double up with
+ * their catalogue equivalents. The catalogue entry wins.
  */
-export function withSchneiderCatalog(base: readonly Part[]): Part[] {
-  const catalogSkus = new Set(SCHNEIDER_CATALOG_PARTS.map((p) => p.id));
+export function withCatalog(base: readonly Part[]): Part[] {
+  const catalogSkus = new Set(CATALOG_PARTS.map((p) => p.id));
   const filtered = base.filter((p) => {
     const sku = typeof p.attributes.sku === 'string' ? p.attributes.sku : p.id;
     return !catalogSkus.has(sku) && !catalogSkus.has(p.id);
   });
-  return [...filtered, ...SCHNEIDER_CATALOG_PARTS];
+  return [...filtered, ...CATALOG_PARTS];
 }
+
+/** @deprecated Back-compat alias — `withCatalog` now merges every manufacturer. */
+export const withSchneiderCatalog = withCatalog;
 
 /* --------------------------- export (DB → git JSON) ------------------------ */
 

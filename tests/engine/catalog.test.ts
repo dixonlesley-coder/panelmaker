@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CATALOG_ISSUES,
+  CATALOG_PARTS,
   SCHNEIDER_CATALOG_ISSUES,
   SCHNEIDER_CATALOG_PARTS,
   importCatalogText,
@@ -19,10 +21,19 @@ describe('manufacturer catalogue', () => {
     expect(SCHNEIDER_CATALOG_ISSUES).toEqual([]);
   });
 
+  it('every committed dataset (all manufacturers) has zero validation issues', () => {
+    expect(CATALOG_ISSUES).toEqual([]);
+  });
+
+  it('the merged catalogue has globally-unique SKUs across manufacturers', () => {
+    const ids = CATALOG_PARTS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('every catalogue part is a well-formed Part with a stable SKU id', () => {
     expect(SCHNEIDER_CATALOG_PARTS.length).toBeGreaterThan(0);
     const ids = new Set<string>();
-    for (const p of SCHNEIDER_CATALOG_PARTS) {
+    for (const p of CATALOG_PARTS) {
       expect(p.id).toBeTruthy();
       expect(ids.has(p.id)).toBe(false); // unique
       ids.add(p.id);
