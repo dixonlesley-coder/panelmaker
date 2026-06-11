@@ -82,9 +82,8 @@ const BRK_GAP = 26; // bar block → breaker symbol
 const BRK_H = 20;
 const RCD_BAND = 15;
 const STARTER_BAND = 28;
-const LOAD_GAP = 10;
-const LOAD_H = 24;
-const CABLE_GAP = 11;
+const LOAD_W = 70; // external load-node width (≤ WAY_W so siblings don't overlap)
+const LOAD_NODE_H = 74; // approx external load-node height (for layout clearance)
 
 const FG = 'var(--mantine-color-text)';
 const DIM = 'var(--mantine-color-dimmed)';
@@ -383,13 +382,14 @@ interface Layout {
   brkTop: number;
   rcdTop?: number;
   starterTop?: number;
-  loadTop: number;
-  cableY: number;
+  /** Where each way's outgoing terminal sits (the panel's output to the load). */
+  outY: number;
   height: number;
 }
 
 /** Vertical layout — RCD / starter bands are reserved only when the panel uses
- * them, so every way's load + cable label stays aligned. */
+ * them. The panel ends at the MCB/starter output terminal; the LOAD itself is a
+ * separate node wired to that terminal, so loads live outside the panel. */
 function layout(threePhase: boolean, hasRcd: boolean, hasStarter: boolean): Layout {
   const bars = barLayout(threePhase);
   const brkTop = bars[bars.length - 1]!.y + BRK_GAP;
@@ -404,9 +404,8 @@ function layout(threePhase: boolean, hasRcd: boolean, hasStarter: boolean): Layo
     starterTop = y + 4;
     y = starterTop + STARTER_BAND;
   }
-  const loadTop = y + LOAD_GAP;
-  const cableY = loadTop + LOAD_H + CABLE_GAP;
-  return { bars, brkTop, rcdTop, starterTop, loadTop, cableY, height: cableY + 27 };
+  const outY = y + 12;
+  return { bars, brkTop, rcdTop, starterTop, outY, height: outY + 8 };
 }
 
 function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
@@ -568,14 +567,14 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
               d.onContextCircuit?.(w.id, e.clientX, e.clientY);
             }}
           >
-            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''} — double-click to edit`}</title>
-            {/* Hover highlight: signals this component is selectable / editable. */}
+            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''} — double-click to edit`}</title>
+            {/* Hover highlight: signals this MCB is selectable / editable. */}
             {hoverWay === w.id && !dragging && (
               <rect
                 x={cx - WAY_W / 2 + 5}
                 y={L.brkTop - 9}
                 width={WAY_W - 10}
-                height={L.cableY - L.brkTop + 15}
+                height={L.outY - L.brkTop + 14}
                 rx={6}
                 fill="var(--mantine-color-indigo-5)"
                 fillOpacity={0.1}
@@ -589,10 +588,10 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
               return <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={L.brkTop} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.8} />;
             })}
             {w.phase !== '3ph' && (
-              <line x1={cx + 8} y1={barY('N')} x2={cx + 8} y2={L.loadTop} stroke={PHASE_COLOR.N} strokeWidth={1.5} strokeDasharray="4 2" />
+              <line x1={cx + 8} y1={barY('N')} x2={cx + 8} y2={L.outY} stroke={PHASE_COLOR.N} strokeWidth={1.5} strokeDasharray="4 2" />
             )}
-            <line x1={cx + 12} y1={barY('PE')} x2={cx + 12} y2={L.loadTop + LOAD_H} stroke={PHASE_COLOR.PE} strokeWidth={1.5} strokeDasharray="4 2" />
-            <line x1={cx} y1={L.brkTop + BRK_H} x2={cx} y2={L.loadTop} stroke={runColor} strokeWidth={1.8} />
+            <line x1={cx + 12} y1={barY('PE')} x2={cx + 12} y2={L.outY} stroke={PHASE_COLOR.PE} strokeWidth={1.5} strokeDasharray="4 2" />
+            <line x1={cx} y1={L.brkTop + BRK_H} x2={cx} y2={L.outY} stroke={runColor} strokeWidth={1.8} />
             {breaker(cx, L.brkTop, w.warn ? 'var(--mantine-color-red-6)' : FG)}
             <text x={cx + 9} y={L.brkTop + 13} fontSize={8} fill={DIM}>
               {w.breakerA}
@@ -605,29 +604,11 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
                 {w.starter.replace('_', '-')}
               </text>
             )}
-            <line x1={cx - 3} y1={L.loadTop - 3} x2={cx + 3} y2={L.loadTop - 9} stroke={FG} strokeWidth={1} />
-            {loadSymbol(cx, L.loadTop, w, threePhase)}
-            <text x={cx} y={L.cableY} fontSize={9} fontWeight={700} textAnchor="middle" fill={FG}>
-              {w.cable}
+            {/* Output terminal — the LOAD is a separate node wired to here. */}
+            <circle cx={cx} cy={L.outY} r={2.4} fill={runColor} />
+            <text x={cx} y={L.outY + 11} fontSize={6.5} textAnchor="middle" fill={DIM}>
+              {w.breakerA}
             </text>
-            {w.feeds ? (
-              // Feeder way: the loading % is shown on its feeder edge instead.
-              <text x={cx} y={L.cableY + 10} fontSize={8} fontWeight={700} textAnchor="middle" fill={PHASE_COLOR.L3}>
-                → {w.feeds}
-              </text>
-            ) : (
-              w.util !== undefined && (
-                <text x={cx} y={L.cableY + 10} fontSize={8} fontWeight={700} textAnchor="middle" fill={utilColor(w.util)}>
-                  {w.util}%
-                </text>
-              )
-            )}
-            {/* The circuit's label/name (double-click to edit; full text on hover). */}
-            {w.name && (
-              <text x={cx} y={L.cableY + 21} fontSize={6.5} textAnchor="middle" fill={DIM}>
-                {w.name.length > 24 ? `${w.name.slice(0, 23)}…` : w.name}
-              </text>
-            )}
           </g>
         );
       })}
@@ -663,7 +644,6 @@ function UnifiedPanelNode({ data }: NodeProps) {
   const expanded = zoom >= 0.72;
   const width = panelWidth(d.ways.length, d.bus.length);
   const hasError = (d.issues ?? []).some((i) => i.severity === 'error');
-  const feederIndex = (id: string) => d.ways.findIndex((w) => w.id === id);
   const [hover, setHover] = useState(false); // highlight the draggable/selectable panel on hover
   // Panel health: the worst cable loading + how many ways are overloaded — shown
   // as a badge so problem panels stand out while zoomed out.
@@ -762,11 +742,11 @@ function UnifiedPanelNode({ data }: NodeProps) {
         )}
       </Box>
 
-      {/* Anchors for existing feeder edges (not for starting new connections). */}
-      {d.feederIds.map((id) => {
-        const idx = feederIndex(id);
-        const left = expanded ? LEFT + idx * WAY_W + WAY_W / 2 : 24;
-        return <Handle key={id} type="source" id={id} position={Position.Bottom} style={{ left }} isConnectable={false} />;
+      {/* A source anchor per way at its MCB column — feeder edges go to sub-panels,
+          load edges go to the external load node. Not for starting new connections. */}
+      {d.ways.map((w, i) => {
+        const left = LEFT + i * WAY_W + WAY_W / 2;
+        return <Handle key={w.id} type="source" id={w.id} position={Position.Bottom} style={{ left }} isConnectable={false} />;
       })}
       {/* Outlet: drag from here onto another panel to feed it (creates the feeder).
           Big + low so it's an easy target. */}
@@ -791,7 +771,68 @@ function UnifiedPanelNode({ data }: NodeProps) {
   );
 }
 
-const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode };
+/** External load node: the load hangs OUTSIDE the panel, wired to its MCB. */
+interface LoadNodeData {
+  kind: LoadKind;
+  name: string;
+  breakerA: string;
+  cable: string;
+  util?: number;
+  phase: PhaseAssignment;
+  threePhase: boolean;
+  warn: boolean;
+  onEdit?: () => void;
+  onContext?: (x: number, y: number) => void;
+  [key: string]: unknown;
+}
+
+function LoadNode({ data }: NodeProps) {
+  const d = data as LoadNodeData;
+  const [hover, setHover] = useState(false);
+  // loadSymbol() only reads .kind/.feeds — give it a minimal way-shaped object.
+  const symW = { kind: d.kind, feeds: undefined } as unknown as UnifiedWay;
+  return (
+    <Box
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onDoubleClick={() => d.onEdit?.()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        d.onContext?.(e.clientX, e.clientY);
+      }}
+      style={{
+        width: LOAD_W,
+        background: 'var(--mantine-color-body)',
+        border: `1px solid ${d.warn ? 'var(--mantine-color-red-5)' : hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-default-border)'}`,
+        borderRadius: 'var(--mantine-radius-md)',
+        boxShadow: hover ? 'var(--mantine-shadow-md)' : 'var(--mantine-shadow-xs)',
+        padding: 5,
+        cursor: 'pointer',
+        transition: 'box-shadow 120ms ease, border-color 120ms ease',
+      }}
+    >
+      <Handle type="target" position={Position.Top} id="in" isConnectable={false} />
+      <svg width={LOAD_W - 12} height={30} style={{ display: 'block', margin: '0 auto' }}>
+        <line x1={(LOAD_W - 12) / 2} y1={0} x2={(LOAD_W - 12) / 2} y2={6} stroke={PHASE_COLOR[d.phase] ?? FG} strokeWidth={1.6} />
+        {loadSymbol((LOAD_W - 12) / 2, 8, symW, d.threePhase)}
+      </svg>
+      <Text size="9px" fw={700} ta="center" lineClamp={1} title={d.name}>
+        {d.name}
+      </Text>
+      <Text
+        size="9px"
+        ta="center"
+        lineClamp={1}
+        style={{ color: d.util !== undefined ? utilColor(d.util) : 'var(--mantine-color-dimmed)' }}
+      >
+        {d.breakerA} · {d.cable}
+        {d.util !== undefined ? ` · ${d.util}%` : ''}
+      </Text>
+    </Box>
+  );
+}
+
+const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode };
 
 /**
  * Feeder edge between panels. Sibling feeders from the same parent share a
@@ -920,9 +961,13 @@ function buildUnified(
   };
 
   const rowPitch =
-    Math.max(...project.panels.filter((p) => system.panels[p.id]).map((p) => heightFor(p.id)), 120) + 150;
+    // panel + the external-load band below it + breathing room for the next row
+    Math.max(...project.panels.filter((p) => system.panels[p.id]).map((p) => heightFor(p.id)), 120) +
+    LOAD_NODE_H +
+    120;
 
   const nodes: Node[] = [];
+  const edges: Edge[] = [];
   for (const [d, ids] of [...rows.entries()].sort((a, b) => a[0] - b[0])) {
     const widths = ids.map((id) => panelWidth(system.panels[id]?.circuits.length ?? 0, busDevicesFor(id).length));
     const GAP = 80;
@@ -989,7 +1034,44 @@ function buildUnified(
       };
       // draggable comes from the flow-level nodesDraggable; per-node draggable:false
       // would override it and break rearranging. Panels are deletable (Delete key).
-      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data });
+      const panelY = d * rowPitch;
+      nodes.push({ id, type: 'uPanel', position: { x, y: panelY }, data });
+
+      // Each non-feeder way's LOAD hangs outside the panel as its own node, wired
+      // to that way's MCB output. Feeder ways connect to their sub-panel instead.
+      const panelH = heightFor(id);
+      ways.forEach((wy, i) => {
+        if (wy.feeds) return;
+        const loadId = `load-${wy.id}`;
+        const wayCx = LEFT + i * WAY_W + WAY_W / 2;
+        nodes.push({
+          id: loadId,
+          type: 'load',
+          position: { x: x + wayCx - LOAD_W / 2, y: panelY + panelH + 34 },
+          deletable: false,
+          data: {
+            kind: wy.kind,
+            name: wy.name,
+            breakerA: wy.breakerA,
+            cable: wy.cable,
+            util: wy.util,
+            phase: wy.phase,
+            threePhase: panel.system === '3ph',
+            warn: wy.warn,
+            onEdit: () => onEditCircuit(id, wy.id),
+            onContext: (mx: number, my: number) => onContextCircuit(id, wy.id, mx, my),
+          },
+        });
+        edges.push({
+          id: `e-${loadId}`,
+          source: id,
+          sourceHandle: wy.id,
+          target: loadId,
+          targetHandle: 'in',
+          type: 'smoothstep',
+          style: { stroke: PHASE_COLOR[wy.phase] ?? 'var(--mantine-color-gray-5)', strokeWidth: 1.6 },
+        });
+      });
       x += w + GAP;
     });
   }
@@ -1004,7 +1086,6 @@ function buildUnified(
     feedersByParent.set(parentId, list);
   }
 
-  const edges: Edge[] = [];
   for (const [parentId, list] of feedersByParent) {
     list.forEach(({ circuitId, childId }, i) => {
       const feederWay = system.panels[parentId]?.circuits.find((c) => c.circuitId === circuitId);
@@ -1174,6 +1255,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // using expanded sizes, so panels don't collide once you zoom in.
   const onNodeDragStop = useCallback(
     (_e: unknown, node: Node) => {
+      if (node.type !== 'uPanel') return; // only keep panels from overlapping
       setNodes((cur) => {
         const me = panelBox(node.id);
         let { x, y } = node.position;
@@ -1181,7 +1263,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         for (let pass = 0; pass < 40; pass++) {
           let bumped = false;
           for (const n of cur) {
-            if (n.id === node.id) continue;
+            if (n.id === node.id || n.type !== 'uPanel') continue;
             const o = panelBox(n.id);
             if (x < n.position.x + o.w + M && x + me.w + M > n.position.x && y < n.position.y + o.h + M && y + me.h + M > n.position.y) {
               y = n.position.y + o.h + M; // drop below the obstacle
