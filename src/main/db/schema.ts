@@ -126,6 +126,8 @@ export const circuits = sqliteTable('circuits', {
   motorKw: real('motor_kw'),
   motorPoles: integer('motor_poles'),
   startingDuty: text('starting_duty'),
+  /** Explicit supply phase count (1 or 3); null = auto-infer. */
+  phases: integer('phases'),
 
   // Pump / level
   controlMode: text('control_mode'),

@@ -88,7 +88,7 @@ function computeCircuit(
     kind: c.loadKind,
     loadW,
     motorKw: c.motorKw,
-    hasStarter: Boolean(c.starterType),
+    phases: c.phases,
     isFeeder,
   });
   const motorLike = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
@@ -186,6 +186,18 @@ function computeCircuit(
   let heatW = 0;
   let floorGear = false;
   const warnings: Warning[] = [];
+
+  // A single-phase motor above ~4 kW is impractical (the 1-ph standard data
+  // tops out near 3.7 kW); flag a forced 1-phase motor that large.
+  if (motorLike && !threePhase && c.motorKw !== undefined && c.motorKw > 4) {
+    warnings.push({
+      code: 'single-phase-large-motor',
+      severity: 'warning',
+      message: `${c.name}: ${c.motorKw} kW on single phase is impractical — single-phase motors are rarely above ~4 kW. Supply it three-phase or confirm the machine rating.`,
+      panelId: panel.id,
+      circuitId: c.id,
+    });
+  }
 
   let control;
   if (c.starterType && c.motorKw !== undefined) {

@@ -63,6 +63,9 @@ describe('SQLite persistence', () => {
     // Per-circuit cable construction + the essential (genset-backed) panel flag.
     lighting.cableType = 'NYA';
     lp.essential = true;
+    // Explicit motor supply phase must survive the round-trip.
+    const mccPump = project.panels.find((p) => p.name.includes('MCC'))!.circuits.find((c) => c.motorKw)!;
+    mccPump.phases = 1;
     project.meta = {
       client: 'PT Contoh',
       location: 'Jakarta',
@@ -96,6 +99,8 @@ describe('SQLite persistence', () => {
     const mcc = loaded!.panels.find((p) => p.name.includes('MCC'))!;
     const starDelta = mcc.circuits.find((c) => c.starterType === 'STAR_DELTA')!;
     expect(starDelta.motorKw).toBe(37);
+    // explicit motor supply phase round-trips
+    expect(mcc.circuits.find((c) => c.motorKw)!.phases).toBe(1);
 
     // pump circuit round-trips its control mode
     const pump = mcc.circuits.find((c) => c.controlMode === 'fill');

@@ -81,6 +81,10 @@ export function Sources() {
   const batt: BatteryConfig = { ...DEFAULT_BATT, ...project.sources?.battery };
   const res = system.sources;
 
+  // When any panel is marked essential, the genset sizes to those panels and the
+  // whole-building backup fraction no longer applies.
+  const essentialCount = project.panels.filter((p) => p.essential === true).length;
+
   const setGen = (p: Partial<GeneratorConfig>) => updateSources({ generator: { ...gen, ...p } });
   const setSolar = (p: Partial<SolarConfig>) => updateSources({ solar: { ...solar, ...p } });
   const setBatt = (p: Partial<BatteryConfig>) => updateSources({ battery: { ...batt, ...p } });
@@ -107,13 +111,20 @@ export function Sources() {
         />
         {gen.enabled && (
           <>
+            {essentialCount > 0 && (
+              <Text size="xs" c="dimmed" mt="sm">
+                {t('sources.essentialActive', { count: essentialCount })}
+              </Text>
+            )}
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm">
               <NumberInput
                 label={t('sources.backupOfDemand')}
+                description={t('sources.backupOfDemandHint')}
                 value={Math.round(gen.backupFraction * 100)}
                 min={10}
                 max={100}
                 step={5}
+                disabled={essentialCount > 0}
                 onChange={(v) => setGen({ backupFraction: (typeof v === 'number' ? v : 100) / 100 })}
               />
               <div>

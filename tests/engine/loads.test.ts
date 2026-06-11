@@ -20,6 +20,28 @@ describe('1-phase / 3-phase logic', () => {
     expect(circuitIsThreePhase({ panelSystem: '1ph', kind: 'motor', loadW: 0, motorKw: 5.5 })).toBe(false);
   });
 
+  it('does NOT force 3-phase just because a motor has a starter', () => {
+    // A small single-phase pump/motor routinely has a DOL contactor + overload;
+    // the starter must not make it three-phase (it sizes off the rating).
+    expect(
+      circuitIsThreePhase({ panelSystem: '3ph', kind: 'pump', loadW: 0, motorKw: 0.75 }),
+    ).toBe(false);
+  });
+
+  it('honours an explicit phase override either way', () => {
+    // Force a small pump to 3-phase, and a large motor down to 1-phase.
+    expect(
+      circuitIsThreePhase({ panelSystem: '3ph', kind: 'pump', loadW: 0, motorKw: 0.75, phases: 3 }),
+    ).toBe(true);
+    expect(
+      circuitIsThreePhase({ panelSystem: '3ph', kind: 'motor', loadW: 0, motorKw: 11, phases: 1 }),
+    ).toBe(false);
+    // But a 1-phase panel ignores a 3-phase override (no 3-phase supply exists).
+    expect(
+      circuitIsThreePhase({ panelSystem: '1ph', kind: 'pump', loadW: 0, motorKw: 4, phases: 3 }),
+    ).toBe(false);
+  });
+
   it('recommendPhase', () => {
     expect(recommendPhase('lighting', 1000)).toBe('1ph');
     expect(recommendPhase('pump', 0, 11)).toBe('3ph');
@@ -115,5 +137,26 @@ describe('computePanel integration: phase balance + grounding', () => {
     const socket = r.circuits.find((c) => c.name === 'Sockets')!;
     expect(socket.grounding.cores).toBe(3); // socket = L+N+PE
     expect(r.circuits[0]!.grounding.peCsaMm2).toBeGreaterThan(0);
+  });
+
+  it('sizes a 1-phase pump on a single phase and a forced-3φ pump on all three', () => {
+    const panel: PanelInput = {
+      id: 'P', name: 'Pumps', system: '3ph', voltageV: 400, ambientTempC: 30,
+      installMethod: 'conduit', groupingCount: 1, diversityFactor: 1, sourceType: 'utility',
+      circuits: [
+        // Small booster with a DOL starter: must stay single-phase (the bug was
+        // that the starter forced it to 3-phase).
+        { id: 'p1', name: 'Booster 1φ', role: 'branch', loadW: 0, cosPhi: 0.85, lengthM: 10, loadKind: 'pump', isLighting: false, demandFactor: 1, motorKw: 0.75, starterType: 'DOL', phases: 1 },
+        // Same rating but explicitly forced three-phase.
+        { id: 'p2', name: 'Booster 3φ', role: 'branch', loadW: 0, cosPhi: 0.85, lengthM: 10, loadKind: 'pump', isLighting: false, demandFactor: 1, motorKw: 0.75, starterType: 'DOL', phases: 3 },
+      ],
+    };
+    const r = computePanel(panel);
+    const p1 = r.circuits.find((c) => c.circuitId === 'p1')!;
+    const p2 = r.circuits.find((c) => c.circuitId === 'p2')!;
+    expect(['L1', 'L2', 'L3']).toContain(p1.phase); // single-phase: assigned a line
+    expect(p2.phase).toBe('3ph');
+    // The 1-phase machine draws a markedly higher line current than the 3-phase one.
+    expect(p1.designCurrentA).toBeGreaterThan(p2.designCurrentA);
   });
 });

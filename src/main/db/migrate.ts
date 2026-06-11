@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   motor_kw REAL,
   motor_poles INTEGER,
   starting_duty TEXT,
+  phases INTEGER,
   control_mode TEXT,
   sensing TEXT,
   cable_override_mm2 REAL,
@@ -231,6 +232,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'cable_type', ddl: 'ALTER TABLE circuits ADD COLUMN cable_type TEXT' },
   // Essential (genset-backed) panel flag.
   { table: 'panels', column: 'essential', ddl: 'ALTER TABLE panels ADD COLUMN essential INTEGER' },
+  // Explicit supply phase count (1 or 3) for a circuit.
+  { table: 'circuits', column: 'phases', ddl: 'ALTER TABLE circuits ADD COLUMN phases INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

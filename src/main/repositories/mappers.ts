@@ -94,6 +94,7 @@ export function circuitToRow(
     motorKw: undefToNull(c.motorKw),
     motorPoles: undefToNull(c.motorPoles),
     startingDuty: undefToNull(c.startingDuty),
+    phases: undefToNull(c.phases),
     controlMode: undefToNull(c.controlMode),
     sensing: undefToNull(c.sensing),
     cableOverrideMm2: undefToNull(c.cableOverrideMm2),
@@ -145,6 +146,8 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   if (motorPoles !== undefined) c.motorPoles = motorPoles;
   const startingDuty = nullToUndef(r.startingDuty);
   if (startingDuty !== undefined) c.startingDuty = startingDuty as CircuitInput['startingDuty'];
+  const phases = nullToUndef(r.phases);
+  if (phases === 1 || phases === 3) c.phases = phases;
   const controlMode = nullToUndef(r.controlMode);
   if (controlMode !== undefined) c.controlMode = controlMode as CircuitInput['controlMode'];
   const sensing = nullToUndef(r.sensing);

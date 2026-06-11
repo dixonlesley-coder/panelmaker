@@ -31,6 +31,8 @@ export interface FloatingLoad {
   isLighting: boolean;
   motorKw?: number;
   starterType?: StarterType;
+  /** Explicit supply phase count (1 or 3) — preserved when wired in. */
+  phases?: 1 | 3;
   position: { x: number; y: number };
 }
 import { buildSchematic, mergeSchematic } from '@shared/engine';
@@ -673,6 +675,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         demandFactor: load.demandFactor,
         ...(load.motorKw !== undefined ? { motorKw: load.motorKw } : {}),
         ...(load.starterType !== undefined ? { starterType: load.starterType } : {}),
+        ...(load.phases !== undefined ? { phases: load.phases } : {}),
       };
       return {
         ...withHistory(s, (project) =>

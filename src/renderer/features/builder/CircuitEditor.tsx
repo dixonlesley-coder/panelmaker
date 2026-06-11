@@ -244,6 +244,26 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
               onChange={(v) => v && patch({ starterType: v as StarterType })}
             />
           )}
+          {motor && (
+            <Select
+              label={t('circuitEditor.phases')}
+              description={t('circuitEditor.phasesHint')}
+              data={[
+                { value: 'auto', label: t('circuitEditor.phasesAuto') },
+                { value: '1', label: t('circuitEditor.phases1') },
+                { value: '3', label: t('circuitEditor.phases3') },
+              ]}
+              value={circuit.phases !== undefined ? String(circuit.phases) : 'auto'}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true }}
+              styles={
+                circuit.phases !== undefined
+                  ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                  : undefined
+              }
+              onChange={(v) => patch({ phases: v === '1' ? 1 : v === '3' ? 3 : undefined })}
+            />
+          )}
           <Select
             label={t('builder.colUsage')}
             data={SCHEDULE_OPTIONS}

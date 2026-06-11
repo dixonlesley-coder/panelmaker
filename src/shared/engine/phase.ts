@@ -8,22 +8,29 @@ export interface ThreePhaseInput {
   kind: LoadKind;
   loadW: number;
   motorKw?: number;
-  hasStarter?: boolean;
+  /** Explicit phase count chosen by the user (1 or 3); overrides the inference. */
+  phases?: 1 | 3;
   isFeeder?: boolean;
 }
 
 /**
  * Whether a circuit is supplied three-phase. On a single-phase panel everything
- * is single-phase. On a three-phase panel: feeders and large/motor loads are
- * three-phase; small loads stay single-phase (and get phase-balanced).
+ * is single-phase. On a three-phase panel an explicit per-circuit choice wins;
+ * otherwise feeders and large/motor loads are three-phase and small loads stay
+ * single-phase (and get phase-balanced).
+ *
+ * NOTE: phase is NOT inferred from the presence of a starter — a single-phase
+ * motor routinely has a DOL contactor + thermal overload — only from the motor's
+ * rating (≥ {@link MOTOR_THREE_PHASE_KW}) or the explicit `phases` override.
  */
 export function circuitIsThreePhase(i: ThreePhaseInput): boolean {
   if (i.panelSystem === '1ph') return false;
   if (i.isFeeder || i.kind === 'feeder') return true;
+  if (i.phases !== undefined) return i.phases === 3;
   const def = LOAD_DEFAULTS[i.kind];
   if (def.motorLike) {
     const kw = i.motorKw ?? i.loadW / 1000;
-    return kw >= MOTOR_THREE_PHASE_KW || Boolean(i.hasStarter);
+    return kw >= MOTOR_THREE_PHASE_KW;
   }
   return i.loadW > SINGLE_PHASE_MAX_W;
 }

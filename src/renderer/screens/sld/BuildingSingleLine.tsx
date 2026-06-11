@@ -92,7 +92,9 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   // Resistive water heater — hotels/apartments/restaurants; no-neutral when 3φ.
   { key: 'heating', labelKey: 'vbuilder.heating', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.heating', { loadW: 2000 }) },
   { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.motor', { loadW: 0, motorKw: 5.5, starterType: 'DOL' }) },
-  { key: 'pump', labelKey: 'vbuilder.pump', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump', { loadW: 0, motorKw: 4, starterType: 'DOL' }) },
+  // Pumps split by supply phase: a small 1-ph booster vs a 3-ph transfer pump.
+  { key: 'pump1', labelKey: 'vbuilder.pump1ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump1ph', { loadW: 0, motorKw: 0.75, starterType: 'DOL', phases: 1 }) },
+  { key: 'pump3', labelKey: 'vbuilder.pump3ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump3ph', { loadW: 0, motorKw: 4, starterType: 'DOL', phases: 3 }) },
   { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
   // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
   { key: 'ups', labelKey: 'vbuilder.ups', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
@@ -1614,6 +1616,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         isLighting: action.loadKind === 'lighting',
         ...(action.defaults.motorKw !== undefined ? { motorKw: action.defaults.motorKw } : {}),
         ...(action.defaults.starterType !== undefined ? { starterType: action.defaults.starterType } : {}),
+        ...(action.defaults.phases !== undefined ? { phases: action.defaults.phases } : {}),
         position: { x: p.x - (LOAD_W + 8) / 2, y: p.y - 16 },
       });
       notifications.show({ message: t('system.loadDropped'), color: 'teal' });

@@ -44,6 +44,13 @@ export interface CircuitInput {
   motorKw?: number;
   motorPoles?: number;
   startingDuty?: StartingDuty;
+  /**
+   * Explicit supply phase count (1 or 3). Overrides the automatic inference
+   * (which keys off the motor rating / load size), so a single-phase booster
+   * pump or a three-phase resistive bank can be stated outright. Ignored on a
+   * single-phase panel (everything is 1-phase there).
+   */
+  phases?: 1 | 3;
 
   // Pump / level
   controlMode?: PumpControlMode;
