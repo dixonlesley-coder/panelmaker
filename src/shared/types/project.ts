@@ -12,6 +12,7 @@ import type {
   ConductorMaterial,
   EarthingSystem,
   OccupancyType,
+  CableType,
 } from './electrical';
 import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
 import type { LightFixture, SocketOutlet, SwitchGroup } from './fixtures';
@@ -59,6 +60,13 @@ export interface CircuitInput {
 
   /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
   cableOverrideMm2?: number;
+  /**
+   * Explicit cable construction for this run (NYY / NYM / NYA / NYAF …). When
+   * absent the engine derives the type from the panel (NYY 3ph / NYM 1ph; N2XY
+   * for XLPE; NAYY/NA2XY for aluminum). Drives the cable label on schedules and
+   * which catalog cable family the BOM matches; sizing itself is unaffected.
+   */
+  cableType?: CableType;
   /**
    * Manual breaker rating override (A). When set, the engine uses this rating
    * instead of auto-sizing from the load — and FLAGS non-compliance (an

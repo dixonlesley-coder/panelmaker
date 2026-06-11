@@ -15,7 +15,7 @@ import {
   TextInput,
 } from '@mantine/core';
 import { IconBulb, IconTrash } from '@tabler/icons-react';
-import type { CircuitInput, CircuitResult, LoadKind, StarterType } from '@shared/types';
+import type { CableType, CircuitInput, CircuitResult, LoadKind, StarterType } from '@shared/types';
 import {
   LOAD_KINDS,
   LOAD_DEFAULTS,
@@ -47,6 +47,8 @@ const CABLE_OPTIONS = [
   { value: 'auto', label: 'Auto' },
   ...STANDARD_SECTIONS_MM2.map((s) => ({ value: String(s), label: `${s} mm²` })),
 ];
+/** Selectable cable constructions (the catalog stocks these; 'auto' = panel default). */
+const CABLE_TYPES: CableType[] = ['NYY', 'NYM', 'NYA', 'NYAF'];
 
 function isMotorKind(kind: LoadKind): boolean {
   return kind === 'motor' || kind === 'pump';
@@ -255,7 +257,7 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
         <Divider label={t('circuitEditor.cableSection')} />
 
         {/* Cable run */}
-        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
           <NumberInput
             label={t('builder.colLength')}
             value={circuit.lengthM}
@@ -263,6 +265,22 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             step={5}
             suffix=" m"
             onChange={(v) => patch({ lengthM: typeof v === 'number' ? v : 0 })}
+          />
+          <Select
+            label={t('circuitEditor.cableType')}
+            data={[
+              { value: 'auto', label: t('circuitEditor.cableTypeAuto') },
+              ...CABLE_TYPES.map((ct) => ({ value: ct, label: t(`circuitEditor.cableType${ct}`) })),
+            ]}
+            value={circuit.cableType ?? 'auto'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            styles={
+              circuit.cableType !== undefined
+                ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                : undefined
+            }
+            onChange={(v) => patch({ cableType: v && v !== 'auto' ? (v as CableType) : undefined })}
           />
           <Select
             label={t('builder.overrideCable')}

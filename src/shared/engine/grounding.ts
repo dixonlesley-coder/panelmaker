@@ -44,7 +44,7 @@ export function sizeGrounding(i: GroundingInput): GroundingResult {
   const prefix = runs > 1 ? `${runs}× ` : '';
   const cableSpec = `${prefix}${type} ${cores}×${i.phaseCsaMm2} mm² (+ ${pe} mm² PE)`;
 
-  return { peCsaMm2: pe, neutralCsaMm2: neutral, cores, cableSpec };
+  return { peCsaMm2: pe, neutralCsaMm2: neutral, cores, cableSpec, cableType: type };
 }
 
 /**

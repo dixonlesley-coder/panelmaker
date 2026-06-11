@@ -67,14 +67,25 @@ function matchBreakerPart(need: BreakerNeed, parts: Part[]): string | undefined 
   return candidates[0]?.id;
 }
 
-/** Pick a catalog cable whose copper section is >= the sized section. */
-function matchCablePart(csaMm2: number, parts: Part[]): string | undefined {
+/**
+ * Pick a catalog cable whose section is >= the sized section, preferring parts
+ * of the circuit's effective construction (`attributes.type`, e.g. NYM vs NYY).
+ * When the catalog has no part of that type, fall back to section-only matching
+ * so brands that only stock one construction still price the run.
+ */
+function matchCablePart(csaMm2: number, parts: Part[], cableType?: string): string | undefined {
   const candidates = parts
     .filter((p) => p.category === 'cable' && typeof p.attributes.csaMm2 === 'number')
-    .map((p) => ({ id: p.id, csaMm2: p.attributes.csaMm2 as number }))
-    .filter((p) => p.csaMm2 >= csaMm2)
-    .sort((a, b) => a.csaMm2 - b.csaMm2);
-  return candidates[0]?.id;
+    .map((p) => ({
+      id: p.id,
+      csaMm2: p.attributes.csaMm2 as number,
+      type: typeof p.attributes.type === 'string' ? (p.attributes.type as string) : undefined,
+    }))
+    .filter((p) => p.csaMm2 >= csaMm2);
+  const sameType = cableType ? candidates.filter((p) => p.type === cableType) : [];
+  const pool = sameType.length > 0 ? sameType : candidates;
+  pool.sort((a, b) => a.csaMm2 - b.csaMm2);
+  return pool[0]?.id;
 }
 
 /** Pick the first catalog part of a category (point-level accessories). */
@@ -100,7 +111,7 @@ export function circuitOrderCodes(
     },
     parts,
   );
-  const cableId = matchCablePart(circuit.cable.csaMm2, parts);
+  const cableId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
   const out: { breaker?: string; cable?: string } = {};
   const breaker = skuOf(parts, breakerId);
   const cable = skuOf(parts, cableId);
@@ -135,11 +146,11 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
 
     // Cable run (priced per metre — qty 1 here as the run length is not modelled
     // as a separate quantity in the result; kept as one line for the summary).
-    const cablePartId = matchCablePart(circuit.cable.csaMm2, parts);
+    const cablePartId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
     lines.push({
       partId: cablePartId,
       sku: skuOf(parts, cablePartId),
-      description: `Cable ${circuit.cable.csaMm2} mm² — ${circuit.name}`,
+      description: `Cable ${circuit.grounding.cableType} ${circuit.cable.csaMm2} mm² — ${circuit.name}`,
       category: 'cable',
       qty: 1,
       matched: cablePartId !== undefined,

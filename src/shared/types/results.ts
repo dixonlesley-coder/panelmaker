@@ -3,7 +3,7 @@
 import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly } from './control';
-import type { PhaseAssignment, EarthingSystem } from './electrical';
+import type { PhaseAssignment, EarthingSystem, CableType } from './electrical';
 import type { SourcesResult } from './sources';
 // Type-only imports of result shapes defined alongside their engine modules
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
@@ -45,6 +45,12 @@ export interface GroundingResult {
   cores: number;
   /** Human-readable cable make-up, e.g. "NYY 4×16 mm² (+ 16 mm² PE)". */
   cableSpec: string;
+  /**
+   * Effective cable construction: the circuit's explicit choice when set,
+   * otherwise the panel default (NYY 3ph / NYM 1ph, N2XY for XLPE, NAYY/NA2XY
+   * for aluminum). The BOM matches catalog cable parts against this type.
+   */
+  cableType: CableType;
 }
 
 /** Per-phase loading (line currents, A) and the resulting imbalance. */

@@ -164,13 +164,16 @@ function computeCircuit(
     threePhase,
     hasNeutral,
     runsPerPhase,
-    // Cable family: Cu/PVC keeps the NYY (3ph) / NYM (1ph) defaults; XLPE is
-    // N2XY; aluminum maps to NAYY (PVC) / NA2XY (XLPE).
-    ...(material === 'Al'
-      ? { cableType: (insulation === 'XLPE' ? 'NA2XY' : 'NAYY') as CableType }
-      : insulation === 'XLPE'
-        ? { cableType: 'N2XY' as CableType }
-        : {}),
+    // Cable family: an explicit per-circuit choice wins; otherwise Cu/PVC keeps
+    // the NYY (3ph) / NYM (1ph) defaults, XLPE is N2XY, and aluminum maps to
+    // NAYY (PVC) / NA2XY (XLPE).
+    ...(c.cableType
+      ? { cableType: c.cableType }
+      : material === 'Al'
+        ? { cableType: (insulation === 'XLPE' ? 'NA2XY' : 'NAYY') as CableType }
+        : insulation === 'XLPE'
+          ? { cableType: 'N2XY' as CableType }
+          : {}),
   });
   const rcd = circuitRcd({
     earthingSystem: opts.earthingSystem ?? 'TN-C-S',
