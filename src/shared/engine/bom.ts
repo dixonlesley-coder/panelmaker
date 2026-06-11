@@ -23,13 +23,47 @@ function skuOf(parts: Part[], partId: string | undefined): string | undefined {
   return typeof sku === 'string' && sku.length > 0 ? sku : undefined;
 }
 
-/** Pick the cheapest catalog breaker whose rating covers `ratingA`. */
-function matchBreakerPart(ratingA: number, parts: Part[]): string | undefined {
+/** What the engine sized — used to pick the closest-matching catalog breaker. */
+interface BreakerNeed {
+  ratingA: number;
+  curve?: string;
+  deviceClass?: string;
+  /** Desired pole count (3 for a three-phase circuit, 1 otherwise). */
+  poles?: number;
+}
+
+/**
+ * Pick the catalog breaker that best fits the sized device: the smallest standard
+ * rating that covers `ratingA`, but preferring the right device class (MCB/MCCB),
+ * pole count and trip curve. A coarse rating-only match would grab a 1P part for a
+ * 3P breaker now that the catalog carries the full 1P–4P × B/C/D matrix — so a
+ * mismatch on class/poles/curve outweighs a smaller rating. A part that simply
+ * doesn't declare an attribute is treated as compatible (no penalty).
+ */
+function matchBreakerPart(need: BreakerNeed, parts: Part[]): string | undefined {
   const candidates = parts
     .filter((p) => p.category === 'breaker' && typeof p.attributes.ratingA === 'number')
-    .map((p) => ({ id: p.id, ratingA: p.attributes.ratingA as number }))
-    .filter((p) => p.ratingA >= ratingA)
-    .sort((a, b) => a.ratingA - b.ratingA);
+    .map((p) => ({
+      id: p.id,
+      ratingA: p.attributes.ratingA as number,
+      poles: typeof p.attributes.poles === 'number' ? (p.attributes.poles as number) : undefined,
+      curve: typeof p.attributes.curve === 'string' ? (p.attributes.curve as string) : undefined,
+      deviceClass:
+        typeof p.attributes.deviceClass === 'string' ? (p.attributes.deviceClass as string) : undefined,
+    }))
+    .filter((p) => p.ratingA >= need.ratingA);
+
+  const penalty = (c: (typeof candidates)[number]): number => {
+    let s = 0;
+    if (need.deviceClass && c.deviceClass && c.deviceClass !== need.deviceClass) s += 1000;
+    if (need.poles !== undefined && c.poles !== undefined && c.poles !== need.poles) s += 100;
+    if (need.curve && c.curve && c.curve !== need.curve) s += 10;
+    return s;
+  };
+
+  candidates.sort(
+    (a, b) => penalty(a) - penalty(b) || a.ratingA - b.ratingA || (a.poles ?? 9) - (b.poles ?? 9),
+  );
   return candidates[0]?.id;
 }
 
@@ -53,8 +87,16 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
   const lines: BomLine[] = [];
 
   for (const circuit of panel.circuits) {
-    // Branch breaker.
-    const breakerPartId = matchBreakerPart(circuit.breaker.ratingA, parts);
+    // Branch breaker — match class/poles/curve, not just rating.
+    const breakerPartId = matchBreakerPart(
+      {
+        ratingA: circuit.breaker.ratingA,
+        curve: circuit.breaker.curve,
+        deviceClass: circuit.breaker.deviceClass,
+        poles: circuit.phase === '3ph' ? 3 : 1,
+      },
+      parts,
+    );
     lines.push({
       partId: breakerPartId,
       sku: skuOf(parts, breakerPartId),
