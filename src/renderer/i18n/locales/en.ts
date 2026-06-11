@@ -930,6 +930,8 @@ export const en = {
     pump3ph: 'Pump (3φ)',
     ev: 'EV charger',
     general: 'General load',
+    general1ph: 'Custom load (1φ)',
+    general3ph: 'Custom load (3φ)',
     spare: 'Spare MCB way',
     spareName: 'Spare way',
     subpanel: 'Sub-panel + feeder',

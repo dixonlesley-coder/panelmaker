@@ -87,6 +87,8 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
   const preferredBrand = useProjectStore((s) => s.preferredBrand);
   const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
   const motor = isMotorKind(circuit.loadKind);
+  // Feeders are three-phase by topology — offering a phase override would lie.
+  const isFeederCircuit = circuit.loadKind === 'feeder' || circuit.feedsPanelId !== undefined;
   // The catalog order code the BOM would match for this device (selected brand).
   const codes = result ? circuitOrderCodes(result, partsForBrand(parts, preferredBrand)) : undefined;
 
@@ -244,7 +246,7 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
               onChange={(v) => v && patch({ starterType: v as StarterType })}
             />
           )}
-          {motor && (
+          {!isFeederCircuit && (
             <Select
               label={t('circuitEditor.phases')}
               description={t('circuitEditor.phasesHint')}

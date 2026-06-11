@@ -98,7 +98,11 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
   // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
   { key: 'ups', labelKey: 'vbuilder.ups', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
-  { key: 'general', labelKey: 'vbuilder.general', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general', { loadW: 2000 }) },
+  // Custom/general loads with the phase stated outright — for the odd equipment
+  // (kilns, lab gear, kitchen ranges…) the kind presets don't cover. Double-click
+  // after dropping to set the real W / cos φ / demand factor.
+  { key: 'general1', labelKey: 'vbuilder.general1ph', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general1ph', { loadW: 2000, phases: 1 }) },
+  { key: 'general3', labelKey: 'vbuilder.general3ph', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general3ph', { loadW: 7500, phases: 3 }) },
   // A spare way: installed breaker, no load/cable — boards keep 20-30% spare.
   { key: 'spare', labelKey: 'vbuilder.spare', icon: <IconCircuitSwitchOpen size={14} />, action: loadCard('spare', 'vbuilder.spareName', { loadW: 0, lengthM: 1 }) },
   { key: 'subpanel', labelKey: 'vbuilder.subpanel', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },

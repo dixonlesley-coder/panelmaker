@@ -935,6 +935,8 @@ export const id: TranslationKeys = {
     pump3ph: 'Pompa (3φ)',
     ev: 'Pengisi EV',
     general: 'Beban umum',
+    general1ph: 'Beban kustom (1φ)',
+    general3ph: 'Beban kustom (3φ)',
     spare: 'Jalur MCB cadangan',
     spareName: 'Jalur cadangan',
     subpanel: 'Sub-panel + feeder',

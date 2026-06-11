@@ -40,6 +40,9 @@ describe('1-phase / 3-phase logic', () => {
     expect(
       circuitIsThreePhase({ panelSystem: '1ph', kind: 'pump', loadW: 0, motorKw: 4, phases: 3 }),
     ).toBe(false);
+    // Non-motor kinds honour it too: a small 3φ kiln, a big 1φ resistive bank.
+    expect(circuitIsThreePhase({ panelSystem: '3ph', kind: 'general', loadW: 4000, phases: 3 })).toBe(true);
+    expect(circuitIsThreePhase({ panelSystem: '3ph', kind: 'heating', loadW: 8000, phases: 1 })).toBe(false);
   });
 
   it('recommendPhase', () => {
