@@ -29,7 +29,7 @@ export interface LoadDefaults {
 
 export const LOAD_DEFAULTS: Readonly<Record<LoadKind, LoadDefaults>> = {
   general: { label: 'General', cosPhi: 0.85, demandFactor: 1, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
-  lighting: { label: 'Lighting', cosPhi: 0.9, demandFactor: 1, curve: 'B', threePhasePreferred: false, motorLike: false, needsNeutral: false },
+  lighting: { label: 'Lighting', cosPhi: 0.9, demandFactor: 1, curve: 'B', threePhasePreferred: false, motorLike: false, needsNeutral: true },
   socket: { label: 'Socket outlets', cosPhi: 0.9, demandFactor: 0.7, curve: 'C', threePhasePreferred: false, motorLike: false, needsNeutral: true },
   heating: { label: 'Heating / resistive', cosPhi: 1.0, demandFactor: 1, curve: 'C', threePhasePreferred: true, motorLike: false, needsNeutral: false },
   hvac: { label: 'HVAC / air-con', cosPhi: 0.85, demandFactor: 0.9, curve: 'C', threePhasePreferred: true, motorLike: true, needsNeutral: true },
