@@ -419,6 +419,7 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
   // in SVG units (screen px ÷ zoom) and snaps to a new slot on release.
   const { zoom } = useViewport();
   const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
+  const [hoverWay, setHoverWay] = useState<string | null>(null); // highlight the hovered, selectable way
   const dragRef = useRef({ from: 0, startX: 0, dx: 0 });
   const liveRef = useRef({ ways: d.ways, onReorder: d.onReorder, zoom });
   liveRef.current = { ways: d.ways, onReorder: d.onReorder, zoom };
@@ -543,6 +544,8 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
             className="nodrag"
             style={{ cursor: 'grab', opacity: dragging ? 0.65 : 1 }}
             transform={dragging ? `translate(${drag.dx} 0)` : undefined}
+            onPointerEnter={() => setHoverWay(w.id)}
+            onPointerLeave={() => setHoverWay((h) => (h === w.id ? null : h))}
             // Drag the column to reorder; a click/double-click won't move enough
             // to trigger a slot change.
             onPointerDown={(e) => startWayDrag(e, i, w.id)}
@@ -560,6 +563,21 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
             }}
           >
             <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''} — double-click to edit`}</title>
+            {/* Hover highlight: signals this component is selectable / editable. */}
+            {hoverWay === w.id && !dragging && (
+              <rect
+                x={cx - WAY_W / 2 + 5}
+                y={L.brkTop - 9}
+                width={WAY_W - 10}
+                height={L.cableY - L.brkTop + 15}
+                rx={6}
+                fill="var(--mantine-color-indigo-5)"
+                fillOpacity={0.1}
+                stroke="var(--mantine-color-indigo-4)"
+                strokeOpacity={0.55}
+                strokeWidth={1}
+              />
+            )}
             {taps.map((k, j) => {
               const ox = cx + (taps.length > 1 ? (j - 1) * 5 : 0);
               return <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={L.brkTop} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.8} />;
@@ -627,16 +645,26 @@ function UnifiedPanelNode({ data }: NodeProps) {
   const width = panelWidth(d.ways.length, d.bus.length);
   const hasError = (d.issues ?? []).some((i) => i.severity === 'error');
   const feederIndex = (id: string) => d.ways.findIndex((w) => w.id === id);
+  const [hover, setHover] = useState(false); // highlight the draggable/selectable panel on hover
 
   return (
     <Box
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
         width,
         background: 'var(--mantine-color-body)',
-        border: `1px solid ${hasError ? 'var(--mantine-color-red-5)' : 'var(--mantine-color-default-border)'}`,
+        border: `1px solid ${
+          hasError
+            ? 'var(--mantine-color-red-5)'
+            : hover
+              ? 'var(--mantine-color-indigo-5)'
+              : 'var(--mantine-color-default-border)'
+        }`,
         borderRadius: 'var(--mantine-radius-md)',
-        boxShadow: 'var(--mantine-shadow-sm)',
+        boxShadow: hover ? 'var(--mantine-shadow-md)' : 'var(--mantine-shadow-sm)',
         padding: 10,
+        transition: 'box-shadow 120ms ease, border-color 120ms ease',
       }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(SLD_DND)) {
