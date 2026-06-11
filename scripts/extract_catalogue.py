@@ -263,7 +263,14 @@ def auto_json(pdf_path: Path, page_range: str | None) -> None:
         out: dict = {"pages": total, "tables": []}
         for pageno in range(max(1, lo), min(total, hi) + 1):
             page = pdf.pages[pageno - 1]
-            for ti, table in enumerate(page.extract_tables() or []):
+            tables = page.extract_tables() or []
+            if not tables:
+                # Fall back to a text-position strategy for tables without full
+                # ruling (the line strategy finds nothing on those pages).
+                tables = page.extract_tables(
+                    {"vertical_strategy": "text", "horizontal_strategy": "text"}
+                ) or []
+            for ti, table in enumerate(tables):
                 if not table or len(table) < 2:
                     continue
                 header = [(c or "").strip() for c in table[0]]

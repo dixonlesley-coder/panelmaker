@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Background,
   Controls,
@@ -6,6 +6,7 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useViewport,
   type Edge,
   type Node,
@@ -905,10 +906,21 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     [addPanel, t],
   );
 
-  const { nodes, edges } = useMemo(
+  const built = useMemo(
     () => buildUnified(project, system, openCircuit, addItem, openContext),
     [project, system, openCircuit, addItem, openContext],
   );
+  const edges = built.edges;
+  // Panels are auto-arranged from the feeder tree, but draggable to rearrange.
+  // Keep React Flow's node state so a drag sticks; re-sync node *data* when the
+  // model changes while preserving any positions the user has dragged.
+  const [nodes, setNodes, onNodesChange] = useNodesState(built.nodes);
+  useEffect(() => {
+    setNodes((cur) => {
+      const posById = new Map(cur.map((n) => [n.id, n.position]));
+      return built.nodes.map((n) => ({ ...n, position: posById.get(n.id) ?? n.position }));
+    });
+  }, [built.nodes, setNodes]);
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
   const editingCircuit = editingPanel?.circuits.find((c) => c.id === editing?.circuitId);
@@ -985,6 +997,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           <ReactFlow
             nodes={nodes}
             edges={edges}
+            onNodesChange={onNodesChange}
             nodeTypes={UNIFIED_NODE_TYPES}
             fitView
             fitViewOptions={{ padding: 0.15 }}
@@ -992,7 +1005,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             minZoom={0.2}
             maxZoom={2.5}
             nodesConnectable={false}
-            nodesDraggable={false}
+            nodesDraggable
             elementsSelectable={false}
             zoomOnDoubleClick={false}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
