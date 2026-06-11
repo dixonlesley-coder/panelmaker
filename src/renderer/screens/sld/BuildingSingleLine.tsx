@@ -417,7 +417,9 @@ function layout(threePhase: boolean, hasRcd: boolean, hasStarter: boolean): Layo
     y = starterTop + STARTER_BAND;
   }
   const outY = y + 12;
-  return { bars, brkTop, rcdTop, starterTop, outY, height: outY + 8 };
+  // Height must clear the output-terminal amp label drawn at outY + 11 (~outY + 14
+  // with the glyph descenders), else the bottom row of labels gets clipped.
+  return { bars, brkTop, rcdTop, starterTop, outY, height: outY + 18 };
 }
 
 function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
