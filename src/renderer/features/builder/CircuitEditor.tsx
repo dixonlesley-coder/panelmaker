@@ -25,6 +25,7 @@ import {
 } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { circuitOrderCodes } from '@shared/engine/bom';
+import { partsForBrand } from '@shared/data/catalog';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps, formatPercent } from '@renderer/lib/format';
 
@@ -81,10 +82,11 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const parts = useProjectStore((s) => s.parts);
+  const preferredBrand = useProjectStore((s) => s.preferredBrand);
   const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
   const motor = isMotorKind(circuit.loadKind);
-  // The catalog order code the BOM would match for this device — surfaced inline.
-  const codes = result ? circuitOrderCodes(result, parts) : undefined;
+  // The catalog order code the BOM would match for this device (selected brand).
+  const codes = result ? circuitOrderCodes(result, partsForBrand(parts, preferredBrand)) : undefined;
 
   const util =
     result && result.cable.deratedIzA > 0

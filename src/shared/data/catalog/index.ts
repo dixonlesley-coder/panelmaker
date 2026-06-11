@@ -170,6 +170,26 @@ export const CATALOG_PARTS: readonly Part[] = merged.parts;
 /** Validation issues across ALL committed datasets — asserted empty by the test. */
 export const CATALOG_ISSUES: readonly CatalogIssue[] = merged.issues;
 
+/** The generic (non-brand) source used for standard cables — always kept on a brand filter. */
+export const GENERIC_BRAND = 'Generic';
+
+/** Distinct device manufacturers in the catalogue (excludes the generic cable brand). */
+export const CATALOG_BRANDS: readonly string[] = [
+  ...new Set(CATALOG_PARTS.map((p) => p.manufacturer)),
+]
+  .filter((b) => b !== GENERIC_BRAND)
+  .sort();
+
+/**
+ * Narrow a parts list to a single manufacturer for order-code matching, while
+ * keeping the generic standard items (cables, brand 'Generic') so cable runs still
+ * match. `null`/`undefined` returns every part (all brands).
+ */
+export function partsForBrand(parts: readonly Part[], brand: string | null | undefined): Part[] {
+  if (!brand) return [...parts];
+  return parts.filter((p) => p.manufacturer === brand || p.manufacturer === GENERIC_BRAND);
+}
+
 /**
  * Merge the whole catalogue (all manufacturers) onto a base parts list,
  * de-duplicating by SKU so the illustrative sample parts don't double up with

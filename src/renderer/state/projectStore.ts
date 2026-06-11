@@ -96,6 +96,8 @@ export interface ProjectState {
   floatingLoads: FloatingLoad[];
   activePanelId: string;
   activeScreen: Screen;
+  /** Preferred manufacturer for order-code matching / exports (null = all brands). */
+  preferredBrand: string | null;
   /** Control/ladder schematics, keyed by circuitId. */
   schematics: Record<string, ControlSchematic>;
   /** Undo stack: prior project states, oldest first (capped at HISTORY_LIMIT). */
@@ -118,6 +120,7 @@ export interface ProjectState {
   // navigation
   setScreen: (screen: Screen) => void;
   setActivePanel: (panelId: string) => void;
+  setPreferredBrand: (brand: string | null) => void;
 
   // circuit editing
   updateCircuit: (panelId: string, circuitId: string, patch: Partial<CircuitInput>) => void;
@@ -404,6 +407,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   floatingLoads: [],
   activePanelId: initialProject.panels[0]?.id ?? '',
   activeScreen: 'system',
+  preferredBrand: null,
   schematics: {},
   past: [],
   future: [],
@@ -412,6 +416,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setScreen: (screen) => set({ activeScreen: screen }),
   setActivePanel: (panelId) => set({ activePanelId: panelId }),
+  setPreferredBrand: (brand) => set({ preferredBrand: brand }),
 
   updateCircuit: (panelId, circuitId, patch) =>
     set((s) =>

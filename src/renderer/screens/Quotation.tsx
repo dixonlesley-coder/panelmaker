@@ -16,6 +16,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { IconCash, IconDownload, IconReceipt2 } from '@tabler/icons-react';
 import { computeQuotation } from '@shared/engine';
+import { partsForBrand } from '@shared/data/catalog';
 import { costSystemConsolidated } from '@renderer/lib/bom';
 import { formatIdr } from '@renderer/lib/format';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -25,11 +26,15 @@ import { exportQuotationPdf } from '@renderer/api';
 export function Quotation() {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
-  const parts = useProjectStore((s) => s.parts);
+  const allParts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
+  const preferredBrand = useProjectStore((s) => s.preferredBrand);
   const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
 
   const quotation = project.meta?.quotation ?? {};
+
+  // The quotation BOM + its PDF use the selected manufacturer (cables stay available).
+  const parts = useMemo(() => partsForBrand(allParts, preferredBrand), [allParts, preferredBrand]);
 
   // Consolidated, priced project BOM → quotation (labor + mark-ups).
   const system = useSystemResult();

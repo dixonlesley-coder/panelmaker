@@ -7,6 +7,7 @@ import {
   Drawer,
   Group,
   Menu,
+  Select,
   SimpleGrid,
   Stack,
   Table,
@@ -39,6 +40,7 @@ import { Stat } from '@renderer/features/components/Stat';
 import { ProjectIssues } from '@renderer/features/issues/ProjectIssues';
 import { BuildingSingleLine } from '@renderer/screens/sld/BuildingSingleLine';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
+import { partsForBrand, CATALOG_BRANDS } from '@shared/data/catalog';
 import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
 import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
 import { downloadCsv } from '@renderer/lib/download';
@@ -56,6 +58,9 @@ export function SystemView() {
   const project = useProjectStore((s) => s.project);
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
+  const preferredBrand = useProjectStore((s) => s.preferredBrand);
+  // Costing + order codes use the selected manufacturer (cables stay available).
+  const bomParts = useMemo(() => partsForBrand(parts, preferredBrand), [parts, preferredBrand]);
   const addPanel = useProjectStore((s) => s.addPanel);
   const addPanelFromTemplate = useProjectStore((s) => s.addPanelFromTemplate);
   const importPanels = useProjectStore((s) => s.importPanels);
@@ -68,14 +73,14 @@ export function SystemView() {
 
   const cost = useMemo(() => {
     const priceMap = new Map<string, number>(Object.entries(prices));
-    return costSystem(system, parts, priceMap);
-  }, [system, parts, prices]);
+    return costSystem(system, bomParts, priceMap);
+  }, [system, bomParts, prices]);
 
   // Consolidated project-wide BOM (per-panel lines merged by part/description).
   const projectBom = useMemo(() => {
     const priceMap = new Map<string, number>(Object.entries(prices));
-    return costSystemConsolidated(system, parts, priceMap);
-  }, [system, parts, prices]);
+    return costSystemConsolidated(system, bomParts, priceMap);
+  }, [system, bomParts, prices]);
 
   /** Pick a CSV load list, parse it leniently, and append its panels (undoable). */
   function onImportLoadList() {
@@ -399,6 +404,8 @@ export function SystemView() {
  */
 function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: string }) {
   const { t } = useTranslation();
+  const preferredBrand = useProjectStore((s) => s.preferredBrand);
+  const setPreferredBrand = useProjectStore((s) => s.setPreferredBrand);
   const { lines } = cost;
   if (lines.length === 0) return null;
 
@@ -419,6 +426,17 @@ function ProjectBomCard({ cost, projectName }: { cost: CostResult; projectName: 
           </Text>
         </Group>
         <Group gap="xs">
+          <Select
+            size="xs"
+            w={160}
+            placeholder={t('system.allBrands')}
+            data={[...CATALOG_BRANDS]}
+            value={preferredBrand}
+            onChange={(v) => setPreferredBrand(v)}
+            clearable
+            comboboxProps={{ withinPortal: true }}
+            aria-label={t('system.exportBrand')}
+          />
           <Button
             size="xs"
             variant="default"

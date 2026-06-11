@@ -38,6 +38,7 @@ import {
 } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { circuitOrderCodes } from '@shared/engine/bom';
+import { partsForBrand } from '@shared/data/catalog';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
@@ -1321,7 +1322,10 @@ function buildUnified(
 export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
-  const parts = useProjectStore((s) => s.parts);
+  const allParts = useProjectStore((s) => s.parts);
+  const preferredBrand = useProjectStore((s) => s.preferredBrand);
+  // Inline order codes follow the chosen export brand (cables stay available).
+  const parts = useMemo(() => partsForBrand(allParts, preferredBrand), [allParts, preferredBrand]);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
@@ -1681,6 +1685,13 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             <Panel position="top-right">
               <CanvasHelp />
             </Panel>
+            {preferredBrand && (
+              <Panel position="top-left">
+                <Badge variant="light" color="indigo" size="sm" radius="sm">
+                  {t('system.codesBrand', { brand: preferredBrand })}
+                </Badge>
+              </Panel>
+            )}
           </ReactFlow>
         </ReactFlowProvider>
       </Box>
