@@ -138,6 +138,36 @@ describe('manufacturer catalogue', () => {
     expect(candidates).toEqual([]);
   });
 
+  it('handles the GoPact MCCB layout: codes under 3P/4P columns + Icu band rows', () => {
+    // Mirrors the real catalogue page: Fixed/Adjustable blocks, each with a
+    // Rating column and 3P/4P code columns, and "Icu = N kA" section bands.
+    const header = [
+      'Rating', '3P 3D', 'Harga (Rp)', 'SS', '4P 4D', 'Harga (Rp)', 'SS',
+      'Rating', '3P 3D', 'Harga (Rp)', 'SS', '4P 4D', 'Harga (Rp)', 'SS',
+    ];
+    const rows = [
+      ['Icu = 10 kA at 415 V AC', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['16 A', 'G12T3F16', '772.000', '1', 'G12T4F16', '1.043.000', '2', '13-16 A', 'G12T3A16', '1.103.000', '2', 'G12T4A16', '1.521.000', '2'],
+      ['125 A', 'G12T3F125', '947.000', '1', 'G12T4F125', '1.292.000', '2', '100-125 A', 'G12T3A125', '1.275.000', '2', 'G12T4A125', '1.608.000', '2'],
+      ['Icu = 30 kA at 415 V AC', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['16 A', 'G12F3F16', '1.018.000', '1', 'G12F4F16', '1.218.000', '2', '13-16 A', 'G12F3A16', '1.227.000', '2', 'G12F4A16', '1.770.000', '2'],
+    ];
+    const candidates = tablesToCandidates([{ page: 6, header, rows }], { defaultCategory: 'breaker', defaultSeries: 'GoPact MCCB' });
+    // 3 data rows × 4 code columns = 12 parts
+    expect(candidates).toHaveLength(12);
+
+    const fixed3p = candidates.find((c) => c.sku === 'G12T3F16');
+    expect(fixed3p?.attributes).toMatchObject({ ratingA: 16, poles: 3, breakingKa: 10 });
+    const adj4p = candidates.find((c) => c.sku === 'G12T4A16');
+    expect(adj4p?.attributes).toMatchObject({ ratingA: 16, poles: 4, breakingKa: 10 }); // "13-16 A" → 16
+    const band30 = candidates.find((c) => c.sku === 'G12F4A16');
+    expect(band30?.attributes.breakingKa).toBe(30); // carried from the 30 kA band
+    // all validate through the loader
+    const { parts, issues } = loadCatalog({ catalogVersion: 'x', manufacturer: 'Schneider Electric', source: 'pdf', parts: candidates });
+    expect(issues).toEqual([]);
+    expect(parts).toHaveLength(12);
+  });
+
   it('reports a malformed file as a single issue instead of throwing', () => {
     const { parts, issues } = importCatalogText('{ not valid json');
     expect(parts).toEqual([]);

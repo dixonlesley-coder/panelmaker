@@ -289,14 +289,109 @@ function csvToCatalogFile(text: string): CatalogFile {
   return { catalogVersion: 'import', manufacturer: 'Schneider Electric', source: 'CSV import', parts };
 }
 
+/* PDF ordering tables rarely have a literal "sku" header — the codes sit under
+   columns headed like "3P 3D" / "4P 4D", several per row, with the breaking
+   capacity in "Icu = … kA" band rows. So for tables we detect order codes by
+   CONTENT, read poles from the 3P/4P labels, pair each code with the rating to
+   its left, and carry the Icu bands down. */
+const ORDER_CODE_RE = /^[A-Z]{1,4}[0-9][A-Z0-9-]{2,}$/i;
+function isCodeCell(s: string): boolean {
+  const v = s.trim();
+  return v.length >= 5 && ORDER_CODE_RE.test(v) && /[A-Za-z]/.test(v) && /[0-9]/.test(v);
+}
+function isRatingCell(s: string): boolean {
+  return /^\d+\s*(?:-\s*\d+)?\s*a$/i.test(s.trim());
+}
+function ratingFromCell(s: string): number | undefined {
+  const t = s.trim();
+  if (!/a$/i.test(t)) return undefined; // ends with A — "16 A", "13-16 A", "100-125 A"
+  const nums = t.match(/\d+/g);
+  return nums && nums.length ? Number(nums[nums.length - 1]) : undefined; // upper bound of a range
+}
+function kaFromRow(cells: string[]): number | undefined {
+  for (const c of cells) {
+    const m = c.match(/(\d+(?:[.,]\d+)?)\s*kA/i);
+    if (m) return Number(m[1]!.replace(',', '.'));
+  }
+  return undefined;
+}
+function polesFromColumn(header: string[], rows: string[][], c: number): number | undefined {
+  for (const cell of [header[c] ?? '', ...rows.map((r) => r[c] ?? '')]) {
+    if (isCodeCell(cell)) continue; // never read poles out of an order code
+    const m = cell.match(/(\d)\s*P\b/i);
+    if (m) return Number(m[1]);
+  }
+  return undefined;
+}
+
+/** Map one detected table to entries via content-based code/rating detection. */
+function tableToEntries(header: string[], rows: string[][], defaults: TableMapDefaults): CatalogEntry[] {
+  const width = Math.max(header.length, ...rows.map((r) => r.length), 0);
+  const codeCols: number[] = [];
+  const ratingCols: number[] = [];
+  for (let c = 0; c < width; c++) {
+    const cells = rows.map((r) => (r[c] ?? '').trim()).filter((v) => v !== '');
+    if (cells.length === 0) continue;
+    if (cells.filter(isCodeCell).length / cells.length >= 0.5) {
+      codeCols.push(c);
+    } else if (norm(header[c] ?? '') === 'rating' || cells.filter(isRatingCell).length / cells.length >= 0.4) {
+      ratingCols.push(c);
+    }
+  }
+  if (codeCols.length === 0) return [];
+
+  const polesByCol = new Map(codeCols.map((c) => [c, polesFromColumn(header, rows, c)] as const));
+  const nearestRating = (c: number): number | undefined => {
+    let best: number | undefined;
+    for (const rc of ratingCols) if (rc < c) best = rc;
+    return best;
+  };
+
+  const category = (defaults.defaultCategory ?? 'breaker') as PartCategory;
+  const series = defaults.defaultSeries?.trim() ?? '';
+  const out: CatalogEntry[] = [];
+  let ctxKa: number | undefined;
+  for (const row of rows) {
+    const cells = row.map((c) => (c ?? '').trim());
+    const codesHere = codeCols.filter((c) => isCodeCell(cells[c] ?? ''));
+    if (codesHere.length === 0) {
+      const ka = kaFromRow(cells);
+      if (ka !== undefined) ctxKa = ka; // "Icu = X kA" band → applies to following rows
+      continue;
+    }
+    for (const c of codesHere) {
+      const sku = (cells[c] ?? '').replace(/\s+/g, '');
+      const rc = nearestRating(c);
+      const ratingA = rc !== undefined ? ratingFromCell(cells[rc] ?? '') : undefined;
+      const poles = polesByCol.get(c);
+      const attributes: Record<string, unknown> = { ...(defaults.extraAttributes ?? {}) };
+      if (ratingA !== undefined) attributes.ratingA = ratingA;
+      if (poles !== undefined) attributes.poles = poles;
+      if (ctxKa !== undefined) attributes.breakingKa = ctxKa;
+      const model = [series || 'Device', poles ? `${poles}P` : '', ratingA ? `${ratingA}A` : '']
+        .filter(Boolean)
+        .join(' ');
+      out.push({ sku, category, series: series || model, model, attributes });
+    }
+  }
+  return out;
+}
+
 /**
  * Map the PDF extractor's raw tables to catalogue entries (de-duped by SKU).
+ * Tries the header-based mapper first (clean tables with a "Reference"/"sku"
+ * column + per-column attributes); falls back to content-based detection for
+ * catalogue tables whose codes live under "3P 3D"/"4P 4D" columns.
  * `defaults` carries the user's review choices (category/series the tables omit).
  */
 export function tablesToCandidates(tables: RawTable[], defaults: TableMapDefaults = {}): CatalogEntry[] {
   const bySku = new Map<string, CatalogEntry>();
   for (const t of tables) {
-    for (const e of rowsToEntries(t.header ?? [], t.rows ?? [], defaults)) bySku.set(e.sku, e);
+    const header = t.header ?? [];
+    const rows = t.rows ?? [];
+    let entries = rowsToEntries(header, rows, defaults);
+    if (entries.length === 0) entries = tableToEntries(header, rows, defaults);
+    for (const e of entries) if (!bySku.has(e.sku)) bySku.set(e.sku, e);
   }
   return [...bySku.values()];
 }
