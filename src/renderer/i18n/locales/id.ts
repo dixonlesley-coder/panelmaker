@@ -553,6 +553,10 @@ export const id: TranslationKeys = {
     current: 'saat ini',
     duplicate: 'Duplikat jalur',
     delete: 'Hapus jalur',
+    feeder: 'Kabel feeder',
+    editCable: 'Edit kabel…',
+    disconnect: 'Putuskan feeder',
+    disconnected: 'Feeder diputus — panel kini menjadi root mandiri.',
   },
   system: {
     eyebrow: 'Ikhtisar bangunan',
