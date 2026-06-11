@@ -1136,6 +1136,49 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     });
   }, [built.nodes, setNodes]);
 
+  // A panel's EXPANDED footprint (width × detail height), so a drag can be nudged
+  // clear of other panels even while zoomed out (where the card looks short).
+  const panelBox = useCallback(
+    (panelId: string): { w: number; h: number } => {
+      const res = system.panels[panelId];
+      const panel = project.panels.find((p) => p.id === panelId);
+      if (!res || !panel) return { w: 300, h: 130 };
+      const hasRcd = res.circuits.some((c) => c.rcd.required);
+      const hasStarter = res.circuits.some((c) => c.control);
+      return {
+        w: panelWidth(res.circuits.length, 0),
+        h: layout(panel.system === '3ph', hasRcd, hasStarter).height + 16,
+      };
+    },
+    [system, project],
+  );
+
+  // On drop, push the dragged panel down until it no longer overlaps any other —
+  // using expanded sizes, so panels don't collide once you zoom in.
+  const onNodeDragStop = useCallback(
+    (_e: unknown, node: Node) => {
+      setNodes((cur) => {
+        const me = panelBox(node.id);
+        let { x, y } = node.position;
+        const M = 28;
+        for (let pass = 0; pass < 40; pass++) {
+          let bumped = false;
+          for (const n of cur) {
+            if (n.id === node.id) continue;
+            const o = panelBox(n.id);
+            if (x < n.position.x + o.w + M && x + me.w + M > n.position.x && y < n.position.y + o.h + M && y + me.h + M > n.position.y) {
+              y = n.position.y + o.h + M; // drop below the obstacle
+              bumped = true;
+            }
+          }
+          if (!bumped) break;
+        }
+        return cur.map((n) => (n.id === node.id ? { ...n, position: { x, y } } : n));
+      });
+    },
+    [panelBox, setNodes],
+  );
+
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
   const editingCircuit = editingPanel?.circuits.find((c) => c.id === editing?.circuitId);
   const editingResult = editing
@@ -1248,6 +1291,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               if (pid && cid) setEdgeCtx({ panelId: pid, circuitId: cid, x: e.clientX, y: e.clientY });
             }}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
+            onNodeDragStop={onNodeDragStop}
             onNodeContextMenu={(e, node) => {
               e.preventDefault();
               setNodeCtx({ panelId: node.id, x: e.clientX, y: e.clientY });

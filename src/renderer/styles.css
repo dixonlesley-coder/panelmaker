@@ -154,7 +154,8 @@ thead th,
   .sld-lod-enter {
     animation: sld-lod-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
     transform-origin: top center;
-    will-change: opacity, transform;
+    /* No will-change: it promotes a compositing layer that the browser
+       rasterises at 1× and then scales up on zoom-in → blurry components. */
   }
 
   /* The color-scheme toggle cross-fades instead of flashing. */
@@ -202,12 +203,9 @@ thead th,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .react-flow__node {
-    transition: filter 160ms ease, transform 160ms ease;
-  }
-  .react-flow__node:hover {
-    filter: drop-shadow(0 6px 16px rgba(16, 24, 40, 0.14));
-  }
+  /* No transform/filter on the node: a CSS transform transition fights React
+     Flow's own positioning, and a drop-shadow filter rasterises the node into a
+     layer that blurs when zoomed. The hover lift is done on the node card itself. */
   .react-flow__edge-path {
     transition: stroke 160ms ease, stroke-width 160ms ease;
   }
