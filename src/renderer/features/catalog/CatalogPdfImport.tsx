@@ -32,6 +32,7 @@ const PREVIEW_ROWS = 40;
 export function CatalogPdfImport() {
   const { t } = useTranslation();
   const importParts = useProjectStore((s) => s.importParts);
+  const mergePrices = useProjectStore((s) => s.mergePrices);
 
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -70,8 +71,10 @@ export function CatalogPdfImport() {
 
   function onImport() {
     importParts(validated.parts);
+    const priced = Object.keys(validated.prices).length;
+    if (priced > 0) mergePrices(validated.prices);
     notifications.show({
-      message: t('catalogPdf.imported', { count: validated.parts.length, skipped: validated.issues.length }),
+      message: t('catalogPdf.imported', { count: validated.parts.length, skipped: validated.issues.length, priced }),
       color: validated.issues.length ? 'yellow' : 'teal',
     });
     setOpened(false);
@@ -164,6 +167,7 @@ export function CatalogPdfImport() {
                           <Table.Th>A</Table.Th>
                           <Table.Th>P</Table.Th>
                           <Table.Th>{t('catalogPdf.colCurve')}</Table.Th>
+                          <Table.Th ta="right">{t('catalogPdf.colPrice')}</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -175,6 +179,7 @@ export function CatalogPdfImport() {
                             <Table.Td>{String(p.attributes.ratingA ?? '')}</Table.Td>
                             <Table.Td>{String(p.attributes.poles ?? '')}</Table.Td>
                             <Table.Td>{String(p.attributes.curve ?? '')}</Table.Td>
+                            <Table.Td ta="right">{validated.prices[p.id] ? validated.prices[p.id]!.toLocaleString('id-ID') : ''}</Table.Td>
                           </Table.Tr>
                         ))}
                       </Table.Tbody>

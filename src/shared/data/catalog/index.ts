@@ -32,6 +32,9 @@ export interface CatalogEntry {
   attributes: Record<string, unknown>;
   /** Unit of sale; devices are "pcs" (the default). */
   unit?: string;
+  /** Captured unit price (IDR), routed to the pricelist on import — never into
+   * the committed parts dataset. */
+  priceIdr?: number;
 }
 
 /** The committed catalogue file shape. */
@@ -57,9 +60,12 @@ export interface CatalogIssue {
  * parts at runtime (so a bad row can never crash the app) while the unit test
  * asserts `issues` is empty (so a bad row can never be committed).
  */
-export function loadCatalog(file: CatalogFile): { parts: Part[]; issues: CatalogIssue[] } {
+export function loadCatalog(
+  file: CatalogFile,
+): { parts: Part[]; issues: CatalogIssue[]; prices: Record<string, number> } {
   const parts: Part[] = [];
   const issues: CatalogIssue[] = [];
+  const prices: Record<string, number> = {};
   const seen = new Set<string>();
 
   file.parts.forEach((e, index) => {
@@ -95,9 +101,10 @@ export function loadCatalog(file: CatalogFile): { parts: Part[]; issues: Catalog
       attributes: { ...a, sku: e.sku, series: e.series },
       defaultUnit: e.unit ?? 'pcs',
     });
+    if (typeof e.priceIdr === 'number' && e.priceIdr > 0) prices[e.sku] = e.priceIdr;
   });
 
-  return { parts, issues };
+  return { parts, issues, prices };
 }
 
 const schneiderFile = schneiderRaw as unknown as CatalogFile;
@@ -196,22 +203,29 @@ export interface TableMapDefaults {
 }
 
 // Header aliases so a distributor/extractor CSV or a PDF table need not use our
-// exact names. norm() strips punctuation so "Cat. No." == "cat no", "In (A)" == "in a".
-const SKU_HEADERS = ['sku', 'order code', 'ordercode', 'reference', 'ref', 'cat no', 'catalogue number', 'code'];
-const MODEL_HEADERS = ['model', 'description', 'designation'];
-const SERIES_HEADERS = ['series', 'range'];
+// exact names. norm() strips punctuation so "Cat. No." == "cat no", "In (A)" ==
+// "in a". Includes Indonesian catalogue headers (Referensi, Deskripsi, Arus, Harga).
+const SKU_HEADERS = [
+  'sku', 'order code', 'ordercode', 'reference', 'referensi', '4p referensi', 'ref', '4p ref',
+  'cat no', 'catalogue number', 'code', 'kode',
+];
+const MODEL_HEADERS = ['model', 'description', 'designation', 'deskripsi', 'deskripsi produk', 'detail produk'];
+const SERIES_HEADERS = ['series', 'range', 'seri'];
 const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const isPriceHeader = (k: string) => /harga|price/.test(k) || /^rp$/.test(k);
 
 // Map a catalogue column header to a canonical attribute key (so "In (A)" →
 // ratingA, "Icu (kA)" → breakingKa) for tables that don't use our names.
 const ATTR_ALIASES: { key: string; test: (k: string) => boolean }[] = [
-  { key: 'ratingA', test: (k) => /^(in|in a)$/.test(k) || /rating|rated current|nominal current/.test(k) },
-  { key: 'poles', test: (k) => /^poles?$/.test(k) || /no of poles?/.test(k) },
+  { key: 'ratingA', test: (k) => /^(in|in a|arus|rating amps)$/.test(k) || /rating|rated current|nominal current/.test(k) },
+  { key: 'poles', test: (k) => /\bpoles?\b/.test(k) || /no of poles?/.test(k) },
   { key: 'curve', test: (k) => /curve|trip/.test(k) },
   { key: 'breakingKa', test: (k) => /icu|icn|breaking/.test(k) || /^ka$/.test(k) },
 ];
 
-type ColRole = { kind: 'sku' | 'category' | 'series' | 'model' | 'unit' } | { kind: 'attr'; key: string };
+type ColRole =
+  | { kind: 'sku' | 'category' | 'series' | 'model' | 'unit' | 'price' }
+  | { kind: 'attr'; key: string };
 function classify(header: string): ColRole {
   const k = norm(header);
   if (SKU_HEADERS.includes(k)) return { kind: 'sku' };
@@ -219,12 +233,24 @@ function classify(header: string): ColRole {
   if (SERIES_HEADERS.includes(k)) return { kind: 'series' };
   if (MODEL_HEADERS.includes(k)) return { kind: 'model' };
   if (k === 'unit') return { kind: 'unit' };
+  if (isPriceHeader(k)) return { kind: 'price' };
   for (const a of ATTR_ALIASES) if (a.test(k)) return { kind: 'attr', key: a.key };
   return { kind: 'attr', key: header.trim() || 'col' };
 }
 
-/** Coerce a cell to the right type for its canonical attribute key. */
+/** Parse an Indonesian price cell ("174.084.000" → 174084000). Non-numeric ("Hub. Kami") → undefined. */
+function parsePrice(s: string): number | undefined {
+  const digits = s.replace(/[^\d]/g, '');
+  if (digits === '') return undefined;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** Coerce a feature cell to the right type; `undefined` means "omit this attribute". */
 function coerce(key: string, val: string): unknown {
+  // Tick/cross feature columns (RS485, Front USB, …): "✔" → true, "-"/"✗" → omit.
+  if (/^[✓✔]$/.test(val) || /^(yes|ya)$/i.test(val)) return true;
+  if (/^[-–—✗xX]$/.test(val) || /^(no|tidak|n\/a)$/i.test(val)) return undefined;
   if (key === 'ratingA' || key === 'breakingKa') {
     const m = val.match(/(\d+(?:[.,]\d+)?)/);
     return m ? Number(m[1]!.replace(',', '.')) : val;
@@ -254,6 +280,7 @@ function rowsToEntries(header: string[], rows: string[][], defaults: TableMapDef
     let series = defaults.defaultSeries ?? '';
     let model = '';
     let unit: string | undefined;
+    let priceIdr: number | undefined;
     const attributes: Record<string, unknown> = { ...(defaults.extraAttributes ?? {}) };
     header.forEach((_h, i) => {
       const role = roles[i]!;
@@ -265,7 +292,11 @@ function rowsToEntries(header: string[], rows: string[][], defaults: TableMapDef
         case 'series': series = val; break;
         case 'model': model = val; break;
         case 'unit': unit = val; break;
-        default: attributes[role.key] = coerce(role.key, val);
+        case 'price': priceIdr = parsePrice(val) ?? priceIdr; break;
+        default: {
+          const v = coerce(role.key, val);
+          if (v !== undefined) attributes[role.key] = v;
+        }
       }
     });
     if (!sku) continue;
@@ -276,6 +307,7 @@ function rowsToEntries(header: string[], rows: string[][], defaults: TableMapDef
       model: model || series,
       attributes,
       ...(unit ? { unit } : {}),
+      ...(priceIdr !== undefined ? { priceIdr } : {}),
     });
   }
   return entries;
@@ -329,10 +361,13 @@ function tableToEntries(header: string[], rows: string[][], defaults: TableMapDe
   const width = Math.max(header.length, ...rows.map((r) => r.length), 0);
   const codeCols: number[] = [];
   const ratingCols: number[] = [];
+  const priceCols: number[] = [];
   for (let c = 0; c < width; c++) {
     const cells = rows.map((r) => (r[c] ?? '').trim()).filter((v) => v !== '');
     if (cells.length === 0) continue;
-    if (cells.filter(isCodeCell).length / cells.length >= 0.5) {
+    if (isPriceHeader(norm(header[c] ?? ''))) {
+      priceCols.push(c);
+    } else if (cells.filter(isCodeCell).length / cells.length >= 0.5) {
       codeCols.push(c);
     } else if (norm(header[c] ?? '') === 'rating' || cells.filter(isRatingCell).length / cells.length >= 0.4) {
       ratingCols.push(c);
@@ -345,6 +380,10 @@ function tableToEntries(header: string[], rows: string[][], defaults: TableMapDe
     let best: number | undefined;
     for (const rc of ratingCols) if (rc < c) best = rc;
     return best;
+  };
+  const nearestPrice = (c: number): number | undefined => {
+    for (const pc of priceCols) if (pc > c) return pc; // first price column to the right
+    return undefined;
   };
 
   const category = (defaults.defaultCategory ?? 'breaker') as PartCategory;
@@ -368,10 +407,12 @@ function tableToEntries(header: string[], rows: string[][], defaults: TableMapDe
       if (ratingA !== undefined) attributes.ratingA = ratingA;
       if (poles !== undefined) attributes.poles = poles;
       if (ctxKa !== undefined) attributes.breakingKa = ctxKa;
+      const pc = nearestPrice(c);
+      const priceIdr = pc !== undefined ? parsePrice(cells[pc] ?? '') : undefined;
       const model = [series || 'Device', poles ? `${poles}P` : '', ratingA ? `${ratingA}A` : '']
         .filter(Boolean)
         .join(' ');
-      out.push({ sku, category, series: series || model, model, attributes });
+      out.push({ sku, category, series: series || model, model, attributes, ...(priceIdr !== undefined ? { priceIdr } : {}) });
     }
   }
   return out;
@@ -405,10 +446,16 @@ export function parseCatalogText(text: string): CatalogFile {
  * Import a catalogue file's text (JSON or CSV) into validated {@link Part}s.
  * Never throws — a malformed file is reported as a single issue.
  */
-export function importCatalogText(text: string): { parts: Part[]; issues: CatalogIssue[] } {
+export function importCatalogText(
+  text: string,
+): { parts: Part[]; issues: CatalogIssue[]; prices: Record<string, number> } {
   try {
     return loadCatalog(parseCatalogText(text));
   } catch (e) {
-    return { parts: [], issues: [{ index: -1, sku: '', reason: `could not parse file: ${(e as Error).message}` }] };
+    return {
+      parts: [],
+      issues: [{ index: -1, sku: '', reason: `could not parse file: ${(e as Error).message}` }],
+      prices: {},
+    };
   }
 }

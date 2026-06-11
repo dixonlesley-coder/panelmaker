@@ -843,7 +843,9 @@ function buildUnified(
         onAddItem: (action) => onAddItem(id, action),
         onReorder: (ids) => onReorder(id, ids),
       };
-      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, draggable: false });
+      // draggable comes from the flow-level nodesDraggable; per-node draggable:false
+      // would override it and break rearranging.
+      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data });
       x += w + GAP;
     });
   }

@@ -78,6 +78,7 @@ export function Settings() {
 
   const parts = useProjectStore((s) => s.parts);
   const importParts = useProjectStore((s) => s.importParts);
+  const mergePrices = useProjectStore((s) => s.mergePrices);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
   const meta = project.meta ?? {};
@@ -92,8 +93,9 @@ export function Settings() {
   function onCatalogFile(file: File | null) {
     if (!file) return;
     void file.text().then((text) => {
-      const { parts: loaded, issues } = importCatalogText(text);
+      const { parts: loaded, issues, prices } = importCatalogText(text);
       if (loaded.length > 0) importParts(loaded);
+      if (Object.keys(prices).length > 0) mergePrices(prices);
       const color = loaded.length === 0 ? 'red' : issues.length > 0 ? 'yellow' : 'teal';
       notifications.show({
         message:
