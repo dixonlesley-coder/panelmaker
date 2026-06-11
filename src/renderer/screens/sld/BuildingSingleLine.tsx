@@ -749,6 +749,10 @@ function FeederEdge({
 }: EdgeProps) {
   const offset = (data?.offset as number | undefined) ?? 0;
   const label = data?.label as string | undefined;
+  const util = data?.util as number | undefined;
+  // Colour the label by cable loading: ≥100% overloaded (red), ≥85% tight (orange).
+  const color =
+    util === undefined ? undefined : util >= 100 ? 'var(--mantine-color-red-7)' : util >= 85 ? 'var(--mantine-color-orange-7)' : undefined;
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
     centerY: (sourceY + targetY) / 2 + offset,
@@ -756,11 +760,12 @@ function FeederEdge({
   });
   return (
     <>
-      <BaseEdge path={path} markerEnd={markerEnd} style={style} />
+      <BaseEdge path={path} markerEnd={markerEnd} style={style} interactionWidth={24} />
       {label && (
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan"
+            title="Double-click to edit this feeder cable (length, size)"
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
@@ -770,6 +775,7 @@ function FeederEdge({
               padding: '0 4px',
               borderRadius: 3,
               whiteSpace: 'nowrap',
+              ...(color ? { color } : {}),
             }}
           >
             {label}
@@ -947,8 +953,15 @@ function buildUnified(
   for (const [parentId, list] of feedersByParent) {
     list.forEach(({ circuitId, childId }, i) => {
       const feederWay = system.panels[parentId]?.circuits.find((c) => c.circuitId === circuitId);
+      // Cable loading: load current ÷ the cable's derated ampacity.
+      const util =
+        feederWay && feederWay.cable.deratedIzA > 0
+          ? Math.round((feederWay.designCurrentA / feederWay.cable.deratedIzA) * 100)
+          : undefined;
       const feederLabel = feederWay
-        ? `${feederWay.breaker.ratingA}A · ${cableLabel(feederWay.cable.csaMm2, feederWay.grounding.cores, feederWay.cable.runsPerPhase)}`
+        ? `${feederWay.breaker.ratingA}A · ${cableLabel(feederWay.cable.csaMm2, feederWay.grounding.cores, feederWay.cable.runsPerPhase)}${
+            util !== undefined ? ` · ${util}%` : ''
+          }`
         : undefined;
       // Spread sibling centre-lines around the midpoint so cables + labels don't stack.
       const offset = (i - (list.length - 1) / 2) * 26;
@@ -959,7 +972,8 @@ function buildUnified(
         target: childId,
         targetHandle: 'in',
         type: 'feeder',
-        data: { label: feederLabel, offset },
+        // panelId + circuitId let a double-click open this feeder's editor.
+        data: { label: feederLabel, offset, panelId: parentId, circuitId, util },
         style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
       });
     });
@@ -982,14 +996,17 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
-  const [editing, setEditing] = useState<{ panelId: string; circuitId: string } | null>(null);
+  const [editing, setEditing] = useState<{ panelId: string; circuitId: string; focus: 'device' | 'cable' } | null>(null);
   const [inspectPanelId, setInspectPanelId] = useState<string | null>(null);
   // Right-click → replacement-parts menu anchored at the cursor.
   const [ctx, setCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
 
-  const openCircuit = useCallback((panelId: string, circuitId: string) => {
-    setEditing({ panelId, circuitId });
-  }, []);
+  const openCircuit = useCallback(
+    (panelId: string, circuitId: string, focus: 'device' | 'cable' = 'device') => {
+      setEditing({ panelId, circuitId, focus });
+    },
+    [],
+  );
   const openContext = useCallback((panelId: string, circuitId: string, x: number, y: number) => {
     setCtx({ panelId, circuitId, x, y });
   }, []);
@@ -1155,6 +1172,12 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             deleteKeyCode={null}
             zoomOnDoubleClick={false}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
+            onEdgeDoubleClick={(_, edge) => {
+              // Double-click a feeder cable → edit it (length, size, …).
+              const pid = edge.data?.panelId as string | undefined;
+              const cid = edge.data?.circuitId as string | undefined;
+              if (pid && cid) openCircuit(pid, cid, 'cable');
+            }}
           >
             <Background gap={18} />
             <Controls showInteractive={false} />
@@ -1168,7 +1191,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           panelId={editing.panelId}
           circuit={editingCircuit}
           result={editingResult}
-          focus="device"
+          focus={editing.focus}
           opened
           onClose={() => setEditing(null)}
         />
