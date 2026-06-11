@@ -844,6 +844,8 @@ export const en = {
     sectionActions: 'Actions',
     addCircuit: 'Add circuit to active panel',
     addPanel: 'Add panel',
+    exportPdf: 'Export single-line PDF',
+    saveProject: 'Save project',
     navigateHint: 'navigate',
     runHint: 'run',
   },

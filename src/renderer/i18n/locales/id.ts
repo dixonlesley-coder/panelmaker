@@ -849,6 +849,8 @@ export const id: TranslationKeys = {
     sectionActions: 'Aksi',
     addCircuit: 'Tambah sirkuit ke panel aktif',
     addPanel: 'Tambah panel',
+    exportPdf: 'Ekspor PDF satu-garis',
+    saveProject: 'Simpan proyek',
     navigateHint: 'navigasi',
     runHint: 'jalankan',
   },

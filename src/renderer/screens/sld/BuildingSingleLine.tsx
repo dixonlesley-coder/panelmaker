@@ -5,6 +5,7 @@ import {
   Controls,
   EdgeLabelRenderer,
   Handle,
+  MiniMap,
   Panel,
   Position,
   ReactFlow,
@@ -1662,6 +1663,21 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           >
             <Background gap={GRID} />
             <Controls showInteractive={false} />
+            <MiniMap
+              pannable
+              zoomable
+              nodeStrokeWidth={2}
+              nodeColor={(n) =>
+                n.type === 'uPanel'
+                  ? 'var(--mantine-color-indigo-5)'
+                  : n.type === 'grid'
+                    ? '#c92a2a'
+                    : n.type === 'floatLoad'
+                      ? 'var(--mantine-color-orange-5)'
+                      : 'var(--mantine-color-gray-5)'
+              }
+              style={{ width: 150, height: 100 }}
+            />
             <Panel position="top-right">
               <CanvasHelp />
             </Panel>

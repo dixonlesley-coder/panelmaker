@@ -7,6 +7,8 @@ import {
   IconArrowForwardUp,
   IconBox,
   IconChartLine,
+  IconDeviceFloppy,
+  IconFileTypePdf,
   IconFolder,
   IconGauge,
   IconLayoutGridAdd,
@@ -20,8 +22,10 @@ import {
   IconSolarPanel,
 } from '@tabler/icons-react';
 import { useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { panelLabel } from '@shared/labels';
 import { useProjectStore, type Screen } from '@renderer/state/projectStore';
+import { exportSystemPdf, saveProjectToDisk } from '@renderer/api';
 
 interface Command {
   id: string;
@@ -73,6 +77,7 @@ export function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const panels = useProjectStore((s) => s.project.panels);
+  const project = useProjectStore((s) => s.project);
   const setScreen = useProjectStore((s) => s.setScreen);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const addCircuit = useProjectStore((s) => s.addCircuit);
@@ -157,6 +162,32 @@ export function CommandPalette() {
         },
       },
       {
+        id: 'act:export-pdf',
+        label: t('palette.exportPdf'),
+        section: t('palette.sectionActions'),
+        icon: <IconFileTypePdf size={16} />,
+        keywords: 'export pdf single-line report',
+        run: () => {
+          void exportSystemPdf(project).then((r) =>
+            notifications.show({ message: r.message, color: r.ok ? 'teal' : r.reason === 'web' ? 'blue' : 'red' }),
+          );
+          close();
+        },
+      },
+      {
+        id: 'act:save',
+        label: t('palette.saveProject'),
+        section: t('palette.sectionActions'),
+        icon: <IconDeviceFloppy size={16} />,
+        keywords: 'save disk',
+        run: () => {
+          void saveProjectToDisk(project).then((r) =>
+            notifications.show({ message: r.message, color: r.ok ? 'teal' : r.reason === 'web' ? 'blue' : 'red' }),
+          );
+          close();
+        },
+      },
+      {
         id: 'act:undo',
         label: t('history.undo'),
         section: t('palette.sectionActions'),
@@ -190,7 +221,7 @@ export function CommandPalette() {
     ];
     return [...nav, ...panelCmds, ...actions];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panels, activePanelId, computedScheme, t]);
+  }, [panels, project, activePanelId, computedScheme, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
