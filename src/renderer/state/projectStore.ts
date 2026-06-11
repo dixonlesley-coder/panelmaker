@@ -149,6 +149,8 @@ export interface ProjectState {
   connectPanelAsFeeder: (parentPanelId: string, childPanelId: string) => void;
   /** Remove a feeder circuit and reset the panel it fed back to a standalone root. */
   disconnectFeeder: (panelId: string, feederCircuitId: string) => void;
+  /** Delete a panel; drops feeders that fed it and orphans the panels it fed. */
+  removePanel: (panelId: string) => void;
   /** Set (or clear) a panel's building occupancy class. */
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
   /** Append a new panel built from a template (fresh ids) and select it. */
@@ -689,6 +691,37 @@ export const useProjectStore = create<ProjectState>((set) => ({
           }),
         })),
         schematics,
+      };
+    }),
+
+  removePanel: (panelId) =>
+    set((s) => {
+      const target = s.project.panels.find((p) => p.id === panelId);
+      if (!target) return s;
+      // Feeder circuit ids in the removed panel → orphan the panels they fed.
+      const feederIds = new Set(target.circuits.filter((c) => c.feedsPanelId).map((c) => c.id));
+      const schematics = { ...s.schematics };
+      for (const c of target.circuits) delete schematics[c.id];
+
+      const next = withHistory(s, (project) => ({
+        ...project,
+        panels: project.panels
+          .filter((p) => p.id !== panelId)
+          .map((p) => {
+            // Drop any feeder in another panel that fed the removed one.
+            const circuits = p.circuits.filter((c) => c.feedsPanelId !== panelId);
+            // Orphan a child the removed panel fed: back to a standalone root.
+            if (p.sourceType === 'feeder' && p.fedByCircuitId !== undefined && feederIds.has(p.fedByCircuitId)) {
+              const { fedByCircuitId: _f, ...rest } = p;
+              return { ...rest, sourceType: 'utility' as const, circuits };
+            }
+            return { ...p, circuits };
+          }),
+      }));
+      return {
+        ...next,
+        schematics,
+        activePanelId: s.activePanelId === panelId ? next.project.panels[0]?.id : s.activePanelId,
       };
     }),
 
