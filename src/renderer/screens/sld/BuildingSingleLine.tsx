@@ -971,9 +971,8 @@ function buildUnified(
         onReorder: (ids) => onReorder(id, ids),
       };
       // draggable comes from the flow-level nodesDraggable; per-node draggable:false
-      // would override it and break rearranging. deletable:false so the Delete key
-      // only removes (disconnects) feeder edges, never panels.
-      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, deletable: false });
+      // would override it and break rearranging. Panels are deletable (Delete key).
+      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data });
       x += w + GAP;
     });
   }
@@ -1030,6 +1029,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const addPanel = useProjectStore((s) => s.addPanel);
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
   const disconnectFeeder = useProjectStore((s) => s.disconnectFeeder);
+  const removePanel = useProjectStore((s) => s.removePanel);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -1043,6 +1043,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const [ctx, setCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
   // Right-click a feeder edge → disconnect / edit menu at the cursor.
   const [edgeCtx, setEdgeCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
+  // Right-click a panel → open / delete menu at the cursor.
+  const [nodeCtx, setNodeCtx] = useState<{ panelId: string; x: number; y: number } | null>(null);
 
   const disconnectEdge = useCallback(
     (panelId: string, circuitId: string) => {
@@ -1227,13 +1229,17 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               // guards self-/cyclic links and only adopts unconnected panels).
               if (c.source && c.target && c.source !== c.target) connectPanelAsFeeder(c.source, c.target);
             }}
-            onEdgesDelete={(deleted) => {
-              // Select a feeder + Delete → disconnect it (panels are deletable:false).
-              for (const e of deleted) {
+            onDelete={({ nodes: dn, edges: de }) => {
+              // Delete (or Backspace): remove selected panels; disconnect selected
+              // feeders. A feeder whose panel is itself being removed is skipped —
+              // removePanel already cleans it up — so we don't double-process.
+              const removed = new Set(dn.map((n) => n.id));
+              for (const e of de) {
                 const pid = e.data?.panelId as string | undefined;
                 const cid = e.data?.circuitId as string | undefined;
-                if (pid && cid) disconnectEdge(pid, cid);
+                if (pid && cid && !removed.has(e.source) && !removed.has(e.target)) disconnectEdge(pid, cid);
               }
+              for (const n of dn) removePanel(n.id);
             }}
             onEdgeContextMenu={(e, edge) => {
               e.preventDefault();
@@ -1242,6 +1248,10 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               if (pid && cid) setEdgeCtx({ panelId: pid, circuitId: cid, x: e.clientX, y: e.clientY });
             }}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
+            onNodeContextMenu={(e, node) => {
+              e.preventDefault();
+              setNodeCtx({ panelId: node.id, x: e.clientX, y: e.clientY });
+            }}
             onEdgeDoubleClick={(_, edge) => {
               // Double-click a feeder cable → edit it (length, size, …).
               const pid = edge.data?.panelId as string | undefined;
@@ -1356,6 +1366,35 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             }}
           >
             {t('sldMenu.disconnect')}
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+
+      {/* Right-click a panel → open / delete, anchored at the cursor. */}
+      <Menu opened={nodeCtx !== null} onClose={() => setNodeCtx(null)} position="right-start" width={180} shadow="md" withinPortal>
+        <Menu.Target>
+          <div style={{ position: 'fixed', left: nodeCtx?.x ?? 0, top: nodeCtx?.y ?? 0, width: 1, height: 1 }} />
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Item
+            onClick={() => {
+              if (nodeCtx) openInspector(nodeCtx.panelId);
+              setNodeCtx(null);
+            }}
+          >
+            {t('sldMenu.openPanel')}
+          </Menu.Item>
+          <Menu.Item
+            color="red"
+            onClick={() => {
+              if (nodeCtx) {
+                removePanel(nodeCtx.panelId);
+                notifications.show({ message: t('sldMenu.panelDeleted'), color: 'gray' });
+              }
+              setNodeCtx(null);
+            }}
+          >
+            {t('sldMenu.deletePanel')}
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>

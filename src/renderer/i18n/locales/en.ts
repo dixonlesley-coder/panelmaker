@@ -553,6 +553,9 @@ export const en = {
     editCable: 'Edit cable…',
     disconnect: 'Disconnect feeder',
     disconnected: 'Feeder disconnected — the panel is now a standalone root.',
+    openPanel: 'Open panel',
+    deletePanel: 'Delete panel',
+    panelDeleted: 'Panel deleted.',
   },
   system: {
     eyebrow: 'Building overview',

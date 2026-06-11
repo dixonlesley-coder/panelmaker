@@ -557,6 +557,9 @@ export const id: TranslationKeys = {
     editCable: 'Edit kabel…',
     disconnect: 'Putuskan feeder',
     disconnected: 'Feeder diputus — panel kini menjadi root mandiri.',
+    openPanel: 'Buka panel',
+    deletePanel: 'Hapus panel',
+    panelDeleted: 'Panel dihapus.',
   },
   system: {
     eyebrow: 'Ikhtisar bangunan',

@@ -55,6 +55,23 @@ describe('projectStore', () => {
     expect(orphan.fedByCircuitId).toBeUndefined();
   });
 
+  it('deletes a panel, dropping its feeder and orphaning the panel it fed', () => {
+    const { addPanel, connectPanelAsFeeder, removePanel } = useProjectStore.getState();
+    addPanel();
+    const root = useProjectStore.getState().project.panels[0]!;
+    const child = useProjectStore.getState().project.panels.at(-1)!;
+    connectPanelAsFeeder(root.id, child.id);
+    expect(useProjectStore.getState().project.panels.find((p) => p.id === child.id)!.sourceType).toBe('feeder');
+
+    removePanel(root.id);
+    const after = useProjectStore.getState().project;
+    // root gone, child survives as a standalone root
+    expect(after.panels.some((p) => p.id === root.id)).toBe(false);
+    const orphan = after.panels.find((p) => p.id === child.id)!;
+    expect(orphan.sourceType).toBe('utility');
+    expect(orphan.fedByCircuitId).toBeUndefined();
+  });
+
   it('seeds the realistic sample building', () => {
     const { project } = useProjectStore.getState();
     expect(project.panels.length).toBe(3);
