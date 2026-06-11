@@ -589,6 +589,8 @@ function UnifiedPanelNode({ data }: NodeProps) {
         const raw = e.dataTransfer.getData(SLD_DND);
         if (!raw) return;
         e.preventDefault();
+        // Handled here — don't also fire the canvas-level "new panel" drop.
+        e.stopPropagation();
         try {
           d.onAddItem?.(JSON.parse(raw) as SldAdd);
         } catch {
@@ -828,6 +830,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
+  const addPanel = useProjectStore((s) => s.addPanel);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
@@ -877,6 +880,29 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       notifications.show({ message: t('vbuilder.added', { name: t(action.nameKey) }), color: 'teal' });
     },
     [project, addCircuitConfigured, addSubPanel, t],
+  );
+
+  // Drop on the empty canvas (not on a panel): a sub-panel becomes a new
+  // top-level panel; a load needs a panel, so we nudge the user to drop on one.
+  const onCanvasDrop = useCallback(
+    (e: React.DragEvent) => {
+      const raw = e.dataTransfer.getData(SLD_DND);
+      if (!raw) return;
+      e.preventDefault();
+      let action: SldAdd;
+      try {
+        action = JSON.parse(raw) as SldAdd;
+      } catch {
+        return;
+      }
+      if (action.type === 'subpanel') {
+        addPanel();
+        notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
+      } else {
+        notifications.show({ message: t('system.dropOnPanel'), color: 'yellow' });
+      }
+    },
+    [addPanel, t],
   );
 
   const { nodes, edges } = useMemo(
@@ -945,7 +971,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         </Stack>
       </Card>
 
-      <Box style={{ flex: 1, minWidth: 0 }}>
+      <Box
+        style={{ flex: 1, minWidth: 0 }}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(SLD_DND)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }
+        }}
+        onDrop={onCanvasDrop}
+      >
         <ReactFlowProvider>
           <ReactFlow
             nodes={nodes}
