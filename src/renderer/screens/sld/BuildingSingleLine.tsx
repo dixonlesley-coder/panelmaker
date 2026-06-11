@@ -19,7 +19,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from '@xyflow/react';
-import { Badge, Box, Button, Card, Drawer, Group, List, Menu, Modal, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Box, Button, Card, Drawer, Group, List, Menu, Modal, Paper, Stack, Text, TextInput, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
@@ -1344,6 +1344,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
+  const saveAsTemplate = useProjectStore((s) => s.saveAsTemplate);
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
@@ -1355,6 +1356,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const [edgeCtx, setEdgeCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
   // Right-click a panel → open / delete menu at the cursor.
   const [nodeCtx, setNodeCtx] = useState<{ panelId: string; x: number; y: number } | null>(null);
+  // "Save as template…" on a panel: name prompt before snapshotting.
+  const [tplPrompt, setTplPrompt] = useState<{ panelId: string; name: string } | null>(null);
+  const commitTemplate = () => {
+    if (!tplPrompt) return;
+    const label =
+      tplPrompt.name.trim() || (project.panels.find((p) => p.id === tplPrompt.panelId)?.name ?? '');
+    saveAsTemplate(tplPrompt.panelId, label);
+    notifications.show({ message: t('templateSave.saved', { name: label }), color: 'teal' });
+    setTplPrompt(null);
+  };
   // Deleting a panel that feeds sub-panels disconnects them — confirm first.
   // The pending promise resolves when the user picks Delete (true) or Cancel.
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -1845,6 +1856,17 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             {t('sldMenu.openPanel')}
           </Menu.Item>
           <Menu.Item
+            onClick={() => {
+              const panelId = nodeCtx?.panelId;
+              setNodeCtx(null);
+              if (!panelId) return;
+              const name = project.panels.find((p) => p.id === panelId)?.name ?? '';
+              setTplPrompt({ panelId, name });
+            }}
+          >
+            {t('sldMenu.saveTemplate')}
+          </Menu.Item>
+          <Menu.Item
             color="red"
             onClick={() => {
               const panelId = nodeCtx?.panelId;
@@ -1861,6 +1883,40 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>
+
+      {/* "Save as template…": name the snapshot before storing it. */}
+      <Modal
+        opened={tplPrompt !== null}
+        onClose={() => setTplPrompt(null)}
+        title={t('templateSave.title')}
+        centered
+        size="sm"
+      >
+        {tplPrompt && (
+          <Stack gap="sm">
+            <TextInput
+              label={t('templateSave.nameLabel')}
+              value={tplPrompt.name}
+              data-autofocus
+              onChange={(e) => setTplPrompt({ ...tplPrompt, name: e.currentTarget.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitTemplate();
+              }}
+            />
+            <Text size="xs" c="dimmed">
+              {t('templateSave.hint')}
+            </Text>
+            <Group justify="flex-end" gap="xs">
+              <Button variant="default" size="xs" onClick={() => setTplPrompt(null)}>
+                {t('templateSave.cancel')}
+              </Button>
+              <Button size="xs" onClick={commitTemplate}>
+                {t('templateSave.save')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
 
       {/* Deleting a panel that feeds sub-panels: confirm the cascade first. */}
       <Modal

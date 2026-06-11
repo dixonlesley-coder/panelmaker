@@ -42,6 +42,13 @@ import {
   loadProject as registryLoadProject,
   saveProject as registrySaveProject,
 } from '@renderer/lib/projectsRegistry';
+import {
+  createUserTemplate,
+  instantiateTemplate,
+  loadUserTemplates,
+  persistUserTemplates,
+  type UserPanelTemplate,
+} from '@renderer/lib/userTemplates';
 
 export type Screen =
   | 'projects'
@@ -98,6 +105,8 @@ export interface ProjectState {
   activeScreen: Screen;
   /** Preferred manufacturer for order-code matching / exports (null = all brands). */
   preferredBrand: string | null;
+  /** User-defined panel templates (persisted to localStorage across projects). */
+  userTemplates: UserPanelTemplate[];
   /** Control/ladder schematics, keyed by circuitId. */
   schematics: Record<string, ControlSchematic>;
   /** Undo stack: prior project states, oldest first (capped at HISTORY_LIMIT). */
@@ -185,6 +194,12 @@ export interface ProjectState {
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
   /** Append a new panel built from a template (fresh ids) and select it. */
   addPanelFromTemplate: (templateId: string) => void;
+  /** Snapshot a panel as a reusable user template (persisted across projects). */
+  saveAsTemplate: (panelId: string, label: string) => void;
+  /** Delete a user template (and persist the remaining list). */
+  removeUserTemplate: (templateId: string) => void;
+  /** Stamp a user template into the project (fresh ids) and select the panel. */
+  addPanelFromUserTemplate: (templateId: string) => void;
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
@@ -408,6 +423,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activePanelId: initialProject.panels[0]?.id ?? '',
   activeScreen: 'system',
   preferredBrand: null,
+  userTemplates: loadUserTemplates(),
   schematics: {},
   past: [],
   future: [],
@@ -803,6 +819,37 @@ export const useProjectStore = create<ProjectState>((set) => ({
       if (!template) return s;
       const newPanel = template.build();
       // Disambiguate the name if a panel with this template name already exists.
+      const sameName = s.project.panels.filter((p) => p.name.startsWith(newPanel.name)).length;
+      if (sameName > 0) newPanel.name = `${newPanel.name} ${sameName + 1}`;
+      return {
+        ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, newPanel] })),
+        activePanelId: newPanel.id,
+        activeScreen: 'system',
+      };
+    }),
+
+  saveAsTemplate: (panelId, label) =>
+    set((s) => {
+      const panel = s.project.panels.find((p) => p.id === panelId);
+      if (!panel) return s;
+      const userTemplates = [...s.userTemplates, createUserTemplate(label, panel)];
+      persistUserTemplates(userTemplates);
+      return { userTemplates };
+    }),
+
+  removeUserTemplate: (templateId) =>
+    set((s) => {
+      const userTemplates = s.userTemplates.filter((t) => t.id !== templateId);
+      persistUserTemplates(userTemplates);
+      return { userTemplates };
+    }),
+
+  addPanelFromUserTemplate: (templateId) =>
+    set((s) => {
+      const template = s.userTemplates.find((t) => t.id === templateId);
+      if (!template) return s;
+      const newPanel = instantiateTemplate(template);
+      // Same name disambiguation as the built-in templates.
       const sameName = s.project.panels.filter((p) => p.name.startsWith(newPanel.name)).length;
       if (sameName > 0) newPanel.name = `${newPanel.name} ${sameName + 1}`;
       return {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ActionIcon,
   Badge,
   Button,
   Card,
@@ -19,11 +20,13 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   IconBolt,
+  IconBookmark,
   IconCash,
   IconChevronDown,
   IconDeviceFloppy,
   IconDownload,
   IconPackageExport,
+  IconTrash,
   IconFileSpreadsheet,
   IconFileTypeCsv,
   IconLayoutGridAdd,
@@ -65,6 +68,9 @@ export function SystemView() {
   const bomParts = useMemo(() => partsForBrand(parts, preferredBrand), [parts, preferredBrand]);
   const addPanel = useProjectStore((s) => s.addPanel);
   const addPanelFromTemplate = useProjectStore((s) => s.addPanelFromTemplate);
+  const userTemplates = useProjectStore((s) => s.userTemplates);
+  const addPanelFromUserTemplate = useProjectStore((s) => s.addPanelFromUserTemplate);
+  const removeUserTemplate = useProjectStore((s) => s.removeUserTemplate);
   const importPanels = useProjectStore((s) => s.importPanels);
 
   const system = useSystemResult();
@@ -172,6 +178,41 @@ export function SystemView() {
                   </Text>
                 </Menu.Item>
               ))}
+              {userTemplates.length > 0 && (
+                <>
+                  <Menu.Divider />
+                  <Menu.Label>{t('system.myTemplates')}</Menu.Label>
+                  {userTemplates.map((tpl) => (
+                    <Menu.Item
+                      key={tpl.id}
+                      leftSection={<IconBookmark size={14} />}
+                      rightSection={
+                        <ActionIcon
+                          component="div"
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          aria-label={t('system.removeTemplate')}
+                          title={t('system.removeTemplate')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeUserTemplate(tpl.id);
+                            notifications.show({ message: t('system.templateRemoved'), color: 'gray' });
+                          }}
+                        >
+                          <IconTrash size={12} />
+                        </ActionIcon>
+                      }
+                      onClick={() => addPanelFromUserTemplate(tpl.id)}
+                    >
+                      <Text size="sm">{tpl.label}</Text>
+                      <Text size="xs" c="dimmed">
+                        {t('system.templateMeta', { count: tpl.circuitCount, panel: tpl.savedFrom })}
+                      </Text>
+                    </Menu.Item>
+                  ))}
+                </>
+              )}
             </Menu.Dropdown>
           </Menu>
           <Button
