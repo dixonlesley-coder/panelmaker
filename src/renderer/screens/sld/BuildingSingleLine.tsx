@@ -659,6 +659,11 @@ function UnifiedPanelNode({ data }: NodeProps) {
   const hasError = (d.issues ?? []).some((i) => i.severity === 'error');
   const feederIndex = (id: string) => d.ways.findIndex((w) => w.id === id);
   const [hover, setHover] = useState(false); // highlight the draggable/selectable panel on hover
+  // Panel health: the worst cable loading + how many ways are overloaded — shown
+  // as a badge so problem panels stand out while zoomed out.
+  const utils = d.ways.map((w) => w.util).filter((u): u is number => u !== undefined);
+  const worstUtil = utils.length ? Math.max(...utils) : undefined;
+  const overloaded = utils.filter((u) => u >= 100).length;
 
   return (
     <Box
@@ -715,6 +720,16 @@ function UnifiedPanelNode({ data }: NodeProps) {
           </Box>
         </Group>
         <Group gap={4} wrap="nowrap">
+          {worstUtil !== undefined && (
+            <Badge
+              size="xs"
+              variant={overloaded > 0 ? 'filled' : 'light'}
+              color={overloaded > 0 ? 'red' : worstUtil >= 85 ? 'orange' : 'gray'}
+              title="Worst cable loading in this panel"
+            >
+              {overloaded > 0 ? `${overloaded} over` : `${worstUtil}%`}
+            </Badge>
+          )}
           <NodeIssues issues={d.issues} />
           <Badge size="xs" variant="light" color={d.source === 'utility' ? 'indigo' : 'gray'}>
             {d.source}
@@ -741,11 +756,20 @@ function UnifiedPanelNode({ data }: NodeProps) {
         )}
       </Box>
 
+      {/* Anchors for existing feeder edges (not for starting new connections). */}
       {d.feederIds.map((id) => {
         const idx = feederIndex(id);
         const left = expanded ? LEFT + idx * WAY_W + WAY_W / 2 : 24;
-        return <Handle key={id} type="source" id={id} position={Position.Bottom} style={{ left }} />;
+        return <Handle key={id} type="source" id={id} position={Position.Bottom} style={{ left }} isConnectable={false} />;
       })}
+      {/* Outlet: drag from here onto another panel to feed it (creates the feeder). */}
+      <Handle
+        type="source"
+        id="out"
+        position={Position.Bottom}
+        title="Drag to another panel to feed it"
+        style={{ left: '50%', width: 11, height: 11, background: 'var(--mantine-color-indigo-5)', border: '2px solid var(--mantine-color-body)' }}
+      />
     </Box>
   );
 }
@@ -1003,6 +1027,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const addPanel = useProjectStore((s) => s.addPanel);
+  const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -1180,11 +1205,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             proOptions={{ hideAttribution: true }}
             minZoom={0.2}
             maxZoom={2.5}
-            nodesConnectable={false}
+            nodesConnectable
             nodesDraggable
             elementsSelectable
             deleteKeyCode={null}
             zoomOnDoubleClick={false}
+            onConnect={(c) => {
+              // Drag from a panel's outlet to another panel → feed it (the store
+              // guards self-/cyclic links and only adopts unconnected panels).
+              if (c.source && c.target && c.source !== c.target) connectPanelAsFeeder(c.source, c.target);
+            }}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
             onEdgeDoubleClick={(_, edge) => {
               // Double-click a feeder cable → edit it (length, size, …).
