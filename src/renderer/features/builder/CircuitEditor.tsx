@@ -24,6 +24,7 @@ import {
   presetKeyFor,
 } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
+import { circuitOrderCodes } from '@shared/engine/bom';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps, formatPercent } from '@renderer/lib/format';
 
@@ -79,8 +80,11 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
   const { t } = useTranslation();
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
+  const parts = useProjectStore((s) => s.parts);
   const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
   const motor = isMotorKind(circuit.loadKind);
+  // The catalog order code the BOM would match for this device — surfaced inline.
+  const codes = result ? circuitOrderCodes(result, parts) : undefined;
 
   const util =
     result && result.cable.deratedIzA > 0
@@ -137,11 +141,13 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
               label={t('circuitEditor.breaker')}
               value={`${result.breaker.ratingA} A ${result.breaker.curve}`}
               color={result.breaker.overridden ? 'violet' : undefined}
+              hint={codes?.breaker}
             />
             <Stat
               label={t('circuitEditor.cable')}
               value={`${result.cable.runsPerPhase && result.cable.runsPerPhase > 1 ? `${result.cable.runsPerPhase}× ` : ''}${result.cable.csaMm2} mm²`}
               color={result.cable.overridden ? 'violet' : undefined}
+              hint={codes?.cable}
             />
             <Stat
               label={t('circuitEditor.utilisation')}
@@ -381,7 +387,7 @@ function Stat({
         {value}
       </Text>
       {hint && (
-        <Text size="xs" c="dimmed">
+        <Text size="xs" c="dimmed" ff="monospace">
           {hint}
         </Text>
       )}

@@ -11,7 +11,7 @@
  * costing) and the main process (PDF quotation/BOM export) build the same BOM.
  */
 
-import type { BomLine, CostResult, PanelResult, SystemResult } from '../types/results';
+import type { BomLine, CircuitResult, CostResult, PanelResult, SystemResult } from '../types/results';
 import type { Part } from '../types/parts';
 import { costBom, consolidateBom } from './costing';
 
@@ -80,6 +80,33 @@ function matchCablePart(csaMm2: number, parts: Part[]): string | undefined {
 /** Pick the first catalog part of a category (point-level accessories). */
 function matchFirstOfCategory(category: Part['category'], parts: Part[]): string | undefined {
   return parts.find((p) => p.category === category)?.id;
+}
+
+/**
+ * Matched catalog order codes (SKUs) for a circuit's breaker and cable, using the
+ * SAME matchers the BOM uses — so what's surfaced inline on a component is exactly
+ * what lands in the bill of materials. Absent when no catalog part matches.
+ */
+export function circuitOrderCodes(
+  circuit: CircuitResult,
+  parts: Part[],
+): { breaker?: string; cable?: string } {
+  const breakerId = matchBreakerPart(
+    {
+      ratingA: circuit.breaker.ratingA,
+      curve: circuit.breaker.curve,
+      deviceClass: circuit.breaker.deviceClass,
+      poles: circuit.phase === '3ph' ? 3 : 1,
+    },
+    parts,
+  );
+  const cableId = matchCablePart(circuit.cable.csaMm2, parts);
+  const out: { breaker?: string; cable?: string } = {};
+  const breaker = skuOf(parts, breakerId);
+  const cable = skuOf(parts, cableId);
+  if (breaker) out.breaker = breaker;
+  if (cable) out.cable = cable;
+  return out;
 }
 
 /** Build the list of BOM lines for a single panel. */

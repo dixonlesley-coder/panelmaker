@@ -35,7 +35,8 @@ import {
   IconPlugConnected,
   IconSitemap,
 } from '@tabler/icons-react';
-import type { CircuitInput, LoadKind, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import type { CircuitInput, LoadKind, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import { circuitOrderCodes } from '@shared/engine/bom';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
@@ -142,6 +143,7 @@ interface UnifiedWay {
   cable: string; // "4×16 mm²"
   cableFull: string; // full make-up for the hover title
   util?: number; // cable loading %: load current ÷ derated ampacity
+  orderCode?: string; // matched catalog SKU for the breaker (BOM-consistent)
   feeds?: string;
   warn: boolean;
 }
@@ -583,7 +585,7 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
               d.onContextCircuit?.(w.id, e.clientX, e.clientY);
             }}
           >
-            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''} — double-click to edit`}</title>
+            <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}${w.orderCode ? ` · ${w.orderCode}` : ''} — double-click to edit`}</title>
             {/* Hover highlight: signals this MCB is selectable / editable. */}
             {hoverWay === w.id && !dragging && (
               <rect
@@ -807,6 +809,7 @@ interface LoadNodeData {
   phase: PhaseAssignment;
   threePhase: boolean;
   warn: boolean;
+  orderCode?: string;
   onEdit?: () => void;
   onContext?: (x: number, y: number) => void;
   [key: string]: unknown;
@@ -822,6 +825,7 @@ function LoadNode({ data }: NodeProps) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onDoubleClick={() => d.onEdit?.()}
+      title={`${d.name} — ${d.breakerA} · ${d.cable}${d.orderCode ? ` · ${d.orderCode}` : ''}`}
       onContextMenu={(e) => {
         e.preventDefault();
         d.onContext?.(e.clientX, e.clientY);
@@ -1026,6 +1030,7 @@ function buildUnified(
   onContextCircuit: (panelId: string, circuitId: string, x: number, y: number) => void,
   onReorder: (panelId: string, orderedCircuitIds: string[]) => void,
   floatingLoads: FloatingLoad[],
+  parts: Part[],
 ): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
@@ -1119,6 +1124,7 @@ function buildUnified(
         const child = childId ? byId.get(childId) : undefined;
         const ci = inputById.get(c.circuitId);
         const starter = c.control?.starterType;
+        const orderCode = circuitOrderCodes(c, parts).breaker;
         return {
           id: c.circuitId,
           name: c.name,
@@ -1132,6 +1138,7 @@ function buildUnified(
           cable: cableLabel(c.cable.csaMm2, c.grounding.cores, c.cable.runsPerPhase),
           cableFull: c.grounding.cableSpec,
           ...(c.cable.deratedIzA > 0 ? { util: Math.round((c.designCurrentA / c.cable.deratedIzA) * 100) } : {}),
+          ...(orderCode ? { orderCode } : {}),
           feeds: child ? (child.tag ?? child.name) : undefined,
           warn: !c.voltageDrop.withinLimit,
         };
@@ -1234,6 +1241,7 @@ function buildUnified(
             phase: wy.phase,
             threePhase: panel.system === '3ph',
             warn: wy.warn,
+            ...(wy.orderCode ? { orderCode: wy.orderCode } : {}),
             onEdit: () => onEditCircuit(id, wy.id),
             onContext: (mx: number, my: number) => onContextCircuit(id, wy.id, mx, my),
           },
@@ -1312,6 +1320,7 @@ function buildUnified(
 export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
+  const parts = useProjectStore((s) => s.parts);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
@@ -1428,8 +1437,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   );
 
   const built = useMemo(
-    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads),
-    [project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads],
+    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads, parts),
+    [project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads, parts],
   );
   const edges = built.edges;
   // Panels are auto-arranged from the feeder tree, but draggable to rearrange.
