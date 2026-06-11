@@ -23,6 +23,7 @@ import {
   IconChevronDown,
   IconDeviceFloppy,
   IconDownload,
+  IconPackageExport,
   IconFileSpreadsheet,
   IconFileTypeCsv,
   IconLayoutGridAdd,
@@ -52,6 +53,7 @@ import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
 import { exportLabelsPdf, exportSystemPdf, saveProjectToDisk } from '@renderer/api';
+import { exportAllDeliverables, exportAllMessage } from '@renderer/lib/exportAll';
 
 export function SystemView() {
   const { t } = useTranslation();
@@ -187,6 +189,21 @@ export function SystemView() {
             onClick={async () => notify(await exportSystemPdf(project))}
           >
             {t('system.exportSystemPdf')}
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            color="teal"
+            leftSection={<IconPackageExport size={14} />}
+            onClick={async () => {
+              const res = await exportAllDeliverables();
+              notifications.show({
+                message: exportAllMessage(t, res),
+                color: res.ok ? 'teal' : res.reason === 'cancelled' ? 'gray' : 'red',
+              });
+            }}
+          >
+            {t('system.exportAll')}
           </Button>
           <Button
             size="xs"

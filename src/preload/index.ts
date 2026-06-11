@@ -44,6 +44,9 @@ const api: Api = {
   saveSchematic: (schematic: ControlSchematic) => ipcRenderer.invoke(IPC.saveSchematic, schematic),
   loadSchematic: (circuitId: string) => ipcRenderer.invoke(IPC.loadSchematic, circuitId),
   chooseSavePath: (defaultName: string) => ipcRenderer.invoke(IPC.chooseSavePath, defaultName),
+  chooseDirectory: () => ipcRenderer.invoke(IPC.chooseDirectory),
+  writeExportFile: (filePath: string, data: Uint8Array) =>
+    ipcRenderer.invoke(IPC.writeExportFile, filePath, data),
 
   appVersion: () => ipcRenderer.invoke(IPC.appVersion),
   checkForUpdates: () => ipcRenderer.invoke(IPC.updateCheck),

@@ -13,6 +13,7 @@ import {
   IconGauge,
   IconLayoutGridAdd,
   IconMoon,
+  IconPackageExport,
   IconPlus,
   IconReceipt,
   IconReceipt2,
@@ -26,6 +27,7 @@ import { notifications } from '@mantine/notifications';
 import { panelLabel } from '@shared/labels';
 import { useProjectStore, type Screen } from '@renderer/state/projectStore';
 import { exportSystemPdf, saveProjectToDisk } from '@renderer/api';
+import { exportAllDeliverables, exportAllMessage } from '@renderer/lib/exportAll';
 
 interface Command {
   id: string;
@@ -170,6 +172,22 @@ export function CommandPalette() {
         run: () => {
           void exportSystemPdf(project).then((r) =>
             notifications.show({ message: r.message, color: r.ok ? 'teal' : r.reason === 'web' ? 'blue' : 'red' }),
+          );
+          close();
+        },
+      },
+      {
+        id: 'act:export-all',
+        label: t('palette.exportAll'),
+        section: t('palette.sectionActions'),
+        icon: <IconPackageExport size={16} />,
+        keywords: 'export all deliverables bom schedule dxf pdf',
+        run: () => {
+          void exportAllDeliverables().then((r) =>
+            notifications.show({
+              message: exportAllMessage(t, r),
+              color: r.ok ? 'teal' : r.reason === 'cancelled' ? 'gray' : 'red',
+            }),
           );
           close();
         },

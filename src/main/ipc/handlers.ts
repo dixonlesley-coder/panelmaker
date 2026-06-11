@@ -8,6 +8,8 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { writeFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 import type { Part } from '@shared/types/parts';
 import type { ProjectInput } from '@shared/types/project';
@@ -207,6 +209,21 @@ export function registerIpcHandlers(hooks: IpcHandlerHooks = {}): void {
       ? await dialog.showSaveDialog(win, opts)
       : await dialog.showSaveDialog(opts);
     return res.canceled || !res.filePath ? null : res.filePath;
+  });
+
+  ipcMain.handle(IPC.chooseDirectory, async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender) ?? undefined;
+    const opts = { properties: ['openDirectory' as const, 'createDirectory' as const] };
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    return res.canceled || res.filePaths[0] === undefined ? null : res.filePaths[0];
+  });
+
+  ipcMain.handle(IPC.writeExportFile, async (_e, filePath: unknown, data: unknown) => {
+    const target = z.string().min(1).parse(filePath);
+    if (!isAbsolute(target)) throw new Error(`Export path must be absolute: ${target}`);
+    const bytes = z.instanceof(Uint8Array).parse(data);
+    await writeFile(target, bytes);
+    return { filePath: target, byteLength: bytes.byteLength };
   });
 
   ipcMain.handle(IPC.appVersion, () => app.getVersion());

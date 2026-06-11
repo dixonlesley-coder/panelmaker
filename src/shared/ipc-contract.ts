@@ -115,6 +115,8 @@ export const IPC = {
   saveSchematic: 'schematic:save',
   loadSchematic: 'schematic:load',
   chooseSavePath: 'dialog:saveAs',
+  chooseDirectory: 'dialog:chooseDirectory',
+  writeExportFile: 'export:writeFile',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   updateStatus: 'update:status',
@@ -204,6 +206,15 @@ export interface Api {
 
   /** Show a native "save as" dialog; returns the chosen path or `null` if cancelled. */
   chooseSavePath(defaultName: string): Promise<string | null>;
+
+  /** Show a native folder picker; returns the chosen directory or `null` if cancelled. */
+  chooseDirectory(): Promise<string | null>;
+
+  /**
+   * Write an export artifact (already rendered by the renderer — CSV/XLSX/DXF
+   * bytes) to an absolute path, e.g. inside a directory the user just chose.
+   */
+  writeExportFile(filePath: string, data: Uint8Array): Promise<ExportResult>;
 
   /** Installed application version. */
   appVersion(): Promise<string>;
