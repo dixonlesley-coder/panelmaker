@@ -19,7 +19,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from '@xyflow/react';
-import { Badge, Box, Card, Drawer, Group, Menu, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Badge, Box, Button, Card, Drawer, Group, List, Menu, Modal, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
@@ -43,6 +43,7 @@ import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
 import { dropIndex, reorderIds } from '@renderer/lib/reorder';
+import { fedSubPanelNames } from '@renderer/lib/panelTree';
 import { useProjectStore, type FloatingLoad } from '@renderer/state/projectStore';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CanvasHelp } from '@renderer/screens/sld/CanvasHelp';
@@ -1354,6 +1355,28 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const [edgeCtx, setEdgeCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
   // Right-click a panel → open / delete menu at the cursor.
   const [nodeCtx, setNodeCtx] = useState<{ panelId: string; x: number; y: number } | null>(null);
+  // Deleting a panel that feeds sub-panels disconnects them — confirm first.
+  // The pending promise resolves when the user picks Delete (true) or Cancel.
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    panelNames: string[];
+    childNames: string[];
+    resolve: (ok: boolean) => void;
+  } | null>(null);
+
+  /**
+   * Resolve true when the panels can be deleted: immediately when none of them
+   * feeds a surviving sub-panel, otherwise after the user confirms in the
+   * cascade-warning modal. Undo remains the safety net either way.
+   */
+  const confirmPanelDelete = useCallback(
+    (panelIds: string[]): Promise<boolean> => {
+      const childNames = fedSubPanelNames(project, panelIds);
+      if (childNames.length === 0) return Promise.resolve(true);
+      const panelNames = project.panels.filter((p) => panelIds.includes(p.id)).map((p) => p.name);
+      return new Promise((resolve) => setDeleteConfirm({ panelNames, childNames, resolve }));
+    },
+    [project],
+  );
 
   const disconnectEdge = useCallback(
     (panelId: string, circuitId: string) => {
@@ -1626,6 +1649,12 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               else if (isFloat(c.target) && isPanel(c.source)) attachFloatingLoad(c.target.replace(/^float-/, ''), c.source);
               else if (isPanel(c.source) && isPanel(c.target)) connectPanelAsFeeder(c.source, c.target);
             }}
+            onBeforeDelete={async ({ nodes: dn }) => {
+              // Deleting a panel that feeds sub-panels disconnects them all —
+              // ask first (Delete/Backspace path; the context menu asks too).
+              const panelIds = dn.filter((n) => n.type === 'uPanel').map((n) => n.id);
+              return panelIds.length === 0 ? true : confirmPanelDelete(panelIds);
+            }}
             onDelete={({ nodes: dn, edges: de }) => {
               // Delete (or Backspace): remove selected panels / floating loads;
               // disconnect selected feeders. A feeder whose panel is itself being
@@ -1818,17 +1847,73 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           <Menu.Item
             color="red"
             onClick={() => {
-              if (nodeCtx) {
-                removePanel(nodeCtx.panelId);
-                notifications.show({ message: t('sldMenu.panelDeleted'), color: 'gray' });
-              }
+              const panelId = nodeCtx?.panelId;
               setNodeCtx(null);
+              if (!panelId) return;
+              void confirmPanelDelete([panelId]).then((ok) => {
+                if (!ok) return;
+                removePanel(panelId);
+                notifications.show({ message: t('sldMenu.panelDeleted'), color: 'gray' });
+              });
             }}
           >
             {t('sldMenu.deletePanel')}
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>
+
+      {/* Deleting a panel that feeds sub-panels: confirm the cascade first. */}
+      <Modal
+        opened={deleteConfirm !== null}
+        onClose={() => {
+          deleteConfirm?.resolve(false);
+          setDeleteConfirm(null);
+        }}
+        title={t('sldDelete.title')}
+        centered
+        size="md"
+      >
+        {deleteConfirm && (
+          <Stack gap="sm">
+            <Text size="sm">
+              {t('sldDelete.body', {
+                panel: deleteConfirm.panelNames.join(', '),
+                count: deleteConfirm.childNames.length,
+              })}
+            </Text>
+            <List size="sm" spacing={2}>
+              {deleteConfirm.childNames.map((name) => (
+                <List.Item key={name}>{name}</List.Item>
+              ))}
+            </List>
+            <Text size="xs" c="dimmed">
+              {t('sldDelete.undoHint')}
+            </Text>
+            <Group justify="flex-end" gap="xs">
+              <Button
+                variant="default"
+                size="xs"
+                onClick={() => {
+                  deleteConfirm.resolve(false);
+                  setDeleteConfirm(null);
+                }}
+              >
+                {t('sldDelete.cancel')}
+              </Button>
+              <Button
+                color="red"
+                size="xs"
+                onClick={() => {
+                  deleteConfirm.resolve(true);
+                  setDeleteConfirm(null);
+                }}
+              >
+                {t('sldDelete.confirm')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
     </Group>
   );
 }

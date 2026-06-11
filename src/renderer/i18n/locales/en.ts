@@ -564,6 +564,14 @@ export const en = {
     deletePanel: 'Delete panel',
     panelDeleted: 'Panel deleted.',
   },
+  sldDelete: {
+    title: 'Delete a distribution panel?',
+    body_one: '{{panel}} feeds {{count}} sub-panel. Deleting it removes its feeders; the sub-panel below stays but is disconnected (back to a standalone root):',
+    body_other: '{{panel}} feeds {{count}} sub-panels. Deleting it removes its feeders; the sub-panels below stay but are disconnected (back to standalone roots):',
+    undoHint: 'You can undo this afterwards (Ctrl+Z).',
+    cancel: 'Cancel',
+    confirm: 'Delete panel',
+  },
   system: {
     eyebrow: 'Building overview',
     title: 'Whole-building system',

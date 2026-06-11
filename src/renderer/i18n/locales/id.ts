@@ -568,6 +568,14 @@ export const id: TranslationKeys = {
     deletePanel: 'Hapus panel',
     panelDeleted: 'Panel dihapus.',
   },
+  sldDelete: {
+    title: 'Hapus panel distribusi?',
+    body_one: '{{panel}} menyuplai {{count}} sub-panel. Menghapusnya akan membuang feedernya; sub-panel di bawah tetap ada tetapi terputus (kembali menjadi root mandiri):',
+    body_other: '{{panel}} menyuplai {{count}} sub-panel. Menghapusnya akan membuang feedernya; sub-panel di bawah tetap ada tetapi terputus (kembali menjadi root mandiri):',
+    undoHint: 'Anda dapat membatalkannya setelah ini (Ctrl+Z).',
+    cancel: 'Batal',
+    confirm: 'Hapus panel',
+  },
   system: {
     eyebrow: 'Ikhtisar bangunan',
     title: 'Sistem seluruh bangunan',
