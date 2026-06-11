@@ -35,6 +35,14 @@ on:
 permissions:
   contents: write # electron-builder uploads the installers to a GitHub Release
 
+# Serialise releases. Two runs publishing the SAME version concurrently race on
+# the release assets (electron-builder deletes-then-reuploads), which can leave a
+# release with NO installer/latest.yml and break auto-update. Queue them instead
+# of running in parallel; never cancel a publish midway.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     strategy:
