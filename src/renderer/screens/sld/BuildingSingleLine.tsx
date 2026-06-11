@@ -99,6 +99,11 @@ const PHASE_COLOR: Record<string, string> = {
 /** PUIL/Indonesian R-S-T designation for the IEC phase keys. */
 const PHASE_RST: Record<string, string> = { L1: 'R', L2: 'S', L3: 'T' };
 
+/** Cable-loading colour: calm < 85%, tight 85–100% (orange), overloaded ≥ 100% (red). */
+function utilColor(util: number): string {
+  return util >= 100 ? 'var(--mantine-color-red-7)' : util >= 85 ? 'var(--mantine-color-orange-7)' : DIM;
+}
+
 interface SupplyHead {
   transformer?: string; // "630 kVA"
   generator?: boolean;
@@ -123,6 +128,7 @@ interface UnifiedWay {
   overload?: boolean; // thermal overload (contactor-based starters)
   cable: string; // "4×16 mm²"
   cableFull: string; // full make-up for the hover title
+  util?: number; // cable loading %: load current ÷ derated ampacity
   feeds?: string;
   warn: boolean;
 }
@@ -400,7 +406,7 @@ function layout(threePhase: boolean, hasRcd: boolean, hasStarter: boolean): Layo
   }
   const loadTop = y + LOAD_GAP;
   const cableY = loadTop + LOAD_H + CABLE_GAP;
-  return { bars, brkTop, rcdTop, starterTop, loadTop, cableY, height: cableY + 12 };
+  return { bars, brkTop, rcdTop, starterTop, loadTop, cableY, height: cableY + 16 };
 }
 
 function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
@@ -604,10 +610,17 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
             <text x={cx} y={L.cableY} fontSize={9} fontWeight={700} textAnchor="middle" fill={FG}>
               {w.cable}
             </text>
-            {w.feeds && (
+            {w.feeds ? (
+              // Feeder way: the loading % is shown on its feeder edge instead.
               <text x={cx} y={L.cableY + 10} fontSize={8} fontWeight={700} textAnchor="middle" fill={PHASE_COLOR.L3}>
                 → {w.feeds}
               </text>
+            ) : (
+              w.util !== undefined && (
+                <text x={cx} y={L.cableY + 10} fontSize={8} fontWeight={700} textAnchor="middle" fill={utilColor(w.util)}>
+                  {w.util}%
+                </text>
+              )
             )}
           </g>
         );
@@ -900,6 +913,7 @@ function buildUnified(
           ...(starter && THERMAL_OVERLOAD_STARTERS.has(starter) ? { overload: true } : {}),
           cable: cableLabel(c.cable.csaMm2, c.grounding.cores, c.cable.runsPerPhase),
           cableFull: c.grounding.cableSpec,
+          ...(c.cable.deratedIzA > 0 ? { util: Math.round((c.designCurrentA / c.cable.deratedIzA) * 100) } : {}),
           feeds: child ? (child.tag ?? child.name) : undefined,
           warn: !c.voltageDrop.withinLimit,
         };
