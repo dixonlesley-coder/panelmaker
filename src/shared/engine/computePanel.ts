@@ -114,7 +114,9 @@ function computeCircuit(
     overrideA: c.breakerOverrideA,
   });
   const isTrunk = c.role === 'incomer' || isFeeder;
-  const baseMinSection = isTrunk ? 4 : 2.5;
+  // PUIL final-circuit minimums: 1.5 mm² for lighting, 2.5 mm² for power/sockets,
+  // 4 mm² for mains/feeders.
+  const baseMinSection = isTrunk ? 4 : c.isLighting ? 1.5 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const insulation = panel.insulation ?? 'PVC';
   const material = panel.material ?? 'Cu';
