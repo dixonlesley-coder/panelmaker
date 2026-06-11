@@ -406,7 +406,7 @@ function layout(threePhase: boolean, hasRcd: boolean, hasStarter: boolean): Layo
   }
   const loadTop = y + LOAD_GAP;
   const cableY = loadTop + LOAD_H + CABLE_GAP;
-  return { bars, brkTop, rcdTop, starterTop, loadTop, cableY, height: cableY + 16 };
+  return { bars, brkTop, rcdTop, starterTop, loadTop, cableY, height: cableY + 27 };
 }
 
 function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
@@ -621,6 +621,12 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
                   {w.util}%
                 </text>
               )
+            )}
+            {/* The circuit's label/name (double-click to edit; full text on hover). */}
+            {w.name && (
+              <text x={cx} y={L.cableY + 21} fontSize={6.5} textAnchor="middle" fill={DIM}>
+                {w.name.length > 24 ? `${w.name.slice(0, 23)}…` : w.name}
+              </text>
             )}
           </g>
         );
