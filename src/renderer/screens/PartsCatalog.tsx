@@ -166,17 +166,25 @@ export function PartsCatalog() {
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const [query, setQuery] = useState('');
+  const [brand, setBrand] = useState<string | null>(null);
+
+  // Brands actually present in the loaded catalog (covers imported parts too).
+  const brands = useMemo(
+    () => [...new Set(parts.map((p) => p.manufacturer))].sort((a, b) => a.localeCompare(b)),
+    [parts],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return parts;
-    return parts.filter((p) => {
+    const pool = brand === null ? parts : parts.filter((p) => p.manufacturer === brand);
+    if (!q) return pool;
+    return pool.filter((p) => {
       const haystack = [p.manufacturer, p.model, p.category, p.id, skuOf(p) ?? '', summarizeAttributes(p)]
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [parts, query]);
+  }, [parts, query, brand]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -189,13 +197,26 @@ export function PartsCatalog() {
           </Text>
           <Title order={3}>{t('parts.title')}</Title>
         </div>
-        <TextInput
-          placeholder={t('parts.searchPlaceholder')}
-          leftSection={<IconSearch size={16} />}
-          value={query}
-          onChange={(e) => setQuery(e.currentTarget.value)}
-          w={320}
-        />
+        <Group gap="xs">
+          <Select
+            placeholder={t('parts.allBrands')}
+            aria-label={t('parts.brandFilter')}
+            data={brands}
+            value={brand}
+            clearable
+            searchable
+            comboboxProps={{ withinPortal: true }}
+            onChange={setBrand}
+            w={190}
+          />
+          <TextInput
+            placeholder={t('parts.searchPlaceholder')}
+            leftSection={<IconSearch size={16} />}
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            w={320}
+          />
+        </Group>
       </Group>
 
       <FamilyFinder />

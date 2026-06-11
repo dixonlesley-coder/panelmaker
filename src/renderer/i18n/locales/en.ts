@@ -1031,6 +1031,8 @@ export const en = {
     colArcFlash: 'Arc flash',
   },
   parts: {
+    brandFilter: 'Brand',
+    allBrands: 'All brands',
     finderTitle: 'Manufacturer family finder',
     finderHint: 'Find which Schneider / ABB / Chint / LS series covers a required rating. Representative data — verify the exact catalogue number, Icu and price against the datasheet.',
     finderKind: 'Device',

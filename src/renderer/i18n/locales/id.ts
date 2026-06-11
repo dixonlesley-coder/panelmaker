@@ -1036,6 +1036,8 @@ export const id: TranslationKeys = {
     colArcFlash: 'Busur api',
   },
   parts: {
+    brandFilter: 'Merek',
+    allBrands: 'Semua merek',
     finderTitle: 'Pencari seri produsen',
     finderHint: 'Temukan seri Schneider / ABB / Chint / LS yang mencakup rating yang dibutuhkan. Data representatif — verifikasi nomor katalog, Icu, dan harga pada lembar data.',
     finderKind: 'Perangkat',
