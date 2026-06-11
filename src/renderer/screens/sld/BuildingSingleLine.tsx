@@ -85,6 +85,12 @@ const RCD_BAND = 15;
 const STARTER_BAND = 28;
 const LOAD_W = 70; // external load-node width (≤ WAY_W so siblings don't overlap)
 const LOAD_NODE_H = 74; // approx external load-node height (for layout clearance)
+// The panel card's chrome ABOVE the schematic SVG (title/badges header + card
+// padding + the schematic's top margin), in the expanded/zoomed-in state. The
+// `layout().height` only covers the SVG, so loads must clear schematic + chrome
+// or they land inside the card once it expands on zoom-in.
+const PANEL_CHROME = 64;
+const LOAD_DROP_GAP = 16; // panel (expanded) bottom → its external load nodes
 const GRID_SRC_W = 158; // utility-supply (grid) node, drawn above a utility panel
 const GRID_SRC_H = 54;
 /** Layout grid: panels + loads snap to it so wiring stays legible. */
@@ -1070,10 +1076,13 @@ function buildUnified(
   };
 
   const rowPitch =
-    // panel + the external-load band below it + breathing room for the next row
+    // expanded panel (schematic + chrome) + the external-load band below it +
+    // breathing room before the next row
     Math.max(...project.panels.filter((p) => system.panels[p.id]).map((p) => heightFor(p.id)), 120) +
+    PANEL_CHROME +
+    LOAD_DROP_GAP +
     LOAD_NODE_H +
-    120;
+    80;
 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -1195,7 +1204,9 @@ function buildUnified(
           id: loadId,
           type: 'load',
           parentId: id,
-          position: { x: wayCx - LOAD_W / 2, y: panelH + 34 },
+          // Clear the FULL expanded card (schematic + header/padding), not just the
+          // SVG, so the load never lands inside the panel when it expands on zoom-in.
+          position: { x: wayCx - LOAD_W / 2, y: panelH + PANEL_CHROME + LOAD_DROP_GAP },
           deletable: false,
           // Glued under its MCB and moved by the panel; dragging it itself would
           // only reset on the next recompute, so it isn't independently draggable.
