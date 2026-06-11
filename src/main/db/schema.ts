@@ -97,6 +97,8 @@ export const panels = sqliteTable('panels', {
   sourceType: text('source_type').notNull().default('utility'),
   /** When fed by a parent panel, the upstream feeder circuit id. */
   fedByCircuitId: text('fed_by_circuit_id'),
+  /** Essential (genset-backed) panel — drives generator backup sizing. */
+  essential: integer('essential', { mode: 'boolean' }),
 });
 
 export const circuits = sqliteTable('circuits', {
@@ -130,6 +132,8 @@ export const circuits = sqliteTable('circuits', {
   sensing: text('sensing'),
 
   cableOverrideMm2: real('cable_override_mm2'),
+  /** Explicit cable construction (NYY/NYM/NYA/NYAF…); null = panel default. */
+  cableType: text('cable_type'),
   /** Manual breaker rating override (A). */
   breakerOverrideA: real('breaker_override_a'),
   /** Force a new busbar section to start at this circuit (manual bus break). */

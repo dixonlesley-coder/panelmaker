@@ -97,6 +97,7 @@ export function circuitToRow(
     controlMode: undefToNull(c.controlMode),
     sensing: undefToNull(c.sensing),
     cableOverrideMm2: undefToNull(c.cableOverrideMm2),
+    cableType: undefToNull(c.cableType),
     breakerOverrideA: undefToNull(c.breakerOverrideA),
     busbarBreakBefore: c.busbarBreakBefore === true ? true : null,
     phaseOverride: undefToNull(c.phaseOverride),
@@ -150,6 +151,8 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   if (sensing !== undefined) c.sensing = sensing as CircuitInput['sensing'];
   const cableOverrideMm2 = nullToUndef(r.cableOverrideMm2);
   if (cableOverrideMm2 !== undefined) c.cableOverrideMm2 = cableOverrideMm2;
+  const cableType = nullToUndef(r.cableType);
+  if (cableType !== undefined) c.cableType = cableType as CircuitInput['cableType'];
   const breakerOverrideA = nullToUndef(r.breakerOverrideA);
   if (breakerOverrideA !== undefined) c.breakerOverrideA = breakerOverrideA;
   if (r.busbarBreakBefore) c.busbarBreakBefore = true;
@@ -210,6 +213,7 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     diversityFactor: p.diversityFactor,
     sourceType: p.sourceType,
     fedByCircuitId: undefToNull(p.fedByCircuitId),
+    essential: p.essential === true ? true : null,
   };
 }
 
@@ -236,6 +240,7 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (insulation !== undefined) p.insulation = insulation as PanelInput['insulation'];
   const material = nullToUndef(r.material);
   if (material !== undefined) p.material = material as PanelInput['material'];
+  if (r.essential) p.essential = true;
   return p;
 }
 

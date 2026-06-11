@@ -43,6 +43,12 @@ export interface GeneratorResult {
   ratingKva: number;
   backupKva: number;
   mode: GeneratorMode;
+  /**
+   * Number of essential panels the backup demand was derived from. Absent (or
+   * 0) when no panel is marked essential and the blanket `backupFraction` of
+   * the whole-building demand was used instead.
+   */
+  essentialPanelCount?: number;
   note: string;
 }
 

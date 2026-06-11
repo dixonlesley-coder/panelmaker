@@ -141,6 +141,13 @@ export interface PanelInput {
   /** Fed by the utility, or by a parent panel's feeder circuit. */
   sourceType: 'utility' | 'feeder';
   fedByCircuitId?: string;
+  /**
+   * Essential (genset-backed) panel: stays alive on mains failure. When any
+   * panel is marked, the generator backup demand derives from the essential
+   * panels' actual demand instead of the blanket `backupFraction`, and the
+   * power one-line splits an essential bus behind the ATS.
+   */
+  essential?: boolean;
   circuits: CircuitInput[];
 }
 

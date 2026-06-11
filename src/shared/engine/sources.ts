@@ -26,19 +26,38 @@ import type {
 import { assessGensetStart, type GensetMotor } from './gensetTransient';
 import { round } from './util';
 
-/** Size a standby/prime generator to back up a fraction of the building demand. */
-export function sizeGenerator(buildingDemandKva: number, cfg: GeneratorConfig): GeneratorResult {
-  const backupKva = buildingDemandKva * cfg.backupFraction;
+/** Which panels the genset actually backs: marked essential panels, or a blanket fraction. */
+export interface EssentialDemand {
+  /** Aggregate demand of the marked essential panels (kVA, double-count free). */
+  demandKva: number;
+  /** How many panels are marked (0 = none — fall back to backupFraction). */
+  panelCount: number;
+}
+
+/**
+ * Size a standby/prime generator. When essential panels are marked, the backup
+ * demand is THEIR actual aggregate demand (the real essential bus the ATS
+ * transfers); otherwise fall back to `backupFraction` × the building demand.
+ */
+export function sizeGenerator(
+  buildingDemandKva: number,
+  cfg: GeneratorConfig,
+  essential?: EssentialDemand,
+): GeneratorResult {
+  const useEssential = essential !== undefined && essential.panelCount > 0;
+  const backupKva = useEssential ? essential.demandKva : buildingDemandKva * cfg.backupFraction;
   // Prime (continuous) duty needs ~25% headroom; standby covers the backup load directly.
   const required = cfg.mode === 'prime' ? backupKva * 1.25 : backupKva;
   const ratingKva = selectGeneratorKva(required);
+  const duty = cfg.mode === 'prime' ? 'Prime (continuous)' : 'Standby';
   return {
     ratingKva,
     backupKva: round(backupKva, 1),
     mode: cfg.mode,
-    note: `${cfg.mode === 'prime' ? 'Prime (continuous)' : 'Standby'} genset backing up ${Math.round(
-      cfg.backupFraction * 100,
-    )}% of demand (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. Transfers on mains failure via ATS.`,
+    ...(useEssential ? { essentialPanelCount: essential.panelCount } : {}),
+    note: useEssential
+      ? `${duty} genset backing the ${essential.panelCount} essential panel(s) (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. The ATS transfers the essential bus on mains failure.`
+      : `${duty} genset backing up ${Math.round(cfg.backupFraction * 100)}% of demand (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. Transfers on mains failure via ATS.`,
   };
 }
 
@@ -100,11 +119,12 @@ export function computeSources(
   config: SourcesConfig | undefined,
   buildingDemandKva: number,
   motors: GensetMotor[] = [],
+  essential?: EssentialDemand,
 ): SourcesResult | undefined {
   if (!config) return undefined;
   const out: SourcesResult = {};
   if (config.generator?.enabled) {
-    out.generator = sizeGenerator(buildingDemandKva, config.generator);
+    out.generator = sizeGenerator(buildingDemandKva, config.generator, essential);
     // Verify the genset holds the worst-case motor-start voltage dip within limits.
     out.gensetStart = assessGensetStart({ gensetKva: out.generator.ratingKva, motors });
   }

@@ -220,6 +220,8 @@ interface UnifiedPanelData {
   supply?: SupplyHead; // service-entrance equipment — root panel
   /** A standalone root that is NOT the service entrance — i.e. not fed yet. */
   unfed?: boolean;
+  /** Essential (genset-backed) panel — shown as a chip on the card. */
+  essential?: boolean;
   feederIds: string[];
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
@@ -797,6 +799,11 @@ function UnifiedPanelNode({ data }: NodeProps) {
             </Badge>
           )}
           <NodeIssues issues={d.issues} />
+          {d.essential && (
+            <Badge size="xs" variant="light" color="yellow" title={t('sldNode.essentialHint')}>
+              {t('sldNode.essential')}
+            </Badge>
+          )}
           <Badge
             size="xs"
             variant="light"
@@ -1253,6 +1260,7 @@ function buildUnified(
         // arrives with sourceType 'feeder' but no parent, and must read as
         // not-connected until it's actually wired under one.
         ...(id !== rootId && !parentOf.has(id) ? { unfed: true } : {}),
+        ...(panel.essential === true ? { essential: true } : {}),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
         onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
@@ -1440,6 +1448,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const saveAsTemplate = useProjectStore((s) => s.saveAsTemplate);
   const addSpareWays = useProjectStore((s) => s.addSpareWays);
   const setPhaseAssignments = useProjectStore((s) => s.setPhaseAssignments);
+  const updatePanel = useProjectStore((s) => s.updatePanel);
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
@@ -2082,6 +2091,21 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             }}
           >
             {t('sldMenu.panelSettings')}
+          </Menu.Item>
+          <Menu.Item
+            onClick={() => {
+              const panelId = nodeCtx?.panelId;
+              const wasEssential = ctxPanel?.essential === true;
+              setNodeCtx(null);
+              if (!panelId) return;
+              updatePanel(panelId, { essential: wasEssential ? undefined : true });
+              notifications.show({
+                message: t(wasEssential ? 'sldMenu.essentialOff' : 'sldMenu.essentialOn'),
+                color: wasEssential ? 'gray' : 'teal',
+              });
+            }}
+          >
+            {t(ctxPanel?.essential ? 'sldMenu.unmarkEssential' : 'sldMenu.markEssential')}
           </Menu.Item>
           {ctxPanel?.system === '3ph' && (
             <Menu.Item

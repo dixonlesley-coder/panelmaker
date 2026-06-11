@@ -132,13 +132,51 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const lvVoltageV = roots[0]?.voltageV ?? 400;
   const totalDemandKva = rootDemandW / 1000 / ASSUMED_BUILDING_PF;
   const supply = determineSupply(totalDemandKva, lvVoltageV);
-  // Building motors (for the genset motor-start voltage-dip check).
-  const motors = project.panels.flatMap((p) =>
+  // Essential (genset-backed) panels: their aggregate demand drives the genset
+  // sizing. A panel under an essential ancestor is already inside that
+  // ancestor's demand, so only the topmost essential panels are summed.
+  const hasEssentialAncestor = (id: string): boolean => {
+    let cur = parentOf.get(id);
+    const seen = new Set<string>();
+    while (cur !== undefined && !seen.has(cur)) {
+      if (byId.get(cur)?.essential === true) return true;
+      seen.add(cur);
+      cur = parentOf.get(cur);
+    }
+    return false;
+  };
+  const essentialPanels = project.panels.filter((p) => p.essential === true);
+  const essentialTopW = essentialPanels
+    .filter((p) => !hasEssentialAncestor(p.id))
+    .reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
+  const essential = {
+    demandKva: round(essentialTopW / 1000 / ASSUMED_BUILDING_PF, 1),
+    panelCount: essentialPanels.length,
+  };
+
+  // Building motors (for the genset motor-start voltage-dip check). With an
+  // essential bus only its subtree runs on the genset — assess those motors.
+  const motorPanels =
+    essential.panelCount > 0
+      ? project.panels.filter((p) => p.essential === true || hasEssentialAncestor(p.id))
+      : project.panels;
+  const motors = motorPanels.flatMap((p) =>
     p.circuits
       .filter((c) => c.motorKw !== undefined && c.motorKw > 0)
       .map((c) => ({ name: c.name, kW: c.motorKw!, starterType: c.starterType })),
   );
-  const sources = computeSources(project.sources, totalDemandKva, motors);
+  const sources = computeSources(project.sources, totalDemandKva, motors, essential);
+
+  if (
+    essential.panelCount > 0 &&
+    !(project.sources?.generator?.enabled || project.sources?.battery?.enabled)
+  ) {
+    warnings.push({
+      code: 'essential-no-backup',
+      severity: 'warning',
+      message: `${essential.panelCount} panel(s) are marked essential but no generator or battery is enabled — nothing keeps them alive on mains failure.`,
+    });
+  }
 
   // Prospective fault at the origin (main LV bus) and the source impedance behind
   // it. Each panel's bus fault decays down its feeder run from its parent's bus.
@@ -355,6 +393,16 @@ export function computeSystem(project: ProjectInput): SystemResult {
 
   // PLN service step + revenue metering at the origin (direct vs CT-operated).
   const metering = computeMetering(totalDemandKva, lvVoltageV, roots[0]?.system ?? '3ph');
+
+  // PLN rooftop-PV rule (Permen ESDM): the PV inverter capacity may not exceed
+  // the connected power (daya tersambung) the customer subscribes to.
+  if (sources?.solar && sources.solar.inverterKw * 1000 > metering.serviceVa) {
+    warnings.push({
+      code: 'pv-exceeds-service',
+      severity: 'warning',
+      message: `Solar inverter ${sources.solar.inverterKw} kW exceeds the PLN connected power (${Math.round(metering.serviceVa / 1000)} kVA) — rooftop-PV rules cap inverter capacity at the subscribed daya tersambung. Reduce the array/inverter or raise the service.`,
+    });
+  }
 
   // Surge-protection recommendation at the service origin (Type 1 under a
   // lightning/overhead exposure, else Type 2), keyed to the earthing system.

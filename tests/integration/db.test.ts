@@ -60,6 +60,9 @@ describe('SQLite persistence', () => {
     // Manual overrides must round-trip too.
     lighting.breakerOverrideA = 20;
     lighting.cableOverrideMm2 = 4;
+    // Per-circuit cable construction + the essential (genset-backed) panel flag.
+    lighting.cableType = 'NYA';
+    lp.essential = true;
     project.meta = {
       client: 'PT Contoh',
       location: 'Jakarta',
@@ -110,9 +113,12 @@ describe('SQLite persistence', () => {
     // site conditions round-trip via site_json
     expect(loaded!.site).toEqual({ externalLps: true, overheadSupply: false, soilResistivityOhmM: 150 });
 
-    // panel tag + occupancy round-trip as columns
+    // panel tag + occupancy + essential flag round-trip as columns
     expect(lpdb.tag).toBe('LP-1');
     expect(lpdb.occupancy).toBe('office');
+    expect(lpdb.essential).toBe(true);
+    // an unmarked panel keeps the field absent (not false)
+    expect(loaded!.panels.find((p) => p.name.includes('MCC'))!.essential).toBeUndefined();
 
     // point-level detail (fixtures / switch groups / sockets) round-trips via points_json
     const loadedLighting = lpdb.circuits.find((c) => c.loadKind === 'lighting')!;
@@ -120,6 +126,7 @@ describe('SQLite persistence', () => {
     expect(loadedLighting.switchGroups).toEqual(lighting.switchGroups);
     expect(loadedLighting.breakerOverrideA).toBe(20);
     expect(loadedLighting.cableOverrideMm2).toBe(4);
+    expect(loadedLighting.cableType).toBe('NYA');
     const loadedSocketHost = lpdb.circuits.find((c) => (c.sockets ?? []).length > 0)!;
     expect(loadedSocketHost.sockets).toEqual(socketHost.sockets);
     // a circuit without point detail keeps the fields absent (no empty arrays)

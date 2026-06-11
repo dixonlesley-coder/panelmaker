@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS panels (
   active_pricelist_id TEXT REFERENCES pricelists(id) ON DELETE SET NULL,
   diversity_factor REAL NOT NULL DEFAULT 0.8,
   source_type TEXT NOT NULL DEFAULT 'utility',
-  fed_by_circuit_id TEXT
+  fed_by_circuit_id TEXT,
+  essential INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS circuits (
@@ -98,6 +99,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   control_mode TEXT,
   sensing TEXT,
   cable_override_mm2 REAL,
+  cable_type TEXT,
   breaker_override_a REAL,
   busbar_break_before INTEGER,
   phase_override TEXT,
@@ -225,6 +227,10 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'grouping_override', ddl: 'ALTER TABLE circuits ADD COLUMN grouping_override INTEGER' },
   // Conductor material (Cu / Al).
   { table: 'panels', column: 'material', ddl: 'ALTER TABLE panels ADD COLUMN material TEXT' },
+  // Per-circuit cable construction (NYY/NYM/NYA/NYAF…).
+  { table: 'circuits', column: 'cable_type', ddl: 'ALTER TABLE circuits ADD COLUMN cable_type TEXT' },
+  // Essential (genset-backed) panel flag.
+  { table: 'panels', column: 'essential', ddl: 'ALTER TABLE panels ADD COLUMN essential INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */
