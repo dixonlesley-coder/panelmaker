@@ -85,6 +85,9 @@ const RCD_BAND = 15;
 const STARTER_BAND = 28;
 const LOAD_W = 70; // external load-node width (≤ WAY_W so siblings don't overlap)
 const LOAD_NODE_H = 74; // approx external load-node height (for layout clearance)
+/** Layout grid: panels + loads snap to it so wiring stays legible. */
+const GRID = 16;
+const snap = (n: number) => Math.round(n / GRID) * GRID;
 
 const FG = 'var(--mantine-color-text)';
 const DIM = 'var(--mantine-color-dimmed)';
@@ -1078,7 +1081,7 @@ function buildUnified(
       // draggable comes from the flow-level nodesDraggable; per-node draggable:false
       // would override it and break rearranging. Panels are deletable (Delete key).
       const panelY = d * rowPitch;
-      nodes.push({ id, type: 'uPanel', position: { x, y: panelY }, data });
+      nodes.push({ id, type: 'uPanel', position: { x: snap(x), y: snap(panelY) }, data });
 
       // Each non-feeder way's LOAD hangs outside the panel as its own node, wired
       // to that way's MCB output. Feeder ways connect to their sub-panel instead.
@@ -1090,7 +1093,7 @@ function buildUnified(
         nodes.push({
           id: loadId,
           type: 'load',
-          position: { x: x + wayCx - LOAD_W / 2, y: panelY + panelH + 34 },
+          position: { x: snap(x + wayCx - LOAD_W / 2), y: snap(panelY + panelH + 34) },
           deletable: false,
           data: {
             kind: wy.kind,
@@ -1163,7 +1166,7 @@ function buildUnified(
     nodes.push({
       id: `float-${fl.id}`,
       type: 'floatLoad',
-      position: fl.position,
+      position: { x: snap(fl.position.x), y: snap(fl.position.y) },
       deletable: true,
       data: { kind: fl.loadKind, name: fl.name, loadW: fl.loadW },
     });
@@ -1342,7 +1345,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             if (n.id === node.id || n.type !== 'uPanel') continue;
             const o = panelBox(n.id);
             if (x < n.position.x + o.w + M && x + me.w + M > n.position.x && y < n.position.y + o.h + M && y + me.h + M > n.position.y) {
-              y = n.position.y + o.h + M; // drop below the obstacle
+              y = snap(n.position.y + o.h + M); // drop below the obstacle, on-grid
               bumped = true;
             }
           }
@@ -1437,6 +1440,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             proOptions={{ hideAttribution: true }}
             minZoom={0.2}
             maxZoom={2.5}
+            snapToGrid
+            snapGrid={[GRID, GRID]}
             nodesConnectable
             nodesDraggable
             elementsSelectable
@@ -1488,7 +1493,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               if (pid && cid) openCircuit(pid, cid, 'cable');
             }}
           >
-            <Background gap={18} />
+            <Background gap={GRID} />
             <Controls showInteractive={false} />
           </ReactFlow>
         </ReactFlowProvider>
