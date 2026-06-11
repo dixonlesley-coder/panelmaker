@@ -193,6 +193,59 @@ export interface RawTable {
   index?: number;
   header: string[];
   rows: string[][];
+  /** The page's heading text (used to auto-categorise the parts). */
+  heading?: string;
+}
+
+/* --- Auto-categorisation: infer the PartCategory from the page heading, with a
+   Schneider SKU-prefix fallback, so one PDF upload classifies every part. --- */
+const CATEGORY_KEYWORDS: { re: RegExp; cat: PartCategory }[] = [
+  { re: /mccb|moulded case|molded case/i, cat: 'breaker' },
+  { re: /\bacb\b|air circuit/i, cat: 'breaker' },
+  { re: /rccb|rcbo|\brcd\b|residual current|arus bocor/i, cat: 'breaker' },
+  { re: /\bmcb\b|miniature circuit|pemutus arus|proteksi arus lebih|circuit breaker/i, cat: 'breaker' },
+  { re: /contactor|kontaktor/i, cat: 'contactor' },
+  { re: /overload|beban lebih|thermal relay/i, cat: 'overload_relay' },
+  { re: /soft ?start/i, cat: 'soft_starter' },
+  { re: /\bvfd\b|variable speed|variable frequency|altivar|drive\b/i, cat: 'vfd' },
+  { re: /transfer switch|\bats\b|\bmts\b|automatic transfer|manual transfer/i, cat: 'accessory' },
+  { re: /surge protection|\bspd\b|surge arrest|proteksi petir/i, cat: 'accessory' },
+  { re: /current transformer|trafo arus|\bct\b/i, cat: 'current_transformer' },
+  { re: /\bmeter\b|metering|pengukuran/i, cat: 'panel_meter' },
+  { re: /\btimer\b/i, cat: 'timer_relay' },
+  { re: /protection relay|protective relay|proteksi|relay proteksi|feeder protection|voltage protection/i, cat: 'control_relay' },
+  { re: /push ?button|selector|pilot|indicator|signal lamp|tombol/i, cat: 'pilot_device' },
+  { re: /charge|charging station|ev ?link|kendaraan listrik/i, cat: 'accessory' },
+  { re: /enclosure|enclosur|panelboard|spacial|prisma|kotak panel/i, cat: 'enclosure' },
+  { re: /busbar|bus bar|busway/i, cat: 'busbar' },
+  { re: /\bcable\b|kabel|conductor/i, cat: 'cable' },
+];
+const SKU_PREFIX: { re: RegExp; cat: PartCategory }[] = [
+  { re: /^A9[FNK]/i, cat: 'breaker' },
+  { re: /^A9R/i, cat: 'breaker' },
+  { re: /^A9L/i, cat: 'accessory' },
+  { re: /^A9C/i, cat: 'contactor' },
+  { re: /^(LC1|LC2|LP1)/i, cat: 'contactor' },
+  { re: /^(LRD|LR2|LR3|LRE)/i, cat: 'overload_relay' },
+  { re: /^(NSX|LV[45]|G12)/i, cat: 'breaker' },
+  { re: /^GM/i, cat: 'accessory' },
+  { re: /^OT/i, cat: 'accessory' },
+  { re: /^(REL|P3|P1)/i, cat: 'control_relay' },
+  { re: /^ATV/i, cat: 'vfd' },
+  { re: /^ATS4/i, cat: 'soft_starter' },
+  { re: /^(EVH|EVP)/i, cat: 'accessory' },
+  { re: /^(iEM|METSEPM)/i, cat: 'panel_meter' },
+];
+
+/** Infer a part category from heading text, or `undefined` if nothing matches. */
+export function categorizeFromText(text: string): PartCategory | undefined {
+  for (const { re, cat } of CATEGORY_KEYWORDS) if (re.test(text)) return cat;
+  return undefined;
+}
+/** Infer a part category from a Schneider order-code prefix. */
+export function categorizeFromSku(sku: string): PartCategory | undefined {
+  for (const { re, cat } of SKU_PREFIX) if (re.test(sku)) return cat;
+  return undefined;
 }
 
 /** Overrides applied to every row when mapping a PDF table the user is reviewing. */
@@ -430,8 +483,15 @@ export function tablesToCandidates(tables: RawTable[], defaults: TableMapDefault
   for (const t of tables) {
     const header = t.header ?? [];
     const rows = t.rows ?? [];
-    let entries = rowsToEntries(header, rows, defaults);
-    if (entries.length === 0) entries = tableToEntries(header, rows, defaults);
+    // Auto-categorise this table: page heading → SKU prefix → the review fallback.
+    const sampleSku = rows.flat().find((c) => isCodeCell((c ?? '').replace(/\s+/g, '')));
+    const cat =
+      categorizeFromText(t.heading ?? '') ??
+      (sampleSku ? categorizeFromSku(sampleSku.replace(/\s+/g, '')) : undefined) ??
+      defaults.defaultCategory;
+    const d = cat ? { ...defaults, defaultCategory: cat } : defaults;
+    let entries = rowsToEntries(header, rows, d);
+    if (entries.length === 0) entries = tableToEntries(header, rows, d);
     for (const e of entries) if (!bySku.has(e.sku)) bySku.set(e.sku, e);
   }
   return [...bySku.values()];

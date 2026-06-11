@@ -54,6 +54,14 @@ export function CatalogPdfImport() {
     [candidates],
   );
 
+  // Count parts per auto-assigned category (shown so the user can eyeball the
+  // classification before importing the whole book).
+  const byCategory = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of validated.parts) m.set(p.category, (m.get(p.category) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [validated.parts]);
+
   async function onPickPdf() {
     setLoading(true);
     setResult(null);
@@ -101,10 +109,10 @@ export function CatalogPdfImport() {
           <Group align="flex-end" gap="sm">
             <TextInput
               label={t('catalogPdf.pages')}
-              placeholder="120-140"
+              placeholder={t('catalogPdf.pagesAll')}
               value={pagesInput}
               onChange={(e) => setPagesInput(e.currentTarget.value)}
-              w={140}
+              w={180}
             />
             <Button onClick={onPickPdf} loading={loading} leftSection={<IconFileTypePdf size={16} />}>
               {t('catalogPdf.choose')}
@@ -123,9 +131,21 @@ export function CatalogPdfImport() {
                 </Text>
               </Group>
 
+              {/* Auto-assigned category breakdown */}
+              {byCategory.length > 0 && (
+                <Group gap={6}>
+                  {byCategory.map(([cat, n]) => (
+                    <Badge key={cat} variant="light" color="grape">
+                      {cat} · {n}
+                    </Badge>
+                  ))}
+                </Group>
+              )}
+
               <Group align="flex-end" gap="sm">
                 <Select
                   label={t('catalogPdf.defaultCategory')}
+                  description={t('catalogPdf.defaultCategoryHint')}
                   data={[...PART_CATEGORIES]}
                   value={defaultCategory}
                   onChange={(v) => v && setDefaultCategory(v)}

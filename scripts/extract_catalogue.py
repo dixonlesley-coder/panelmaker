@@ -247,6 +247,14 @@ def inspect(pdf_path: Path, page_range: str) -> None:
                     print(f"    sample = {r}")
 
 
+def page_heading(page) -> str:
+    """The page's title line(s) — the largest text near the top — so the app can
+    auto-categorise its parts. Joins the first couple of non-trivial text lines."""
+    txt = page.extract_text() or ""
+    lines = [ln.strip() for ln in txt.splitlines() if len(ln.strip()) >= 3]
+    return " ".join(lines[:3])[:160]
+
+
 def auto_json(pdf_path: Path, page_range: str | None) -> None:
     """Dump every detected table (header + rows) for a page range as JSON to
     stdout. This is the mode the bundled in-app extractor calls — the app maps
@@ -263,6 +271,7 @@ def auto_json(pdf_path: Path, page_range: str | None) -> None:
         out: dict = {"pages": total, "tables": []}
         for pageno in range(max(1, lo), min(total, hi) + 1):
             page = pdf.pages[pageno - 1]
+            heading = page_heading(page)  # for auto-categorisation in the app
             tables = page.extract_tables() or []
             if not tables:
                 # Fall back to a text-position strategy for tables without full
@@ -275,7 +284,7 @@ def auto_json(pdf_path: Path, page_range: str | None) -> None:
                     continue
                 header = [(c or "").strip() for c in table[0]]
                 rows = [[(c or "").strip() for c in r] for r in table[1:]]
-                out["tables"].append({"page": pageno, "index": ti, "header": header, "rows": rows})
+                out["tables"].append({"page": pageno, "index": ti, "header": header, "rows": rows, "heading": heading})
     print(json.dumps(out, ensure_ascii=False))
 
 

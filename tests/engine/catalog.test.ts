@@ -188,6 +188,27 @@ describe('manufacturer catalogue', () => {
     expect(prices.REL15004).toBe(13401000);
   });
 
+  it('auto-categorises each table from its page heading (SKU prefix as fallback)', () => {
+    const mccb = tablesToCandidates([
+      { page: 6, heading: 'GoPact MCCB — Molded Case Circuit Breaker 125', header: ['Rating', 'Referensi', 'Harga (Rp)'], rows: [['16 A', 'LV510347', '1.000.000']] },
+    ]);
+    expect(mccb[0]!.category).toBe('breaker');
+
+    const relay = tablesToCandidates([
+      { page: 4, heading: 'P1F - Feeder Current Protection Relay', header: ['Model', 'Referensi', 'Harga (Rp)'], rows: [['Model L', 'REL15000', '11.849.000']] },
+    ]);
+    expect(relay[0]!.category).toBe('control_relay');
+
+    const contactor = tablesToCandidates([
+      { page: 9, heading: 'TeSys Contactor', header: ['Referensi', 'Harga (Rp)'], rows: [['LC1D25', '500.000']] },
+    ]);
+    expect(contactor[0]!.category).toBe('contactor');
+
+    // no heading → fall back to the SKU prefix (A9F = Acti9 MCB)
+    const byPrefix = tablesToCandidates([{ page: 1, header: ['Referensi', 'Harga (Rp)'], rows: [['A9F44116', '100.000']] }]);
+    expect(byPrefix[0]!.category).toBe('breaker');
+  });
+
   it('reports a malformed file as a single issue instead of throwing', () => {
     const { parts, issues } = importCatalogText('{ not valid json');
     expect(parts).toEqual([]);

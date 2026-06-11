@@ -521,8 +521,10 @@ export const en = {
   catalogPdf: {
     button: 'Import from PDF',
     title: 'Import catalogue from PDF',
-    hint: 'Pick a catalogue PDF; the bundled extractor reads its ordering tables, then you review and import. Narrow it to the order-code pages for the best results.',
+    hint: 'Pick a catalogue PDF; it extracts every order code, auto-categorises each by the page heading, and captures the Harga (Rp) prices. Leave pages blank for the whole book, then review and import.',
     pages: 'Pages (optional)',
+    pagesAll: 'all pages (blank)',
+    defaultCategoryHint: 'Fallback only — most are auto-detected',
     choose: 'Choose PDF & extract',
     pagesWord: 'pages',
     detected: '{{tables}} tables → {{parts}} candidate parts',
