@@ -562,6 +562,7 @@ export const en = {
     disconnect: 'Disconnect feeder',
     disconnected: 'Feeder disconnected — the panel is now a standalone root.',
     openPanel: 'Open panel',
+    panelSettings: 'Panel settings…',
     addSpares: 'Add recommended spares ({{count}})',
     sparesAdded_one: '{{count}} spare way added.',
     sparesAdded_other: '{{count}} spare ways added.',

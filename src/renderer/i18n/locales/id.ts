@@ -566,6 +566,7 @@ export const id: TranslationKeys = {
     disconnect: 'Putuskan feeder',
     disconnected: 'Feeder diputus — panel kini menjadi root mandiri.',
     openPanel: 'Buka panel',
+    panelSettings: 'Pengaturan panel…',
     addSpares: 'Tambah jalur cadangan yang disarankan ({{count}})',
     sparesAdded_one: '{{count}} jalur cadangan ditambahkan.',
     sparesAdded_other: '{{count}} jalur cadangan ditambahkan.',

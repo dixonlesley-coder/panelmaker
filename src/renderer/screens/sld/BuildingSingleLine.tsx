@@ -39,6 +39,7 @@ import {
 } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { circuitOrderCodes } from '@shared/engine/bom';
+import { balancePhases, type PhaseCircuit } from '@shared/engine';
 import { partsForBrand } from '@shared/data/catalog';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
@@ -49,6 +50,7 @@ import { useProjectStore, type FloatingLoad } from '@renderer/state/projectStore
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CanvasHelp } from '@renderer/screens/sld/CanvasHelp';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
+import { PanelSettingsEditor } from '@renderer/features/builder/PanelSettingsEditor';
 
 /* Palette: drag a card onto a panel to add the way/sub-panel there. */
 const SLD_DND = 'application/x-panelmaker-sld-add';
@@ -1369,6 +1371,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const saveAsTemplate = useProjectStore((s) => s.saveAsTemplate);
   const addSpareWays = useProjectStore((s) => s.addSpareWays);
+  const setPhaseAssignments = useProjectStore((s) => s.setPhaseAssignments);
 
   // Edit on the canvas: double-click a component → its circuit editor; double-
   // click a panel → its full toolset in a side inspector (no screen change).
@@ -1380,6 +1383,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const [edgeCtx, setEdgeCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
   // Right-click a panel → open / delete menu at the cursor.
   const [nodeCtx, setNodeCtx] = useState<{ panelId: string; x: number; y: number } | null>(null);
+  // "Panel settings…" straight from the canvas (voltage / system / derating),
+  // without drilling through the inspector drawer.
+  const [settingsPanelId, setSettingsPanelId] = useState<string | null>(null);
   // "Save as template…" on a panel: name prompt before snapshotting.
   const [tplPrompt, setTplPrompt] = useState<{ panelId: string; name: string } | null>(null);
   const commitTemplate = () => {
@@ -1623,6 +1629,32 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     const sp = system.panels[nodeCtx.panelId]?.spare;
     return sp ? Math.max(0, sp.recommendedSpareWays - sp.spareWaysPresent) : 0;
   })();
+  const ctxPanel = nodeCtx ? project.panels.find((p) => p.id === nodeCtx.panelId) : undefined;
+
+  // One-click L1/L2/L3 re-distribution of a 3-phase panel's 1-phase circuits:
+  // pins each to its balanced line (the same engine pass the old builder had).
+  const autoBalance = (panelId: string) => {
+    const res = system.panels[panelId];
+    const panel = project.panels.find((p) => p.id === panelId);
+    if (!res || !panel) return;
+    const phaseCircuits: PhaseCircuit[] = res.circuits.map((cr) => ({
+      id: cr.circuitId,
+      currentA: cr.designCurrentA,
+      threePhase: cr.phase === '3ph',
+    }));
+    const bal = balancePhases(phaseCircuits, panel.system);
+    const assignment: Record<string, 'L1' | 'L2' | 'L3'> = {};
+    for (const cr of res.circuits) {
+      const a = bal.assignment[cr.circuitId];
+      if (a === 'L1' || a === 'L2' || a === 'L3') assignment[cr.circuitId] = a;
+    }
+    if (Object.keys(assignment).length === 0) {
+      notifications.show({ message: t('vbuilder.phaseNothing'), color: 'yellow' });
+      return;
+    }
+    setPhaseAssignments(panelId, assignment);
+    notifications.show({ message: t('vbuilder.phaseBalanced', { pct: bal.imbalancePct }), color: 'teal' });
+  };
 
   return (
     <Group align="stretch" gap="sm" wrap="nowrap" h="clamp(560px, calc(100vh - 220px), 880px)">
@@ -1911,6 +1943,26 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           >
             {t('sldMenu.openPanel')}
           </Menu.Item>
+          <Menu.Item
+            onClick={() => {
+              const panelId = nodeCtx?.panelId;
+              setNodeCtx(null);
+              if (panelId) setSettingsPanelId(panelId);
+            }}
+          >
+            {t('sldMenu.panelSettings')}
+          </Menu.Item>
+          {ctxPanel?.system === '3ph' && (
+            <Menu.Item
+              onClick={() => {
+                const panelId = nodeCtx?.panelId;
+                setNodeCtx(null);
+                if (panelId) autoBalance(panelId);
+              }}
+            >
+              {t('vbuilder.autoBalance')}
+            </Menu.Item>
+          )}
           {ctxSpares > 0 && (
             <Menu.Item
               onClick={() => {
@@ -1955,6 +2007,18 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>
+
+      {/* Panel settings straight from the context menu (system/voltage/derating). */}
+      {(() => {
+        const settingsPanel = project.panels.find((p) => p.id === settingsPanelId);
+        return settingsPanel ? (
+          <PanelSettingsEditor
+            panel={settingsPanel}
+            opened
+            onClose={() => setSettingsPanelId(null)}
+          />
+        ) : null;
+      })()}
 
       {/* "Save as template…": name the snapshot before storing it. */}
       <Modal
