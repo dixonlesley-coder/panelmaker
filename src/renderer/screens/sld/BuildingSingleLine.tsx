@@ -768,13 +768,24 @@ function UnifiedPanelNode({ data }: NodeProps) {
         const left = expanded ? LEFT + idx * WAY_W + WAY_W / 2 : 24;
         return <Handle key={id} type="source" id={id} position={Position.Bottom} style={{ left }} isConnectable={false} />;
       })}
-      {/* Outlet: drag from here onto another panel to feed it (creates the feeder). */}
+      {/* Outlet: drag from here onto another panel to feed it (creates the feeder).
+          Big + low so it's an easy target. */}
       <Handle
         type="source"
         id="out"
         position={Position.Bottom}
         title="Drag to another panel to feed it"
-        style={{ left: '50%', width: 11, height: 11, background: 'var(--mantine-color-indigo-5)', border: '2px solid var(--mantine-color-body)' }}
+        style={{
+          left: '50%',
+          bottom: -14,
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          background: 'var(--mantine-color-indigo-5)',
+          border: '3px solid var(--mantine-color-body)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+          cursor: 'crosshair',
+        }}
       />
     </Box>
   );
