@@ -168,6 +168,26 @@ describe('manufacturer catalogue', () => {
     expect(parts).toHaveLength(12);
   });
 
+  it('extracts Indonesian Referensi + Harga + checkmark features (relay page)', () => {
+    const header = ['Model', 'Referensi', 'Power Supply Vx', 'DO', 'RS485', 'Front USB', 'Harga (Rp)', 'SS'];
+    const rows = [
+      ['Model L', 'REL15000', '24-240 VAC/VDC', '4', '-', '-', '11.849.000', '2'],
+      ['Model N', 'REL15004', '24-240 VAC/VDC', '6', '✔', '✔', '13.401.000', '2'],
+    ];
+    const candidates = tablesToCandidates([{ page: 1, header, rows }], { defaultCategory: 'control_relay' });
+    expect(candidates.map((c) => c.sku)).toEqual(['REL15000', 'REL15004']);
+    expect(candidates[0]!.priceIdr).toBe(11849000); // "11.849.000" → 11849000
+    expect(candidates[0]!.attributes.DO).toBe(4);
+    expect(candidates[0]!.attributes.RS485).toBeUndefined(); // "-" omitted
+    expect(candidates[1]!.attributes.RS485).toBe(true); // "✔" → true
+    expect(candidates[1]!.model).toBe('Model N');
+    // prices are collected by the loader and routed to the pricelist on import
+    const { parts, prices } = loadCatalog({ catalogVersion: 'x', manufacturer: 'Schneider Electric', source: 'pdf', parts: candidates });
+    expect(parts).toHaveLength(2);
+    expect(prices.REL15000).toBe(11849000);
+    expect(prices.REL15004).toBe(13401000);
+  });
+
   it('reports a malformed file as a single issue instead of throwing', () => {
     const { parts, issues } = importCatalogText('{ not valid json');
     expect(parts).toEqual([]);

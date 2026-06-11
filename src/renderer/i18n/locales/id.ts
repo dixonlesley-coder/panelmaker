@@ -538,8 +538,9 @@ export const id: TranslationKeys = {
     colCategory: 'Kategori',
     colModel: 'Model',
     colCurve: 'Kurva',
+    colPrice: 'Harga (Rp)',
     import: 'Impor {{count}} komponen',
-    imported: 'Mengimpor {{count}} komponen ({{skipped}} dilewati). Tinjau di Katalog Komponen, lalu ekspor.',
+    imported: 'Mengimpor {{count}} komponen ({{priced}} berharga, {{skipped}} dilewati). Tinjau di Katalog Komponen, lalu ekspor.',
   },
 
   sldMenu: {

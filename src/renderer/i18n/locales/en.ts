@@ -534,8 +534,9 @@ export const en = {
     colCategory: 'Category',
     colModel: 'Model',
     colCurve: 'Curve',
+    colPrice: 'Price (Rp)',
     import: 'Import {{count}} parts',
-    imported: 'Imported {{count}} parts ({{skipped}} skipped). Review in Parts Catalog, then export.',
+    imported: 'Imported {{count}} parts ({{priced}} priced, {{skipped}} skipped). Review in Parts Catalog, then export.',
   },
 
   sldMenu: {
