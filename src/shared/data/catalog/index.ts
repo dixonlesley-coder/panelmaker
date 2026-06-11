@@ -18,6 +18,9 @@ import { parseCsv } from '@shared/io/csv';
 import schneiderRaw from './schneider.parts.json';
 import mitsubishiRaw from './mitsubishi.parts.json';
 import lsRaw from './ls.parts.json';
+import abbRaw from './abb.parts.json';
+import legrandRaw from './legrand.parts.json';
+import chintRaw from './chint.parts.json';
 import cablesRaw from './cables.parts.json';
 
 /** One ordering-table row as it appears in the committed JSON. */
@@ -123,6 +126,9 @@ const CATALOG_SOURCES: { brand: string; file: CatalogFile }[] = [
   { brand: 'Schneider', file: schneiderRaw as unknown as CatalogFile },
   { brand: 'Mitsubishi Electric', file: mitsubishiRaw as unknown as CatalogFile },
   { brand: 'LS Electric', file: lsRaw as unknown as CatalogFile },
+  { brand: 'ABB', file: abbRaw as unknown as CatalogFile },
+  { brand: 'Legrand', file: legrandRaw as unknown as CatalogFile },
+  { brand: 'Chint', file: chintRaw as unknown as CatalogFile },
   { brand: 'Generic', file: cablesRaw as unknown as CatalogFile },
 ];
 

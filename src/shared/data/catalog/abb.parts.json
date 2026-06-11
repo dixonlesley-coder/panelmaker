@@ -1,0 +1,6 @@
+{
+  "catalogVersion": "abb-0",
+  "manufacturer": "ABB",
+  "source": "Placeholder — to be populated with verified ABB LV parts (System pro M S200 MCBs, Tmax XT / Formula MCCBs, AF contactors, TA/E overloads, F200 RCCBs) transcribed from authoritative sources. Verify every order code/rating against the manufacturer datasheet before ordering.",
+  "parts": []
+}
