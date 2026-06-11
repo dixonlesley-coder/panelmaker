@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Background,
   Controls,
@@ -90,10 +90,20 @@ interface PowerNodeData {
 
 function PowerSourceNode({ data }: NodeProps) {
   const d = data as PowerNodeData;
+  const [hover, setHover] = useState(false); // highlight the draggable/selectable node on hover
   if (d.kind === 'bus') {
     return (
       <Box
-        style={{ width: 200, background: 'var(--mantine-color-indigo-6)', color: 'white', borderRadius: 4, padding: '6px 10px' }}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          width: 200,
+          background: 'var(--mantine-color-indigo-6)',
+          color: 'white',
+          borderRadius: 4,
+          padding: '6px 10px',
+          outline: hover ? '2px solid var(--mantine-color-indigo-3)' : 'none',
+        }}
       >
         <Handle id="l" type="target" position={Position.Left} />
         <Handle id="t" type="target" position={Position.Top} />
@@ -106,7 +116,15 @@ function PowerSourceNode({ data }: NodeProps) {
     );
   }
   return (
-    <Paper withBorder radius="md" p="xs" shadow="xs" style={{ width: 150 }}>
+    <Paper
+      withBorder
+      radius="md"
+      p="xs"
+      shadow={hover ? 'md' : 'xs'}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ width: 150, borderColor: hover ? 'var(--mantine-color-indigo-5)' : undefined, transition: 'box-shadow 120ms ease' }}
+    >
       <Handle id="l" type="target" position={Position.Left} />
       <Handle id="t" type="target" position={Position.Top} />
       <Group gap={6} wrap="nowrap">
