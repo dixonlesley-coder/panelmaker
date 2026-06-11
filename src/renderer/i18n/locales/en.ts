@@ -573,6 +573,16 @@ export const en = {
     cancel: 'Cancel',
     saved: 'Saved "{{name}}" to My templates.',
   },
+  sldNode: {
+    supply: 'PLN',
+    fed: 'fed',
+    unfed: 'not connected',
+    unfedHint: "No feeder supplies this panel yet — drag a parent panel's outlet onto it.",
+  },
+  sldConnect: {
+    hasParent: '{{name}} is already fed by another panel — disconnect that feeder first.',
+    cycle: 'That connection would loop the feeder tree (a panel cannot feed its own parent).',
+  },
   sldDelete: {
     title: 'Delete a distribution panel?',
     body_one: '{{panel}} feeds {{count}} sub-panel. Deleting it removes its feeders; the sub-panel below stays but is disconnected (back to a standalone root):',
@@ -595,6 +605,7 @@ export const en = {
     exportAllDoneWeb_one: 'Downloaded {{count}} deliverable — the system PDF needs the desktop app.',
     exportAllDoneWeb_other: 'Downloaded {{count}} deliverables — the system PDF needs the desktop app.',
     exportAllCancelled: 'Export cancelled.',
+    panelAddedUnfed: "Panel added — not fed yet. Drag another panel's round outlet onto it to feed it.",
     myTemplates: 'My templates',
     templateMeta_one: '{{count}} circuit · from {{panel}}',
     templateMeta_other: '{{count}} circuits · from {{panel}}',
@@ -623,7 +634,7 @@ export const en = {
     helpFeed: "Drag a panel's round outlet onto another panel to feed it",
     helpLoad: 'Drag a load onto a panel to wire it (creates the MCB)',
     helpCable: 'Double-click a cable to set its length and size',
-    helpDelete: 'Select, then press Delete to remove it or disconnect a feeder',
+    helpDelete: 'Select a panel or floating load and press Delete; right-click a way to delete it',
     helpReorder: 'Drag a column inside a panel to reorder its ways',
     helpZoom: 'Scroll to zoom — panels reveal their internals up close',
     supplyMv: 'Medium voltage + transformer',

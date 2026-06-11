@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { fedSubPanelNames } from '@renderer/lib/panelTree';
+import { fedSubPanelNames, serviceRootId } from '@renderer/lib/panelTree';
+import { computeSystem } from '@shared/engine';
 import type { CircuitInput, PanelInput, ProjectInput } from '@shared/types';
 
 function feeder(id: string, feedsPanelId: string): CircuitInput {
@@ -60,5 +61,47 @@ describe('fedSubPanelNames', () => {
   it('does not report a child that is itself being deleted (multi-select)', () => {
     expect(fedSubPanelNames(project, ['mdp', 'sp1'])).toEqual(['Sub-panel 2', 'Sub-panel 1a']);
     expect(fedSubPanelNames(project, ['mdp', 'sp1', 'sp2', 'sp1a'])).toEqual([]);
+  });
+});
+
+describe('serviceRootId', () => {
+  function load(id: string, loadW: number): CircuitInput {
+    return {
+      id,
+      name: `Load ${id}`,
+      role: 'branch',
+      loadW,
+      cosPhi: 0.85,
+      lengthM: 20,
+      loadKind: 'general',
+      isLighting: false,
+      demandFactor: 1,
+    };
+  }
+
+  it('prefers the utility root that feeds sub-panels (the MDP)', () => {
+    // 'lp' is standalone with a BIGGER load; 'mdp' feeds a child — MDP wins.
+    const prj: ProjectInput = {
+      id: 'p1',
+      name: 'T',
+      panels: [
+        panel('lp', 'Standalone', [load('l1', 50000)]),
+        panel('mdp', 'MDP', [feeder('f1', 'sp')]),
+        { ...panel('sp', 'Sub'), sourceType: 'feeder', fedByCircuitId: 'f1' },
+      ],
+    };
+    expect(serviceRootId(prj, computeSystem(prj))).toBe('mdp');
+  });
+
+  it('breaks ties on demand, then keeps the single/first root', () => {
+    const prj: ProjectInput = {
+      id: 'p2',
+      name: 'T',
+      panels: [panel('a', 'A', [load('l1', 2000)]), panel('b', 'B', [load('l2', 90000)])],
+    };
+    expect(serviceRootId(prj, computeSystem(prj))).toBe('b');
+
+    const single: ProjectInput = { id: 'p3', name: 'T', panels: [panel('only', 'Only')] };
+    expect(serviceRootId(single, computeSystem(single))).toBe('only');
   });
 });

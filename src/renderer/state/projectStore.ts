@@ -95,6 +95,22 @@ function freshProjectId(): string {
   return nextId('PRJ');
 }
 
+/**
+ * "Base", or "Base 2/3/…" — the first name not already taken. Count-based
+ * suffixes (`panels.length + 1`) collide after deletions; panel names land on
+ * drawings and schedules, so keep them unique by construction.
+ */
+function uniquePanelName(panels: PanelInput[], base: string): string {
+  const taken = new Set(panels.map((p) => p.name));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n += 1) {
+    if (!taken.has(`${base} ${n}`)) return `${base} ${n}`;
+  }
+}
+
+/** Why a feeder connect was (or wasn't) made — the canvas toasts accordingly. */
+export type ConnectFeederResult = 'connected' | 'self' | 'missing' | 'has-parent' | 'cycle';
+
 export interface ProjectState {
   project: ProjectInput;
   parts: Part[];
@@ -172,7 +188,8 @@ export interface ProjectState {
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
-  addPanel: () => void;
+  /** Append a blank standalone panel; returns its id (so the canvas can place it). */
+  addPanel: () => string;
   /**
    * Drop a sub-panel onto a parent: creates the child panel AND the feeder
    * circuit in the parent (cross-wired feedsPanelId/fedByCircuitId) as one
@@ -182,10 +199,10 @@ export interface ProjectState {
   /**
    * Wire an EXISTING unassigned panel under a parent: adds a feeder circuit in
    * the parent feeding the child and flips the child to feeder-fed (cross-wired),
-   * as one undoable step. No-op if it would create a feeder cycle or the child
-   * already has a parent.
+   * as one undoable step. Returns why nothing happened when it refuses (child
+   * already has a parent / would create a feeder cycle) so the UI can explain.
    */
-  connectPanelAsFeeder: (parentPanelId: string, childPanelId: string) => void;
+  connectPanelAsFeeder: (parentPanelId: string, childPanelId: string) => ConnectFeederResult;
   /** Remove a feeder circuit and reset the panel it fed back to a standalone root. */
   disconnectFeeder: (panelId: string, feederCircuitId: string) => void;
   /** Delete a panel; drops feeders that fed it and orphans the panels it fed. */
@@ -450,11 +467,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set((s) =>
       withHistory(s, (project) =>
         mapPanel(project, panelId, (panel) => {
+          // Same defaults as the canvas palette's "General" card, so a circuit
+          // costs/sizes the same no matter which entry point created it.
           const newCircuit: CircuitInput = {
             id: nextId('c'),
             name: `New circuit ${panel.circuits.length + 1}`,
             role: 'branch',
-            loadW: 1000,
+            loadW: 2000,
             cosPhi: 0.85,
             lengthM: 20,
             loadKind: 'general',
@@ -642,11 +661,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
       ),
     ),
 
-  addPanel: () =>
+  addPanel: () => {
+    const id = nextId('P');
     set((s) => {
       const newPanel: PanelInput = {
-        id: nextId('P'),
-        name: `New panel ${s.project.panels.length + 1}`,
+        id,
+        name: uniquePanelName(s.project.panels, 'New panel'),
         system: '3ph',
         voltageV: 400,
         ambientTempC: 35,
@@ -661,7 +681,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
         activePanelId: newPanel.id,
         activeScreen: 'system',
       };
-    }),
+    });
+    return id;
+  },
 
   addSubPanel: (parentPanelId) =>
     set((s) => {
@@ -671,7 +693,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const feederId = nextId('c');
       const child: PanelInput = {
         id: childId,
-        name: `Sub-panel ${s.project.panels.length + 1}`,
+        name: uniquePanelName(s.project.panels, 'Sub-panel'),
         system: parent.system,
         voltageV: parent.voltageV,
         ambientTempC: parent.ambientTempC,
@@ -709,24 +731,39 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }));
     }),
 
-  connectPanelAsFeeder: (parentPanelId, childPanelId) =>
+  connectPanelAsFeeder: (parentPanelId, childPanelId) => {
+    // Resolved inside set() (which runs synchronously) so the gesture handler
+    // can toast the reason a connect was refused instead of failing silently.
+    let outcome: ConnectFeederResult = 'connected';
     set((s) => {
-      if (parentPanelId === childPanelId) return s;
+      if (parentPanelId === childPanelId) {
+        outcome = 'self';
+        return s;
+      }
       const parent = s.project.panels.find((p) => p.id === parentPanelId);
       const child = s.project.panels.find((p) => p.id === childPanelId);
-      if (!parent || !child) return s;
+      if (!parent || !child) {
+        outcome = 'missing';
+        return s;
+      }
 
       // child -> its parent, to detect existing parents and cycles.
       const parentOf = new Map<string, string>();
       for (const p of s.project.panels) {
         for (const c of p.circuits) if (c.feedsPanelId) parentOf.set(c.feedsPanelId, p.id);
       }
-      if (parentOf.has(childPanelId)) return s; // already assigned — only adopt orphans
+      if (parentOf.has(childPanelId)) {
+        outcome = 'has-parent'; // already assigned — only adopt orphans
+        return s;
+      }
       // Walk up from the parent; reaching the child means this would cycle.
       let cur: string | undefined = parentPanelId;
       const seen = new Set<string>();
       while (cur !== undefined && !seen.has(cur)) {
-        if (cur === childPanelId) return s;
+        if (cur === childPanelId) {
+          outcome = 'cycle';
+          return s;
+        }
         seen.add(cur);
         cur = parentOf.get(cur);
       }
@@ -754,7 +791,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
           return p;
         }),
       }));
-    }),
+    });
+    return outcome;
+  },
 
   disconnectFeeder: (panelId, feederCircuitId) =>
     set((s) => {

@@ -43,7 +43,7 @@ import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
 import { dropIndex, reorderIds } from '@renderer/lib/reorder';
-import { fedSubPanelNames } from '@renderer/lib/panelTree';
+import { fedSubPanelNames, serviceRootId } from '@renderer/lib/panelTree';
 import { useProjectStore, type FloatingLoad } from '@renderer/state/projectStore';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CanvasHelp } from '@renderer/screens/sld/CanvasHelp';
@@ -166,6 +166,8 @@ interface UnifiedPanelData {
   ways: UnifiedWay[];
   bus: BusDevice[]; // bus-tapped equipment (SPD / capacitor) — root panel
   supply?: SupplyHead; // service-entrance equipment — root panel
+  /** A standalone root that is NOT the service entrance — i.e. not fed yet. */
+  unfed?: boolean;
   feederIds: string[];
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
@@ -661,6 +663,7 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
 /** A panel that renders summary-or-detail from the current viewport zoom. */
 function UnifiedPanelNode({ data }: NodeProps) {
   const d = data as UnifiedPanelData;
+  const { t } = useTranslation();
   const { zoom } = useViewport();
   const expanded = zoom >= 0.72;
   const width = panelWidth(d.ways.length, d.bus.length);
@@ -742,8 +745,17 @@ function UnifiedPanelNode({ data }: NodeProps) {
             </Badge>
           )}
           <NodeIssues issues={d.issues} />
-          <Badge size="xs" variant="light" color={d.source === 'utility' ? 'indigo' : 'gray'}>
-            {d.source}
+          <Badge
+            size="xs"
+            variant="light"
+            color={d.unfed ? 'orange' : d.source === 'utility' ? 'indigo' : 'gray'}
+            title={d.unfed ? t('sldNode.unfedHint') : undefined}
+          >
+            {d.unfed
+              ? t('sldNode.unfed')
+              : d.source === 'utility'
+                ? t('sldNode.supply')
+                : t('sldNode.fed')}
           </Badge>
         </Group>
       </Group>
@@ -1065,8 +1077,9 @@ function buildUnified(
     (rows.get(dd) ?? rows.set(dd, []).get(dd)!).push(p.id);
   }
 
-  // Bus / supply equipment lives at the service-entrance (root) panel.
-  const rootId = project.panels.find((p) => p.sourceType === 'utility')?.id;
+  // Bus / supply equipment lives at the ONE service-entrance (root) panel; any
+  // other standalone root is "not connected yet", not a second PLN intake.
+  const rootId = serviceRootId(project, system);
   const threePh = (id: string) => byId.get(id)?.system === '3ph';
   const busDevicesFor = (id: string): BusDevice[] => {
     if (id !== rootId) return [];
@@ -1168,6 +1181,7 @@ function buildUnified(
         bus: busDevicesFor(id),
         ...(supply ? { supply } : {}),
         feederIds: ways.filter((wy) => wy.feeds).map((wy) => wy.id),
+        ...(panel.sourceType === 'utility' && id !== rootId ? { unfed: true } : {}),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
         onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
@@ -1179,10 +1193,10 @@ function buildUnified(
       const panelY = d * rowPitch;
       nodes.push({ id, type: 'uPanel', position: { x: snap(x), y: snap(panelY) }, data });
 
-      // A utility-fed panel (e.g. the MDP) shows the incoming PLN grid supply as a
-      // CHILD node above its incomer — so it moves with the panel and the feed line
-      // stays straight. Sub-panels are fed by a feeder, not the grid, so they skip this.
-      if (panel.sourceType === 'utility') {
+      // ONLY the service-entrance panel (the MDP) shows the incoming PLN grid
+      // supply as a CHILD node above its incomer — a building has one intake.
+      // Other standalone roots render as "not connected" until they're fed.
+      if (panel.sourceType === 'utility' && id === rootId) {
         const gridId = `grid-${id}`;
         const supplyType = system.supply.type === 'MV' ? 'MV' : 'LV';
         nodes.push({
@@ -1340,6 +1354,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const removeFloatingLoad = useProjectStore((s) => s.removeFloatingLoad);
   const attachFloatingLoad = useProjectStore((s) => s.attachFloatingLoad);
   const rfRef = useRef<ReactFlowInstance | null>(null);
+  // Where a just-created panel should land (the drop point), consumed once by
+  // the node-sync effect — new nodes otherwise get the auto-layout position.
+  const pendingPanelPos = useRef(new Map<string, { x: number; y: number }>());
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -1453,13 +1470,17 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       } catch {
         return;
       }
+      const p = rfRef.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY }) ?? { x: 80, y: 80 };
       if (action.type === 'subpanel') {
-        addPanel();
-        notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
+        // A panel dropped on empty canvas is a STANDALONE panel (nothing feeds
+        // it yet) — say so, and put it where it was dropped, not where the
+        // auto-layout would park it.
+        const id = addPanel();
+        pendingPanelPos.current.set(id, { x: snap(p.x - 150), y: snap(p.y - 40) });
+        notifications.show({ message: t('system.panelAddedUnfed'), color: 'teal' });
         return;
       }
       // Drop a load on the canvas → a floating load to wire into a panel.
-      const p = rfRef.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY }) ?? { x: 80, y: 80 };
       addFloatingLoad({
         name: t(action.nameKey),
         loadKind: action.loadKind,
@@ -1487,7 +1508,14 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   useEffect(() => {
     setNodes((cur) => {
       const posById = new Map(cur.map((n) => [n.id, n.position]));
-      return built.nodes.map((n) => ({ ...n, position: posById.get(n.id) ?? n.position }));
+      return built.nodes.map((n) => {
+        const dropped = pendingPanelPos.current.get(n.id);
+        if (dropped) {
+          pendingPanelPos.current.delete(n.id);
+          return { ...n, position: dropped };
+        }
+        return { ...n, position: posById.get(n.id) ?? n.position };
+      });
     });
   }, [built.nodes, setNodes]);
 
@@ -1658,7 +1686,20 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               // Wire a floating load to a panel → create its MCB; or panel→panel feeder.
               if (isFloat(c.source) && isPanel(c.target)) attachFloatingLoad(c.source.replace(/^float-/, ''), c.target);
               else if (isFloat(c.target) && isPanel(c.source)) attachFloatingLoad(c.target.replace(/^float-/, ''), c.source);
-              else if (isPanel(c.source) && isPanel(c.target)) connectPanelAsFeeder(c.source, c.target);
+              else if (isPanel(c.source) && isPanel(c.target)) {
+                // A refused connect must say WHY — a gesture that silently does
+                // nothing reads as a bug, not as a rule.
+                const res = connectPanelAsFeeder(c.source, c.target);
+                const child = project.panels.find((p) => p.id === c.target);
+                const name = child ? (child.tag ?? child.name) : '';
+                if (res === 'connected') {
+                  notifications.show({ message: t('vbuilder.panelConnected', { name }), color: 'teal' });
+                } else if (res === 'has-parent') {
+                  notifications.show({ message: t('sldConnect.hasParent', { name }), color: 'yellow' });
+                } else if (res === 'cycle') {
+                  notifications.show({ message: t('sldConnect.cycle'), color: 'yellow' });
+                }
+              }
             }}
             onBeforeDelete={async ({ nodes: dn }) => {
               // Deleting a panel that feeds sub-panels disconnects them all —

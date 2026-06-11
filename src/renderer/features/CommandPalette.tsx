@@ -52,11 +52,12 @@ const SCREEN_ICONS: Record<Screen, React.ReactNode> = {
   settings: <IconSettings size={16} />,
 };
 
+// 'panel' is omitted: the standalone Panel Editor screen was retired (it
+// redirects to the system view), so offering it here would be a dead jump.
 const SCREENS: Screen[] = [
   'projects',
   'system',
   'dashboard',
-  'panel',
   'coordination',
   'parts',
   'pricelist',

@@ -577,6 +577,16 @@ export const id: TranslationKeys = {
     cancel: 'Batal',
     saved: '"{{name}}" disimpan ke Templat saya.',
   },
+  sldNode: {
+    supply: 'PLN',
+    fed: 'disuplai',
+    unfed: 'belum tersambung',
+    unfedHint: 'Belum ada feeder yang menyuplai panel ini — seret outlet panel induk ke sini.',
+  },
+  sldConnect: {
+    hasParent: '{{name}} sudah disuplai panel lain — putuskan feeder itu lebih dulu.',
+    cycle: 'Sambungan itu akan membuat lingkaran pada pohon feeder (panel tidak bisa menyuplai induknya sendiri).',
+  },
   sldDelete: {
     title: 'Hapus panel distribusi?',
     body_one: '{{panel}} menyuplai {{count}} sub-panel. Menghapusnya akan membuang feedernya; sub-panel di bawah tetap ada tetapi terputus (kembali menjadi root mandiri):',
@@ -599,6 +609,7 @@ export const id: TranslationKeys = {
     exportAllDoneWeb_one: '{{count}} berkas diunduh — PDF sistem memerlukan aplikasi desktop.',
     exportAllDoneWeb_other: '{{count}} berkas diunduh — PDF sistem memerlukan aplikasi desktop.',
     exportAllCancelled: 'Ekspor dibatalkan.',
+    panelAddedUnfed: 'Panel ditambahkan — belum disuplai. Seret outlet bundar panel lain ke panel ini untuk menyuplainya.',
     myTemplates: 'Templat saya',
     templateMeta_one: '{{count}} sirkuit · dari {{panel}}',
     templateMeta_other: '{{count}} sirkuit · dari {{panel}}',
@@ -627,7 +638,7 @@ export const id: TranslationKeys = {
     helpFeed: 'Seret outlet bulat panel ke panel lain untuk memberi suplai',
     helpLoad: 'Seret beban ke panel untuk mengkabelkannya (membuat MCB)',
     helpCable: 'Klik ganda kabel untuk mengatur panjang dan ukurannya',
-    helpDelete: 'Pilih, lalu tekan Delete untuk menghapus atau memutus feeder',
+    helpDelete: 'Pilih panel atau beban lepas lalu tekan Delete; klik kanan jalur untuk menghapusnya',
     helpReorder: 'Seret kolom di dalam panel untuk menata ulang jalurnya',
     helpZoom: 'Gulir untuk memperbesar — panel menampilkan isinya saat didekati',
     supplyMv: 'Tegangan menengah + trafo',
