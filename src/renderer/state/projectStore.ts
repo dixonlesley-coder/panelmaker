@@ -147,6 +147,8 @@ export interface ProjectState {
    * already has a parent.
    */
   connectPanelAsFeeder: (parentPanelId: string, childPanelId: string) => void;
+  /** Remove a feeder circuit and reset the panel it fed back to a standalone root. */
+  disconnectFeeder: (panelId: string, feederCircuitId: string) => void;
   /** Set (or clear) a panel's building occupancy class. */
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
   /** Append a new panel built from a template (fresh ids) and select it. */
@@ -662,6 +664,32 @@ export const useProjectStore = create<ProjectState>((set) => ({
           return p;
         }),
       }));
+    }),
+
+  disconnectFeeder: (panelId, feederCircuitId) =>
+    set((s) => {
+      const parent = s.project.panels.find((p) => p.id === panelId);
+      const feeder = parent?.circuits.find((c) => c.id === feederCircuitId);
+      if (!parent || !feeder) return s;
+      const childId = feeder.feedsPanelId;
+      const { [feederCircuitId]: _dropped, ...schematics } = s.schematics;
+      return {
+        ...withHistory(s, (project) => ({
+          ...project,
+          panels: project.panels.map((p) => {
+            if (p.id === panelId) {
+              return { ...p, circuits: p.circuits.filter((c) => c.id !== feederCircuitId) };
+            }
+            if (childId && p.id === childId) {
+              // Orphan the fed panel: back to a standalone root.
+              const { fedByCircuitId: _f, ...rest } = p;
+              return { ...rest, sourceType: 'utility' as const };
+            }
+            return p;
+          }),
+        })),
+        schematics,
+      };
     }),
 
   addPanelFromTemplate: (templateId) =>

@@ -971,8 +971,9 @@ function buildUnified(
         onReorder: (ids) => onReorder(id, ids),
       };
       // draggable comes from the flow-level nodesDraggable; per-node draggable:false
-      // would override it and break rearranging.
-      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data });
+      // would override it and break rearranging. deletable:false so the Delete key
+      // only removes (disconnects) feeder edges, never panels.
+      nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, deletable: false });
       x += w + GAP;
     });
   }
@@ -1028,6 +1029,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const addPanel = useProjectStore((s) => s.addPanel);
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
+  const disconnectFeeder = useProjectStore((s) => s.disconnectFeeder);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -1039,6 +1041,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const [inspectPanelId, setInspectPanelId] = useState<string | null>(null);
   // Right-click → replacement-parts menu anchored at the cursor.
   const [ctx, setCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
+  // Right-click a feeder edge → disconnect / edit menu at the cursor.
+  const [edgeCtx, setEdgeCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
+
+  const disconnectEdge = useCallback(
+    (panelId: string, circuitId: string) => {
+      disconnectFeeder(panelId, circuitId);
+      notifications.show({ message: t('sldMenu.disconnected'), color: 'gray' });
+    },
+    [disconnectFeeder, t],
+  );
 
   const openCircuit = useCallback(
     (panelId: string, circuitId: string, focus: 'device' | 'cable' = 'device') => {
@@ -1208,12 +1220,26 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             nodesConnectable
             nodesDraggable
             elementsSelectable
-            deleteKeyCode={null}
+            deleteKeyCode={['Backspace', 'Delete']}
             zoomOnDoubleClick={false}
             onConnect={(c) => {
               // Drag from a panel's outlet to another panel → feed it (the store
               // guards self-/cyclic links and only adopts unconnected panels).
               if (c.source && c.target && c.source !== c.target) connectPanelAsFeeder(c.source, c.target);
+            }}
+            onEdgesDelete={(deleted) => {
+              // Select a feeder + Delete → disconnect it (panels are deletable:false).
+              for (const e of deleted) {
+                const pid = e.data?.panelId as string | undefined;
+                const cid = e.data?.circuitId as string | undefined;
+                if (pid && cid) disconnectEdge(pid, cid);
+              }
+            }}
+            onEdgeContextMenu={(e, edge) => {
+              e.preventDefault();
+              const pid = edge.data?.panelId as string | undefined;
+              const cid = edge.data?.circuitId as string | undefined;
+              if (pid && cid) setEdgeCtx({ panelId: pid, circuitId: cid, x: e.clientX, y: e.clientY });
             }}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
             onEdgeDoubleClick={(_, edge) => {
@@ -1303,6 +1329,33 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             }}
           >
             {t('sldMenu.delete')}
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+
+      {/* Right-click a feeder cable → edit / disconnect, anchored at the cursor. */}
+      <Menu opened={edgeCtx !== null} onClose={() => setEdgeCtx(null)} position="right-start" width={190} shadow="md" withinPortal>
+        <Menu.Target>
+          <div style={{ position: 'fixed', left: edgeCtx?.x ?? 0, top: edgeCtx?.y ?? 0, width: 1, height: 1 }} />
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>{t('sldMenu.feeder')}</Menu.Label>
+          <Menu.Item
+            onClick={() => {
+              if (edgeCtx) openCircuit(edgeCtx.panelId, edgeCtx.circuitId, 'cable');
+              setEdgeCtx(null);
+            }}
+          >
+            {t('sldMenu.editCable')}
+          </Menu.Item>
+          <Menu.Item
+            color="red"
+            onClick={() => {
+              if (edgeCtx) disconnectEdge(edgeCtx.panelId, edgeCtx.circuitId);
+              setEdgeCtx(null);
+            }}
+          >
+            {t('sldMenu.disconnect')}
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>

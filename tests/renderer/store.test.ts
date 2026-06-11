@@ -34,6 +34,27 @@ describe('projectStore', () => {
     });
   });
 
+  it('connects then disconnects a panel as a feeder', () => {
+    const { addPanel, connectPanelAsFeeder, disconnectFeeder } = useProjectStore.getState();
+    addPanel(); // a new standalone root
+    const root = useProjectStore.getState().project.panels[0]!;
+    const child = useProjectStore.getState().project.panels.at(-1)!;
+    expect(child.sourceType).toBe('utility'); // starts unconnected
+
+    connectPanelAsFeeder(root.id, child.id);
+    const parent = useProjectStore.getState().project.panels.find((p) => p.id === root.id)!;
+    const feeder = parent.circuits.find((c) => c.feedsPanelId === child.id);
+    expect(feeder).toBeDefined();
+    expect(useProjectStore.getState().project.panels.find((p) => p.id === child.id)!.sourceType).toBe('feeder');
+
+    disconnectFeeder(root.id, feeder!.id);
+    const after = useProjectStore.getState().project;
+    expect(after.panels.find((p) => p.id === root.id)!.circuits.some((c) => c.feedsPanelId === child.id)).toBe(false);
+    const orphan = after.panels.find((p) => p.id === child.id)!;
+    expect(orphan.sourceType).toBe('utility');
+    expect(orphan.fedByCircuitId).toBeUndefined();
+  });
+
   it('seeds the realistic sample building', () => {
     const { project } = useProjectStore.getState();
     expect(project.panels.length).toBe(3);

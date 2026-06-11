@@ -549,6 +549,10 @@ export const en = {
     current: 'current',
     duplicate: 'Duplicate way',
     delete: 'Delete way',
+    feeder: 'Feeder cable',
+    editCable: 'Edit cable…',
+    disconnect: 'Disconnect feeder',
+    disconnected: 'Feeder disconnected — the panel is now a standalone root.',
   },
   system: {
     eyebrow: 'Building overview',
