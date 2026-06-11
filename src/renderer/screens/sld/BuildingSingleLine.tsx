@@ -504,13 +504,12 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
         const color = PHASE_COLOR[b.key] ?? '#888';
         const h = b.key === 'PE' ? 4 : b.key === 'N' ? 5 : 6;
         const w = right - LEFT;
-        // Tag the phase bars with the R/S/T designation (PUIL/Indonesian
-        // convention) alongside the IEC L1/L2/L3 so the bus reads clearly.
-        const label = PHASE_RST[b.key] ? `${b.key}·${PHASE_RST[b.key]}` : b.key;
+        // Phase bars use the PUIL/Indonesian R-S-T designation (N/PE unchanged).
+        const label = PHASE_RST[b.key] ?? b.key;
         return (
           <g key={b.key}>
             <rect x={3} y={b.y - 6} width={LEFT - 12} height={12} rx={6} fill={color} />
-            <text x={3 + (LEFT - 12) / 2} y={b.y + 3} fontSize={7.5} fontWeight={700} textAnchor="middle" fill="#fff">
+            <text x={3 + (LEFT - 12) / 2} y={b.y + 3} fontSize={9} fontWeight={700} textAnchor="middle" fill="#fff">
               {label}
             </text>
             <rect x={LEFT} y={b.y - h / 2} width={w} height={h} rx={h / 2} fill={color} filter="url(#sldBarShadow)" />
