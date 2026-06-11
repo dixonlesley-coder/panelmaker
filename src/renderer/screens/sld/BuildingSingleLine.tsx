@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   Controls,
@@ -33,6 +33,7 @@ import type { CircuitInput, LoadKind, PhaseAssignment, ProjectInput, SystemResul
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
+import { dropIndex, reorderIds } from '@renderer/lib/reorder';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
@@ -143,6 +144,8 @@ interface UnifiedPanelData {
   onContextCircuit?: (circuitId: string, x: number, y: number) => void;
   /** Add a way / sub-panel here (palette card dropped on this panel). */
   onAddItem?: (action: SldAdd) => void;
+  /** Reorder the panel's ways (drag a component left/right). */
+  onReorder?: (orderedCircuitIds: string[]) => void;
   [key: string]: unknown;
 }
 
@@ -405,6 +408,43 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
   const tailX = LEFT + 16;
   const colX = (i: number) => LEFT + i * WAY_W + WAY_W / 2;
 
+  // Drag a way (component column) left/right to reorder it within the panel.
+  // Pointer-based (HTML5 DnD is unreliable on SVG); the column follows the cursor
+  // in SVG units (screen px ÷ zoom) and snaps to a new slot on release.
+  const { zoom } = useViewport();
+  const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
+  const dragRef = useRef({ from: 0, startX: 0, dx: 0 });
+  const liveRef = useRef({ ways: d.ways, onReorder: d.onReorder, zoom });
+  liveRef.current = { ways: d.ways, onReorder: d.onReorder, zoom };
+
+  const startWayDrag = (e: React.PointerEvent, index: number, id: string) => {
+    if (e.button !== 0) return; // left-button only
+    e.stopPropagation(); // don't start a React Flow node drag
+    dragRef.current = { from: index, startX: e.clientX, dx: 0 };
+    setDrag({ id, dx: 0 });
+  };
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      const dx = (e.clientX - dragRef.current.startX) / (liveRef.current.zoom || 1);
+      dragRef.current.dx = dx;
+      setDrag((cur) => (cur ? { ...cur, dx } : cur));
+    };
+    const up = () => {
+      const { ways, onReorder } = liveRef.current;
+      const to = dropIndex(dragRef.current.from, dragRef.current.dx, WAY_W, ways.length);
+      if (to !== dragRef.current.from) onReorder?.(reorderIds(ways.map((w) => w.id), dragRef.current.from, to));
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+  }, [drag?.id]);
+
   const supplyHead = () => {
     if (!d.supply) return null;
     let sx = LEFT + 176;
@@ -484,10 +524,16 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
       {d.ways.map((w, i) => {
         const cx = colX(i);
         const taps = w.phase === '3ph' ? phaseKeys : [w.phase];
+        const dragging = drag?.id === w.id;
         return (
           <g
             key={w.id}
-            style={{ cursor: 'pointer' }}
+            className="nodrag"
+            style={{ cursor: 'grab', opacity: dragging ? 0.65 : 1 }}
+            transform={dragging ? `translate(${drag.dx} 0)` : undefined}
+            // Drag the column to reorder; a click/double-click won't move enough
+            // to trigger a slot change.
+            onPointerDown={(e) => startWayDrag(e, i, w.id)}
             onDoubleClick={(e) => {
               // Edit this circuit inline; don't let it bubble to the panel-level
               // double-click (which opens the panel inspector).
@@ -666,6 +712,7 @@ function buildUnified(
   onEditCircuit: (panelId: string, circuitId: string) => void,
   onAddItem: (panelId: string, action: SldAdd) => void,
   onContextCircuit: (panelId: string, circuitId: string, x: number, y: number) => void,
+  onReorder: (panelId: string, orderedCircuitIds: string[]) => void,
 ): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
@@ -794,6 +841,7 @@ function buildUnified(
         onEditCircuit: (cid) => onEditCircuit(id, cid),
         onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
         onAddItem: (action) => onAddItem(id, action),
+        onReorder: (ids) => onReorder(id, ids),
       };
       nodes.push({ id, type: 'uPanel', position: { x, y: d * rowPitch }, data, draggable: false });
       x += w + GAP;
@@ -832,6 +880,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const addPanel = useProjectStore((s) => s.addPanel);
+  const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
@@ -907,8 +956,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   );
 
   const built = useMemo(
-    () => buildUnified(project, system, openCircuit, addItem, openContext),
-    [project, system, openCircuit, addItem, openContext],
+    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits),
+    [project, system, openCircuit, addItem, openContext, reorderCircuits],
   );
   const edges = built.edges;
   // Panels are auto-arranged from the feeder tree, but draggable to rearrange.
