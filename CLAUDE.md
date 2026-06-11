@@ -33,6 +33,11 @@ npx electron-vite build   # full Electron bundle: main + preload + renderer -> o
 # database migrations (author with system Node, applied at runtime via migrate())
 npx drizzle-kit generate
 
+# catalogue PDF -> categorised parts JSON (pure-Python pdfplumber; bundled in CI
+# as a PyInstaller binary the app spawns — end users need no Python)
+python scripts/extract_catalogue.py --pdf catalogue.pdf --auto-json   # prints JSON
+python scripts/extract_catalogue.py --pdf catalogue.pdf --inspect 1-20  # debug headers
+
 # package + publish a release (enables auto-update for installed apps)
 GH_TOKEN=<token> npx electron-builder --publish always   # bump package.json "version" first
 ```
@@ -181,6 +186,42 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   encrypted session. **Fail-open until configured** (off when unconfigured / `PANELMAKER_DEV_BYPASS=1`
   / unpackaged), so dev, CI, and the web preview are unaffected. The gate lives entirely in the main
   process; the renderer only reads status via `license:*` IPC. Setup in `LICENSING.md`.
+
+### Edit-on-canvas single-line + catalogue pipeline (same branch, latest)
+
+- **Unified single-line canvas (`screens/sld/BuildingSingleLine.tsx`):** every panel on ONE
+  @xyflow/react canvas with zoom-driven LOD — a summary card zoomed out, the full internal
+  schematic up close (colourised Indonesian **R-S-T / N / PE** bus). It's the primary editing
+  surface: drag the palette onto a panel (adds a way) or blank canvas (adds a panel/load),
+  **double-click** a component to edit it (`CircuitEditor`), **right-click** for compatible
+  **replacement parts** (breaker ratings ≥ design current, cable sections ≥ present size), drag a
+  panel's round **outlet** onto another panel to create a **feeder**, and Delete / right-click to
+  disconnect or delete panels & loads. The old standalone Panel Editor is now a right-side
+  **inspector drawer** (`PanelEditor`). The detail busbar (`PanelSld`, `nodes.tsx`) shows the same
+  R-S-T rails.
+- **Loads live OUTSIDE the panel:** each non-feeder way's load is its own node, parented to its
+  panel (React Flow `parentId`) so it drags with the panel and the drop cable stays straight and a
+  **fixed distance below the card at every zoom** (the card reserves its schematic height so it
+  never grows over the loads). Each drop line is labelled with the cable size + loading %.
+  **Floating loads** drag from the palette onto blank canvas; dropping one near a panel
+  **snaps + auto-wires** it (creates the prerequisite MCB). Panels + loads snap to a grid; a
+  **PLN grid-supply node** is drawn above each utility-fed panel (the MDP) feeding its incomer.
+- **Catalogue → database pipeline:** the committed, versioned JSON dataset
+  (`src/shared/data/catalog/schneider.parts.json`, validated + projected to `Part` by
+  `data/catalog/index.ts`, seeded idempotently by SKU) holds **verified Schneider parts** (Acti9
+  iC60N MCBs, iID RCCBs, ComPacT NSX MCCBs, TeSys LC1D/LRD, Harmony XB5, METSECT5 CTs). A pure-Python
+  **pdfplumber extractor** (`scripts/extract_catalogue.py --auto-json`) auto-categorises a whole
+  catalogue PDF into the schema and is **bundled as a PyInstaller binary in CI** (`resources/extractor/`,
+  spawned by the main process — no Python on end-user machines). In-app **import** (JSON/CSV/PDF)
+  routes parts to the catalog and prices to the **pricelist** (prices NEVER enter the committed parts
+  dataset); a DB→git **export** re-emits the JSON. Catalogue codes are convenience references — the
+  dataset and exports stamp a *verify-against-the-datasheet* disclaimer.
+- **Usability:** a floating **canvas gesture guide** (`screens/sld/CanvasHelp.tsx`) lists the
+  direct-manipulation gestures, and the circuit editor shows a plain-language **"why these sizes"**
+  note (governing constraint: ampacity vs voltage-drop vs manual override) from the engine's
+  existing `cable.appliedRule`/`vdDriven`; the project BOM moved to a side drawer. Both localised.
+- **Release hygiene:** `.github/workflows/release.yml` has a `concurrency: group=release` guard so
+  back-to-back publishes can't race on the GitHub Release assets and break auto-update.
 
 ## README
 
