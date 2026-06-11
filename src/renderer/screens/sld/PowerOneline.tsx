@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Background,
   Controls,
@@ -9,6 +9,7 @@ import {
   type NodeProps,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
 } from '@xyflow/react';
 import { Badge, Box, Group, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import {
@@ -159,14 +160,12 @@ export function PowerOneline({ system }: { system: SystemResult }) {
     }
   };
 
-  const { nodes, edges } = useMemo(() => {
+  const built = useMemo(() => {
     const rfNodes: Node[] = ol.nodes.map((n) => ({
       id: n.id,
       type: 'power',
       position: { x: STAGE[n.kind] * COL_W, y: (LANE[n.id] ?? 1.5) * ROW_H },
       data: { kind: n.kind, label: n.label, sub: n.sub },
-      draggable: false,
-      selectable: false,
     }));
 
     const rfEdges: Edge[] = ol.edges.map((e) => ({
@@ -207,6 +206,17 @@ export function PowerOneline({ system }: { system: SystemResult }) {
     return { nodes: rfNodes, edges: rfEdges };
   }, [ol]);
 
+  const edges = built.edges;
+  // Auto-arranged, but draggable/selectable to rearrange; keep dragged positions
+  // when the model recomputes (session-scoped).
+  const [nodes, setNodes, onNodesChange] = useNodesState(built.nodes);
+  useEffect(() => {
+    setNodes((cur) => {
+      const posById = new Map(cur.map((n) => [n.id, n.position]));
+      return built.nodes.map((n) => ({ ...n, position: posById.get(n.id) ?? n.position }));
+    });
+  }, [built.nodes, setNodes]);
+
   return (
     <Stack gap="sm" pt="xs">
       <Box h={420}>
@@ -214,14 +224,16 @@ export function PowerOneline({ system }: { system: SystemResult }) {
           <ReactFlow
             nodes={nodes}
             edges={edges}
+            onNodesChange={onNodesChange}
             nodeTypes={POWER_NODE_TYPES}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
             minZoom={0.2}
             nodesConnectable={false}
-            nodesDraggable={false}
-            elementsSelectable={false}
+            nodesDraggable
+            elementsSelectable
+            deleteKeyCode={null}
             // Reserve double-click for opening the editor (zoom would swallow it).
             zoomOnDoubleClick={false}
             onNodeDoubleClick={(_, node) => openForNode((node.data as PowerNodeData).kind)}
