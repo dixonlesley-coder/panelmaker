@@ -1,7 +1,7 @@
 {
-  "catalogVersion": "cables-sni-1",
+  "catalogVersion": "cables-sni-2",
   "manufacturer": "Generic",
-  "source": "Standard Indonesian LV power-cable constructions (NYY 0.6/1 kV copper, SNI/IEC) across the standard conductor ladder. These are generic type+size references — NOT brand-specific order codes — so the BOM can match and price cable runs; substitute a specific maker (Supreme, Kabelindo, Jembo, Voksel, KMI, Prysmian) and verify the KHA/derating against the datasheet and PUIL 2011 table 7.3.",
+  "source": "Standard Indonesian LV cable constructions (SNI/IEC, copper) across the standard conductor ladder: NYY (0.6/1 kV power), NYM (300/500 V sheathed indoor), NYA (450/750 V single-core in conduit), NYAF (flexible panel wiring) and BC (bare copper, earthing). These are generic type+size references — NOT brand-specific order codes — so the BOM can match and price cable runs; substitute a specific maker (Supreme, Kabelindo, Jembo, Voksel, KMI, Prysmian) and verify the KHA/derating against the datasheet and PUIL 2011.",
   "parts": [
     { "sku": "NYY-1.5", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 1.5 mm² Cu", "unit": "m", "attributes": { "csaMm2": 1.5, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
     { "sku": "NYY-2.5", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 2.5 mm² Cu", "unit": "m", "attributes": { "csaMm2": 2.5, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
@@ -18,6 +18,41 @@
     { "sku": "NYY-150", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 150 mm² Cu", "unit": "m", "attributes": { "csaMm2": 150, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
     { "sku": "NYY-185", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 185 mm² Cu", "unit": "m", "attributes": { "csaMm2": 185, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
     { "sku": "NYY-240", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 240 mm² Cu", "unit": "m", "attributes": { "csaMm2": 240, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
-    { "sku": "NYY-300", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 300 mm² Cu", "unit": "m", "attributes": { "csaMm2": 300, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } }
+    { "sku": "NYY-300", "category": "cable", "series": "NYY 0.6/1kV", "model": "NYY 300 mm² Cu", "unit": "m", "attributes": { "csaMm2": 300, "type": "NYY", "conductor": "Cu", "voltageRating": "0.6/1 kV" } },
+
+    { "sku": "NYM-1.5", "category": "cable", "series": "NYM 300/500V", "model": "NYM 1.5 mm² Cu", "unit": "m", "attributes": { "csaMm2": 1.5, "type": "NYM", "conductor": "Cu", "voltageRating": "300/500 V" } },
+    { "sku": "NYM-2.5", "category": "cable", "series": "NYM 300/500V", "model": "NYM 2.5 mm² Cu", "unit": "m", "attributes": { "csaMm2": 2.5, "type": "NYM", "conductor": "Cu", "voltageRating": "300/500 V" } },
+    { "sku": "NYM-4", "category": "cable", "series": "NYM 300/500V", "model": "NYM 4 mm² Cu", "unit": "m", "attributes": { "csaMm2": 4, "type": "NYM", "conductor": "Cu", "voltageRating": "300/500 V" } },
+    { "sku": "NYM-6", "category": "cable", "series": "NYM 300/500V", "model": "NYM 6 mm² Cu", "unit": "m", "attributes": { "csaMm2": 6, "type": "NYM", "conductor": "Cu", "voltageRating": "300/500 V" } },
+    { "sku": "NYM-10", "category": "cable", "series": "NYM 300/500V", "model": "NYM 10 mm² Cu", "unit": "m", "attributes": { "csaMm2": 10, "type": "NYM", "conductor": "Cu", "voltageRating": "300/500 V" } },
+
+    { "sku": "NYA-1.5", "category": "cable", "series": "NYA 450/750V", "model": "NYA 1.5 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 1.5, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-2.5", "category": "cable", "series": "NYA 450/750V", "model": "NYA 2.5 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 2.5, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-4", "category": "cable", "series": "NYA 450/750V", "model": "NYA 4 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 4, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-6", "category": "cable", "series": "NYA 450/750V", "model": "NYA 6 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 6, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-10", "category": "cable", "series": "NYA 450/750V", "model": "NYA 10 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 10, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-16", "category": "cable", "series": "NYA 450/750V", "model": "NYA 16 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 16, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-25", "category": "cable", "series": "NYA 450/750V", "model": "NYA 25 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 25, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-35", "category": "cable", "series": "NYA 450/750V", "model": "NYA 35 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 35, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-50", "category": "cable", "series": "NYA 450/750V", "model": "NYA 50 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 50, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-70", "category": "cable", "series": "NYA 450/750V", "model": "NYA 70 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 70, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+    { "sku": "NYA-95", "category": "cable", "series": "NYA 450/750V", "model": "NYA 95 mm² Cu (single-core)", "unit": "m", "attributes": { "csaMm2": 95, "type": "NYA", "conductor": "Cu", "cores": 1, "voltageRating": "450/750 V" } },
+
+    { "sku": "NYAF-0.75", "category": "cable", "series": "NYAF flexible", "model": "NYAF 0.75 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 0.75, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+    { "sku": "NYAF-1", "category": "cable", "series": "NYAF flexible", "model": "NYAF 1 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 1, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+    { "sku": "NYAF-1.5", "category": "cable", "series": "NYAF flexible", "model": "NYAF 1.5 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 1.5, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+    { "sku": "NYAF-2.5", "category": "cable", "series": "NYAF flexible", "model": "NYAF 2.5 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 2.5, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+    { "sku": "NYAF-4", "category": "cable", "series": "NYAF flexible", "model": "NYAF 4 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 4, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+    { "sku": "NYAF-6", "category": "cable", "series": "NYAF flexible", "model": "NYAF 6 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 6, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+    { "sku": "NYAF-10", "category": "cable", "series": "NYAF flexible", "model": "NYAF 10 mm² Cu (flexible)", "unit": "m", "attributes": { "csaMm2": 10, "type": "NYAF", "conductor": "Cu (flexible)", "voltageRating": "450/750 V" } },
+
+    { "sku": "BC-6", "category": "cable", "series": "BC bare copper", "model": "BC 6 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 6, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-10", "category": "cable", "series": "BC bare copper", "model": "BC 10 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 10, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-16", "category": "cable", "series": "BC bare copper", "model": "BC 16 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 16, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-25", "category": "cable", "series": "BC bare copper", "model": "BC 25 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 25, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-35", "category": "cable", "series": "BC bare copper", "model": "BC 35 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 35, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-50", "category": "cable", "series": "BC bare copper", "model": "BC 50 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 50, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-70", "category": "cable", "series": "BC bare copper", "model": "BC 70 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 70, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } },
+    { "sku": "BC-95", "category": "cable", "series": "BC bare copper", "model": "BC 95 mm² bare copper (earthing)", "unit": "m", "attributes": { "csaMm2": 95, "type": "BC", "conductor": "Cu (bare)", "use": "earthing/bonding" } }
   ]
 }
