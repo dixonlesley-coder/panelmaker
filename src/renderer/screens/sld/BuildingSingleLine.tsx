@@ -1006,7 +1006,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             maxZoom={2.5}
             nodesConnectable={false}
             nodesDraggable
-            elementsSelectable={false}
+            elementsSelectable
+            deleteKeyCode={null}
             zoomOnDoubleClick={false}
             onNodeDoubleClick={(_, node) => openInspector(node.id)}
           >
