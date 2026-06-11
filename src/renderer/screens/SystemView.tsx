@@ -36,6 +36,7 @@ import {
 } from '@tabler/icons-react';
 import type { CostResult, SystemResult } from '@shared/types';
 import { Stat } from '@renderer/features/components/Stat';
+import { ProjectIssues } from '@renderer/features/issues/ProjectIssues';
 import { BuildingSingleLine } from '@renderer/screens/sld/BuildingSingleLine';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { costSystem, costSystemConsolidated } from '@renderer/lib/bom';
@@ -131,6 +132,7 @@ export function SystemView() {
           <Title order={3}>{project.name}</Title>
         </div>
         <Group gap="xs">
+          <ProjectIssues system={system} />
           <Menu position="bottom-end" withinPortal shadow="md" width={300}>
             <Menu.Target>
               <Button
