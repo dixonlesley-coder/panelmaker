@@ -270,6 +270,26 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - **Parts Catalog brand filter:** clearable/searchable brand Select (derived from loaded parts)
   combinable with the text search. Everything above localised EN + ID; suite at 434 tests.
 
+### Canvas-workflow audit fixes (same branch, latest)
+
+- **One service entrance:** the PLN intake/meter/SPD/PFC chrome hangs only on the service root
+  (`serviceRootId` in `lib/panelTree.ts`: utility root with feeder children → highest demand →
+  first); other standalone roots show an orange **"not connected"** badge. Refused feeder connects
+  now **toast why** (`connectPanelAsFeeder` returns a `ConnectFeederResult`). The sub-panel card
+  dropped on empty canvas lands AT the drop point with an honest "not fed yet" message.
+- **Spare ways are first-class:** `LoadKind 'spare'` (zero demand, no RCD/conduit/cable in
+  BOM/schedule — schedule prints SPARE), `CircuitResult.loadKind`, palette Spare card, and a
+  right-click **"Add recommended spares (N)"** (engine recommendation now based on ACTIVE modules +
+  `spareWaysPresent`, so it converges).
+- **Canvas context menu** gained **Panel settings…** and **Auto-balance phases** (3-ph).
+- **Blank project:** `newProject(name, 'blank'|'sample')` — Projects screen leads with a blank
+  start (one empty MDP); the demo building is its own tile/menu item.
+- **ONE editing surface:** the inspector drawer's "Build" tab (the old per-panel `VisualBuilder`
+  canvas, plus its `SourceEditor`) was **deleted** — its exclusive features all moved to the
+  unified canvas / Sources screen / Panel settings. The drawer leads with the circuit table.
+- Unique panel names by construction; `addCircuit` default aligned with the palette (2 kW);
+  help-legend Delete line corrected; dead `'panel'` ⌘K nav entry removed. Suite at 445 tests.
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are
