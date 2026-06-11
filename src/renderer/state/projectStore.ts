@@ -4,6 +4,7 @@ import type {
   ControlAssembly,
   ControlSchematic,
   EarthingSystem,
+  LoadKind,
   OccupancyType,
   PanelInput,
   Part,
@@ -14,8 +15,22 @@ import type {
   SchematicSymbolType,
   SiteConditions,
   SourcesConfig,
+  StarterType,
   SuggestedFix,
 } from '@shared/types';
+
+/** A load placed on the canvas but not yet wired to a panel (no MCB yet). */
+export interface FloatingLoad {
+  id: string;
+  name: string;
+  loadKind: LoadKind;
+  loadW: number;
+  cosPhi: number;
+  isLighting: boolean;
+  motorKw?: number;
+  starterType?: StarterType;
+  position: { x: number; y: number };
+}
 import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { desktopApi, persistSchematic } from '@renderer/api';
 import { createSampleProject } from '@renderer/data/sampleProject';
@@ -77,6 +92,8 @@ export interface ProjectState {
   project: ProjectInput;
   parts: Part[];
   prices: Record<string, number>;
+  /** Loads dropped on the canvas, not yet wired to a panel (session-scoped). */
+  floatingLoads: FloatingLoad[];
   activePanelId: string;
   activeScreen: Screen;
   /** Control/ladder schematics, keyed by circuitId. */
@@ -130,6 +147,16 @@ export interface ProjectState {
   setPhaseAssignments: (panelId: string, assignment: Record<string, 'L1' | 'L2' | 'L3'>) => void;
   /** Append a fully-configured circuit (fresh id) to a panel — used by the wizard. */
   addCircuitConfigured: (panelId: string, circuit: Omit<CircuitInput, 'id'>) => void;
+
+  // floating loads (on the canvas, before they're wired to a panel)
+  /** Drop a load on the canvas; returns its id. */
+  addFloatingLoad: (load: Omit<FloatingLoad, 'id'>) => string;
+  /** Move a floating load (drag). */
+  moveFloatingLoad: (id: string, position: { x: number; y: number }) => void;
+  /** Remove a floating load without wiring it. */
+  removeFloatingLoad: (id: string) => void;
+  /** Wire a floating load to a panel: creates its MCB/circuit and drops the float. */
+  attachFloatingLoad: (id: string, panelId: string) => void;
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
@@ -374,6 +401,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   // manufacturer catalogue (the desktop build seeds the same parts into SQLite).
   parts: withSchneiderCatalog(SAMPLE_PARTS),
   prices: SAMPLE_PRICES,
+  floatingLoads: [],
   activePanelId: initialProject.panels[0]?.id ?? '',
   activeScreen: 'system',
   schematics: {},
@@ -544,6 +572,45 @@ export const useProjectStore = create<ProjectState>((set) => ({
         })),
       ),
     ),
+
+  addFloatingLoad: (load) => {
+    const id = nextId('fl');
+    set((s) => ({ floatingLoads: [...s.floatingLoads, { ...load, id }] }));
+    return id;
+  },
+
+  moveFloatingLoad: (id, position) =>
+    set((s) => ({ floatingLoads: s.floatingLoads.map((f) => (f.id === id ? { ...f, position } : f)) })),
+
+  removeFloatingLoad: (id) =>
+    set((s) => ({ floatingLoads: s.floatingLoads.filter((f) => f.id !== id) })),
+
+  attachFloatingLoad: (id, panelId) =>
+    set((s) => {
+      const load = s.floatingLoads.find((f) => f.id === id);
+      if (!load) return s;
+      const circuit: Omit<CircuitInput, 'id'> = {
+        name: load.name,
+        role: 'branch',
+        loadW: load.loadW,
+        cosPhi: load.cosPhi,
+        lengthM: 20,
+        loadKind: load.loadKind,
+        isLighting: load.isLighting,
+        demandFactor: 1,
+        ...(load.motorKw !== undefined ? { motorKw: load.motorKw } : {}),
+        ...(load.starterType !== undefined ? { starterType: load.starterType } : {}),
+      };
+      return {
+        ...withHistory(s, (project) =>
+          mapPanel(project, panelId, (panel) => ({
+            ...panel,
+            circuits: [...panel.circuits, { ...circuit, id: nextId('c') }],
+          })),
+        ),
+        floatingLoads: s.floatingLoads.filter((f) => f.id !== id),
+      };
+    }),
 
   updatePanel: (panelId, patch) =>
     set((s) =>

@@ -15,6 +15,7 @@ import {
   type EdgeProps,
   type Node,
   type NodeProps,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import { Badge, Box, Card, Drawer, Group, Menu, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -38,7 +39,7 @@ import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
 import { dropIndex, reorderIds } from '@renderer/lib/reorder';
-import { useProjectStore } from '@renderer/state/projectStore';
+import { useProjectStore, type FloatingLoad } from '@renderer/state/projectStore';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
 
@@ -832,7 +833,48 @@ function LoadNode({ data }: NodeProps) {
   );
 }
 
-const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode };
+/** A load on the canvas, not yet wired to a panel — drag its outlet to a panel. */
+function FloatLoadNode({ data }: NodeProps) {
+  const d = data as { kind: LoadKind; name: string; loadW: number };
+  const [hover, setHover] = useState(false);
+  const symW = { kind: d.kind, feeds: undefined } as unknown as UnifiedWay;
+  const kw = d.loadW >= 1000 ? `${(d.loadW / 1000).toFixed(1)} kW` : `${d.loadW} W`;
+  return (
+    <Box
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="Drag the dot up to a panel to wire it (creates the MCB)"
+      style={{
+        width: LOAD_W + 8,
+        background: 'var(--mantine-color-body)',
+        border: `1.5px dashed ${hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-orange-5)'}`,
+        borderRadius: 'var(--mantine-radius-md)',
+        boxShadow: hover ? 'var(--mantine-shadow-md)' : 'var(--mantine-shadow-xs)',
+        padding: 5,
+        cursor: 'grab',
+      }}
+    >
+      {/* Outlet at the TOP: drag up to a panel to connect (panel feeds the load). */}
+      <Handle
+        type="source"
+        id="out"
+        position={Position.Top}
+        style={{ width: 16, height: 16, background: 'var(--mantine-color-orange-5)', border: '2px solid var(--mantine-color-body)' }}
+      />
+      <svg width={LOAD_W - 4} height={30} style={{ display: 'block', margin: '0 auto' }}>
+        {loadSymbol((LOAD_W - 4) / 2, 8, symW, false)}
+      </svg>
+      <Text size="9px" fw={700} ta="center" lineClamp={1} title={d.name}>
+        {d.name}
+      </Text>
+      <Text size="9px" c="orange.6" ta="center" lineClamp={1}>
+        {kw} · unwired
+      </Text>
+    </Box>
+  );
+}
+
+const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode, floatLoad: FloatLoadNode };
 
 /**
  * Feeder edge between panels. Sibling feeders from the same parent share a
@@ -897,6 +939,7 @@ function buildUnified(
   onAddItem: (panelId: string, action: SldAdd) => void,
   onContextCircuit: (panelId: string, circuitId: string, x: number, y: number) => void,
   onReorder: (panelId: string, orderedCircuitIds: string[]) => void,
+  floatingLoads: FloatingLoad[],
 ): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
@@ -1115,6 +1158,17 @@ function buildUnified(
     });
   }
 
+  // Floating loads: dropped on the canvas, not yet wired to a panel.
+  for (const fl of floatingLoads) {
+    nodes.push({
+      id: `float-${fl.id}`,
+      type: 'floatLoad',
+      position: fl.position,
+      deletable: true,
+      data: { kind: fl.loadKind, name: fl.name, loadW: fl.loadW },
+    });
+  }
+
   return { nodes, edges };
 }
 
@@ -1128,6 +1182,12 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const connectPanelAsFeeder = useProjectStore((s) => s.connectPanelAsFeeder);
   const disconnectFeeder = useProjectStore((s) => s.disconnectFeeder);
   const removePanel = useProjectStore((s) => s.removePanel);
+  const floatingLoads = useProjectStore((s) => s.floatingLoads);
+  const addFloatingLoad = useProjectStore((s) => s.addFloatingLoad);
+  const moveFloatingLoad = useProjectStore((s) => s.moveFloatingLoad);
+  const removeFloatingLoad = useProjectStore((s) => s.removeFloatingLoad);
+  const attachFloatingLoad = useProjectStore((s) => s.attachFloatingLoad);
+  const rfRef = useRef<ReactFlowInstance | null>(null);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -1211,16 +1271,28 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       if (action.type === 'subpanel') {
         addPanel();
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
-      } else {
-        notifications.show({ message: t('system.dropOnPanel'), color: 'yellow' });
+        return;
       }
+      // Drop a load on the canvas → a floating load to wire into a panel.
+      const p = rfRef.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY }) ?? { x: 80, y: 80 };
+      addFloatingLoad({
+        name: t(action.nameKey),
+        loadKind: action.loadKind,
+        loadW: action.defaults.loadW ?? 1000,
+        cosPhi: action.defaults.cosPhi ?? 0.85,
+        isLighting: action.loadKind === 'lighting',
+        ...(action.defaults.motorKw !== undefined ? { motorKw: action.defaults.motorKw } : {}),
+        ...(action.defaults.starterType !== undefined ? { starterType: action.defaults.starterType } : {}),
+        position: { x: p.x - (LOAD_W + 8) / 2, y: p.y - 16 },
+      });
+      notifications.show({ message: t('system.loadDropped'), color: 'teal' });
     },
-    [addPanel, t],
+    [addPanel, addFloatingLoad, t],
   );
 
   const built = useMemo(
-    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits),
-    [project, system, openCircuit, addItem, openContext, reorderCircuits],
+    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads),
+    [project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads],
   );
   const edges = built.edges;
   // Panels are auto-arranged from the feeder tree, but draggable to rearrange.
@@ -1255,6 +1327,10 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // using expanded sizes, so panels don't collide once you zoom in.
   const onNodeDragStop = useCallback(
     (_e: unknown, node: Node) => {
+      if (node.type === 'floatLoad') {
+        moveFloatingLoad(node.id.replace(/^float-/, ''), node.position); // persist float drag
+        return;
+      }
       if (node.type !== 'uPanel') return; // only keep panels from overlapping
       setNodes((cur) => {
         const me = panelBox(node.id);
@@ -1275,7 +1351,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         return cur.map((n) => (n.id === node.id ? { ...n, position: { x, y } } : n));
       });
     },
-    [panelBox, setNodes],
+    [panelBox, setNodes, moveFloatingLoad],
   );
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
@@ -1366,22 +1442,32 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             elementsSelectable
             deleteKeyCode={['Backspace', 'Delete']}
             zoomOnDoubleClick={false}
+            onInit={(inst) => {
+              rfRef.current = inst;
+            }}
             onConnect={(c) => {
-              // Drag from a panel's outlet to another panel → feed it (the store
-              // guards self-/cyclic links and only adopts unconnected panels).
-              if (c.source && c.target && c.source !== c.target) connectPanelAsFeeder(c.source, c.target);
+              if (!c.source || !c.target || c.source === c.target) return;
+              const isFloat = (id: string) => id.startsWith('float-');
+              const isPanel = (id: string) => !id.startsWith('float-') && !id.startsWith('load-');
+              // Wire a floating load to a panel → create its MCB; or panel→panel feeder.
+              if (isFloat(c.source) && isPanel(c.target)) attachFloatingLoad(c.source.replace(/^float-/, ''), c.target);
+              else if (isFloat(c.target) && isPanel(c.source)) attachFloatingLoad(c.target.replace(/^float-/, ''), c.source);
+              else if (isPanel(c.source) && isPanel(c.target)) connectPanelAsFeeder(c.source, c.target);
             }}
             onDelete={({ nodes: dn, edges: de }) => {
-              // Delete (or Backspace): remove selected panels; disconnect selected
-              // feeders. A feeder whose panel is itself being removed is skipped —
-              // removePanel already cleans it up — so we don't double-process.
+              // Delete (or Backspace): remove selected panels / floating loads;
+              // disconnect selected feeders. A feeder whose panel is itself being
+              // removed is skipped (removePanel cleans it up) to avoid double work.
               const removed = new Set(dn.map((n) => n.id));
               for (const e of de) {
                 const pid = e.data?.panelId as string | undefined;
                 const cid = e.data?.circuitId as string | undefined;
                 if (pid && cid && !removed.has(e.source) && !removed.has(e.target)) disconnectEdge(pid, cid);
               }
-              for (const n of dn) removePanel(n.id);
+              for (const n of dn) {
+                if (n.type === 'floatLoad') removeFloatingLoad(n.id.replace(/^float-/, ''));
+                else if (n.type === 'uPanel') removePanel(n.id);
+              }
             }}
             onEdgeContextMenu={(e, edge) => {
               e.preventDefault();
