@@ -290,6 +290,25 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - Unique panel names by construction; `addCircuit` default aligned with the palette (2 kW);
   help-legend Delete line corrected; dead `'panel'` ⌘K nav entry removed. Suite at 445 tests.
 
+### Palette + hybrid backup (same branch, latest)
+
+- **Palette = standards:** every load card derives cos φ + demand factor from `LOAD_DEFAULTS`
+  (`loadCard()` helper) — no hand-coded values that drift from the wizard/table; `FloatingLoad`
+  carries `demandFactor` so drop-on-canvas wiring equals drop-on-panel. New cards: **Water heater**
+  (`heating`), **UPS / IT load** (`ups`), and an **Energy sources** section (generator / solar PV /
+  battery) that enables the project-level source (defaults shared via `data/sourceDefaults.ts`)
+  and shows it as a badge on the PLN service head. PLN + inverter are deliberately NOT cards
+  (auto: service root / sized inside the solar+battery designs). **Elevator / lift machine room**
+  panel template (11 kW VFD hoist, heavy duty + EN 81 ancillaries). 'fed' badge now requires a
+  REAL parent feeder (template-stamped panels read "not connected").
+- **Essential (genset-backed) panels:** `PanelInput.essential` (right-click toggle, yellow chip;
+  persisted via a real `panels.essential` column). Genset backup demand = the essential panels'
+  actual aggregate demand (topmost-only, no double-count; `backupFraction` fallback), motor-start
+  dip assessed on the essential subtree only, the power one-line splits an **Essential bus**
+  behind the ATS (battery backs it), plus a genset↔PV derate interlock. Warnings:
+  `essential-no-backup`, `pv-exceeds-service` (PLN rooftop cap vs daya tersambung). Also fixed:
+  `circuits.cable_type` column (cableType silently vanished on desktop save/load). Suite at 454.
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are
