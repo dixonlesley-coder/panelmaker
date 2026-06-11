@@ -96,6 +96,8 @@ const PHASE_COLOR: Record<string, string> = {
   N: '#4dabf7',
   PE: '#2f9e44',
 };
+/** PUIL/Indonesian R-S-T designation for the IEC phase keys. */
+const PHASE_RST: Record<string, string> = { L1: 'R', L2: 'S', L3: 'T' };
 
 interface SupplyHead {
   transformer?: string; // "630 kVA"
@@ -502,11 +504,14 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
         const color = PHASE_COLOR[b.key] ?? '#888';
         const h = b.key === 'PE' ? 4 : b.key === 'N' ? 5 : 6;
         const w = right - LEFT;
+        // Tag the phase bars with the R/S/T designation (PUIL/Indonesian
+        // convention) alongside the IEC L1/L2/L3 so the bus reads clearly.
+        const label = PHASE_RST[b.key] ? `${b.key}·${PHASE_RST[b.key]}` : b.key;
         return (
           <g key={b.key}>
             <rect x={3} y={b.y - 6} width={LEFT - 12} height={12} rx={6} fill={color} />
-            <text x={3 + (LEFT - 12) / 2} y={b.y + 3} fontSize={8} fontWeight={700} textAnchor="middle" fill="#fff">
-              {b.key}
+            <text x={3 + (LEFT - 12) / 2} y={b.y + 3} fontSize={7.5} fontWeight={700} textAnchor="middle" fill="#fff">
+              {label}
             </text>
             <rect x={LEFT} y={b.y - h / 2} width={w} height={h} rx={h / 2} fill={color} filter="url(#sldBarShadow)" />
             <rect x={LEFT + 2} y={b.y - h / 2 + 0.6} width={w - 4} height={1.1} rx={0.5} fill="#fff" opacity={0.45} />
@@ -528,6 +533,10 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
       {d.ways.map((w, i) => {
         const cx = colX(i);
         const taps = w.phase === '3ph' ? phaseKeys : [w.phase];
+        // Colour the live run by its phase so each circuit reads clearly: a
+        // single-phase way takes its R/S/T (L1/L2/L3) colour; a 3-phase way's
+        // post-breaker conductor stays neutral (it bundles all three taps above).
+        const runColor = w.phase === '3ph' ? FG : PHASE_COLOR[w.phase] ?? FG;
         const dragging = drag?.id === w.id;
         return (
           <g
@@ -554,13 +563,13 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
             <title>{`${w.name} — ${w.breakerClass} ${w.breakerA}${w.rcd ? ' + RCD' : ''}${w.starter ? ` · ${w.starter}` : ''}, ${w.cableFull}${w.feeds ? ` → ${w.feeds}` : ''} — double-click to edit`}</title>
             {taps.map((k, j) => {
               const ox = cx + (taps.length > 1 ? (j - 1) * 5 : 0);
-              return <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={L.brkTop} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.6} />;
+              return <line key={k} x1={ox} y1={barY(k)} x2={ox} y2={L.brkTop} stroke={PHASE_COLOR[k] ?? '#888'} strokeWidth={1.8} />;
             })}
             {w.phase !== '3ph' && (
-              <line x1={cx + 8} y1={barY('N')} x2={cx + 8} y2={L.brkTop} stroke={PHASE_COLOR.N} strokeWidth={1} strokeDasharray="2 2" />
+              <line x1={cx + 8} y1={barY('N')} x2={cx + 8} y2={L.loadTop} stroke={PHASE_COLOR.N} strokeWidth={1.5} strokeDasharray="4 2" />
             )}
-            <line x1={cx + 12} y1={barY('PE')} x2={cx + 12} y2={L.loadTop + LOAD_H} stroke={PHASE_COLOR.PE} strokeWidth={1} strokeDasharray="2 2" />
-            <line x1={cx} y1={L.brkTop + BRK_H} x2={cx} y2={L.loadTop} stroke={FG} strokeWidth={1.1} />
+            <line x1={cx + 12} y1={barY('PE')} x2={cx + 12} y2={L.loadTop + LOAD_H} stroke={PHASE_COLOR.PE} strokeWidth={1.5} strokeDasharray="4 2" />
+            <line x1={cx} y1={L.brkTop + BRK_H} x2={cx} y2={L.loadTop} stroke={runColor} strokeWidth={1.8} />
             {breaker(cx, L.brkTop, w.warn ? 'var(--mantine-color-red-6)' : FG)}
             <text x={cx + 9} y={L.brkTop + 13} fontSize={8} fill={DIM}>
               {w.breakerA}
