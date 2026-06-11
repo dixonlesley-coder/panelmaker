@@ -85,6 +85,8 @@ const RCD_BAND = 15;
 const STARTER_BAND = 28;
 const LOAD_W = 70; // external load-node width (≤ WAY_W so siblings don't overlap)
 const LOAD_NODE_H = 74; // approx external load-node height (for layout clearance)
+const GRID_SRC_W = 158; // utility-supply (grid) node, drawn above a utility panel
+const GRID_SRC_H = 54;
 /** Layout grid: panels + loads snap to it so wiring stays legible. */
 const GRID = 16;
 const snap = (n: number) => Math.round(n / GRID) * GRID;
@@ -829,7 +831,8 @@ function LoadNode({ data }: NodeProps) {
         lineClamp={1}
         style={{ color: d.util !== undefined ? utilColor(d.util) : 'var(--mantine-color-dimmed)' }}
       >
-        {d.breakerA} · {d.cable}
+        {/* Cable size sits on the drop line; the node keeps the protection + loading. */}
+        {d.breakerA}
         {d.util !== undefined ? ` · ${d.util}%` : ''}
       </Text>
     </Box>
@@ -877,7 +880,67 @@ function FloatLoadNode({ data }: NodeProps) {
   );
 }
 
-const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode, floatLoad: FloatLoadNode };
+/** The incoming utility (PLN grid) supply drawn above a utility-fed panel. */
+interface GridSourceData {
+  supplyType: 'LV' | 'MV';
+  voltage: string; // "400 V" or "20 kV"
+  transformer?: string; // "630 kVA" — shown when fed at MV
+  meter?: string; // "kWh" or "CT 300/5"
+  generator?: boolean;
+  [key: string]: unknown;
+}
+
+function GridSourceNode({ data }: NodeProps) {
+  const d = data as GridSourceData;
+  const { t } = useTranslation();
+  return (
+    <Box
+      style={{
+        width: GRID_SRC_W,
+        background: 'var(--mantine-color-body)',
+        border: '1.5px solid var(--mantine-color-indigo-4)',
+        borderRadius: 'var(--mantine-radius-md)',
+        boxShadow: 'var(--mantine-shadow-xs)',
+        padding: '6px 8px',
+      }}
+    >
+      <Group gap={6} wrap="nowrap" align="center">
+        {/* IEC utility-network symbol: a circle struck through (the grid source). */}
+        <svg width={22} height={22} style={{ flexShrink: 0 }}>
+          <circle cx={11} cy={11} r={9} fill="none" stroke={PHASE_COLOR.L1} strokeWidth={1.6} />
+          <line x1={5} y1={15} x2={17} y2={7} stroke={PHASE_COLOR.L1} strokeWidth={1.4} />
+        </svg>
+        <Box style={{ minWidth: 0 }}>
+          <Text size="xs" fw={700} lineClamp={1}>
+            {t('system.gridSupply')}
+          </Text>
+          <Text style={{ fontSize: 9 }} c="dimmed" lineClamp={1}>
+            {d.supplyType === 'MV' ? t('system.supplyMv') : t('system.supplyLv')} · {d.voltage}
+            {d.transformer ? ` → ${d.transformer}` : ''}
+          </Text>
+        </Box>
+      </Group>
+      {(d.meter || d.generator) && (
+        <Group gap={4} mt={3} wrap="nowrap">
+          {d.meter && (
+            <Badge size="xs" variant="light" color="indigo">
+              {d.meter}
+            </Badge>
+          )}
+          {d.generator && (
+            <Badge size="xs" variant="light" color="orange">
+              ATS
+            </Badge>
+          )}
+        </Group>
+      )}
+      {/* Feeds down into the panel's incomer ('in' target). Display-only. */}
+      <Handle type="source" id="out" position={Position.Bottom} isConnectable={false} />
+    </Box>
+  );
+}
+
+const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode, floatLoad: FloatLoadNode, grid: GridSourceNode };
 
 /**
  * Feeder edge between panels. Sibling feeders from the same parent share a
@@ -1083,8 +1146,46 @@ function buildUnified(
       const panelY = d * rowPitch;
       nodes.push({ id, type: 'uPanel', position: { x: snap(x), y: snap(panelY) }, data });
 
-      // Each non-feeder way's LOAD hangs outside the panel as its own node, wired
-      // to that way's MCB output. Feeder ways connect to their sub-panel instead.
+      // A utility-fed panel (e.g. the MDP) shows the incoming PLN grid supply as a
+      // CHILD node above its incomer — so it moves with the panel and the feed line
+      // stays straight. Sub-panels are fed by a feeder, not the grid, so they skip this.
+      if (panel.sourceType === 'utility') {
+        const gridId = `grid-${id}`;
+        const supplyType = system.supply.type === 'MV' ? 'MV' : 'LV';
+        nodes.push({
+          id: gridId,
+          type: 'grid',
+          parentId: id,
+          position: { x: w / 2 - GRID_SRC_W / 2, y: -(GRID_SRC_H + 30) },
+          deletable: false,
+          draggable: false,
+          data: {
+            supplyType,
+            voltage:
+              supplyType === 'MV' && system.supply.mvVoltageV
+                ? `${system.supply.mvVoltageV / 1000} kV`
+                : `${panel.voltageV} V`,
+            ...(data.supply?.transformer ? { transformer: data.supply.transformer } : {}),
+            ...(data.supply?.meter ? { meter: data.supply.meter } : {}),
+            ...(data.supply?.generator ? { generator: true } : {}),
+          } satisfies GridSourceData,
+        });
+        edges.push({
+          id: `e-grid-${id}`,
+          source: gridId,
+          sourceHandle: 'out',
+          target: id,
+          targetHandle: 'in',
+          type: 'smoothstep',
+          style: { stroke: 'var(--mantine-color-indigo-5)', strokeWidth: 2 },
+        });
+      }
+
+      // Each non-feeder way's LOAD hangs outside the panel as its own CHILD node,
+      // wired to that way's MCB output. As a child its position is relative to the
+      // panel, so (a) dragging the panel drags every load with it, and (b) the load
+      // sits directly under its MCB (center at wayCx) → the drop cable is dead
+      // straight. Feeder ways connect to their sub-panel instead.
       const panelH = heightFor(id);
       ways.forEach((wy, i) => {
         if (wy.feeds) return;
@@ -1093,8 +1194,12 @@ function buildUnified(
         nodes.push({
           id: loadId,
           type: 'load',
-          position: { x: snap(x + wayCx - LOAD_W / 2), y: snap(panelY + panelH + 34) },
+          parentId: id,
+          position: { x: wayCx - LOAD_W / 2, y: panelH + 34 },
           deletable: false,
+          // Glued under its MCB and moved by the panel; dragging it itself would
+          // only reset on the next recompute, so it isn't independently draggable.
+          draggable: false,
           data: {
             kind: wy.kind,
             name: wy.name,
@@ -1108,14 +1213,18 @@ function buildUnified(
             onContext: (mx: number, my: number) => onContextCircuit(id, wy.id, mx, my),
           },
         });
+        // Label the drop cable with its size (+ loading %), like the feeders — and
+        // make double-clicking the line open the cable editor for that circuit.
+        const loadLabel = wy.util !== undefined ? `${wy.cable} · ${wy.util}%` : wy.cable;
         edges.push({
           id: `e-${loadId}`,
           source: id,
           sourceHandle: wy.id,
           target: loadId,
           targetHandle: 'in',
-          type: 'smoothstep',
+          type: 'feeder',
           style: { stroke: PHASE_COLOR[wy.phase] ?? 'var(--mantine-color-gray-5)', strokeWidth: 1.6 },
+          data: { label: loadLabel, util: wy.util, panelId: id, circuitId: wy.id },
         });
       });
       x += w + GAP;
@@ -1382,7 +1491,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   };
 
   return (
-    <Group align="stretch" gap="sm" wrap="nowrap" h={560}>
+    <Group align="stretch" gap="sm" wrap="nowrap" h="clamp(560px, calc(100vh - 220px), 880px)">
       {/* Palette — drag a card onto a panel to add it there */}
       <Card withBorder radius="md" padding="xs" w={140} style={{ flexShrink: 0, overflowY: 'auto' }}>
         <Group gap={4} mb={6} wrap="nowrap">
@@ -1453,7 +1562,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             onConnect={(c) => {
               if (!c.source || !c.target || c.source === c.target) return;
               const isFloat = (id: string) => id.startsWith('float-');
-              const isPanel = (id: string) => !id.startsWith('float-') && !id.startsWith('load-');
+              const isPanel = (id: string) =>
+                !id.startsWith('float-') && !id.startsWith('load-') && !id.startsWith('grid-');
               // Wire a floating load to a panel → create its MCB; or panel→panel feeder.
               if (isFloat(c.source) && isPanel(c.target)) attachFloatingLoad(c.source.replace(/^float-/, ''), c.target);
               else if (isFloat(c.target) && isPanel(c.source)) attachFloatingLoad(c.target.replace(/^float-/, ''), c.source);
@@ -1480,9 +1590,14 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               const cid = edge.data?.circuitId as string | undefined;
               if (pid && cid) setEdgeCtx({ panelId: pid, circuitId: cid, x: e.clientX, y: e.clientY });
             }}
-            onNodeDoubleClick={(_, node) => openInspector(node.id)}
+            onNodeDoubleClick={(_, node) => {
+              // Only panels open the inspector; loads handle their own double-click
+              // (inline circuit editor) and the grid source is display-only.
+              if (node.type === 'uPanel') openInspector(node.id);
+            }}
             onNodeDragStop={onNodeDragStop}
             onNodeContextMenu={(e, node) => {
+              if (node.type !== 'uPanel') return; // panel actions only
               e.preventDefault();
               setNodeCtx({ panelId: node.id, x: e.clientX, y: e.clientY });
             }}

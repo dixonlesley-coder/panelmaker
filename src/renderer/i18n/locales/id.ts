@@ -584,6 +584,7 @@ export const id: TranslationKeys = {
     unpricedLines_other: '{{count}} baris tanpa harga',
     allPriced: 'semua berharga',
     supply: 'Suplai',
+    gridSupply: 'Suplai jaringan PLN',
     supplyMv: 'Tegangan menengah + trafo',
     supplyLv: 'Tegangan rendah (langsung PLN)',
     demandKva: 'kebutuhan {{kva}} kVA',

@@ -580,6 +580,7 @@ export const en = {
     unpricedLines_other: '{{count}} unpriced lines',
     allPriced: 'all priced',
     supply: 'Supply',
+    gridSupply: 'PLN grid supply',
     supplyMv: 'Medium voltage + transformer',
     supplyLv: 'Low voltage (direct PLN)',
     demandKva: '{{kva}} kVA demand',

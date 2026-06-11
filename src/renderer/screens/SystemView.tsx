@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Badge,
   Button,
   Card,
+  Drawer,
   Group,
   Menu,
   SimpleGrid,
@@ -59,6 +60,10 @@ export function SystemView() {
   const importPanels = useProjectStore((s) => s.importPanels);
 
   const system = useSystemResult();
+
+  // The consolidated project BOM lives in a right-side drawer (toggled from the
+  // header) rather than below the diagram, so the single-line gets the full height.
+  const [bomOpen, setBomOpen] = useState(false);
 
   const cost = useMemo(() => {
     const priceMap = new Map<string, number>(Object.entries(prices));
@@ -202,6 +207,15 @@ export function SystemView() {
             onClick={onImportLoadList}
           >
             {t('system.importLoadList')}
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            color="indigo"
+            leftSection={<IconListDetails size={14} />}
+            onClick={() => setBomOpen(true)}
+          >
+            {t('system.projectBom')}
           </Button>
         </Group>
       </Group>
@@ -354,7 +368,23 @@ export function SystemView() {
         </Tabs>
       </Card>
 
-      <ProjectBomCard cost={projectBom} projectName={project.name} />
+      <Drawer
+        opened={bomOpen}
+        onClose={() => setBomOpen(false)}
+        position="right"
+        size="xl"
+        title={
+          <Group gap="xs">
+            <ThemeIcon variant="light" color="indigo" size="sm">
+              <IconListDetails size={14} />
+            </ThemeIcon>
+            <Text fw={600}>{t('system.projectBom')}</Text>
+          </Group>
+        }
+        keepMounted={false}
+      >
+        <ProjectBomCard cost={projectBom} projectName={project.name} />
+      </Drawer>
     </Stack>
   );
 }

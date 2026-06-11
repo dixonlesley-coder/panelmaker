@@ -111,10 +111,24 @@ export interface BusbarNodeData {
   inadequate?: boolean;
   /** True when this section starts at a user-forced (manual) busbar break. */
   manualBreak?: boolean;
+  /** True for a three-phase bus (R-S-T-N-PE); false shows a single phase (L-N-PE). */
+  threePhase?: boolean;
   /** Busbar issues (short-circuit withstand). */
   issues?: NodeIssue[];
   [key: string]: unknown;
 }
+
+/**
+ * Indonesian/PUIL bus rail colours, shared with the building single-line: the
+ * three phases are R-S-T (red/amber/blue), plus the neutral and protective earth.
+ */
+const BUS_RAILS: { key: string; label: string; color: string; thin?: boolean }[] = [
+  { key: 'R', label: 'R', color: '#c92a2a' },
+  { key: 'S', label: 'S', color: '#e8990c' },
+  { key: 'T', label: 'T', color: '#1971c2' },
+  { key: 'N', label: 'N', color: '#4dabf7', thin: true },
+  { key: 'PE', label: 'PE', color: '#2f9e44', thin: true },
+];
 
 export interface BranchNodeData {
   name: string;
@@ -187,20 +201,23 @@ export function IncomerNode({ data }: NodeProps) {
   );
 }
 
-/** Busbar: a wide bar all branches in its section hang off. */
+/** Busbar: a chamber showing the R-S-T (+N/PE) copper rails branches hang off. */
 export function BusbarNode({ data }: NodeProps) {
   const d = data as BusbarNodeData;
+  // Single-phase panels run one phase only — hide S and T so the rails read true.
+  const rails = BUS_RAILS.filter((r) => d.threePhase !== false || r.key === 'R' || r.key === 'N' || r.key === 'PE');
   return (
     <Box
       style={{
         width: d.widthPx ?? 620,
-        background: d.inadequate ? 'var(--mantine-color-red-7)' : 'var(--mantine-color-indigo-6)',
+        background: '#23272b',
         color: 'white',
-        borderRadius: 4,
-        padding: '4px 10px',
+        borderRadius: 5,
+        padding: '4px 10px 7px',
+        border: d.inadequate ? '2px solid var(--mantine-color-red-6)' : '1px solid #3a4047',
       }}
     >
-      <Group justify="space-between" wrap="nowrap" gap={8}>
+      <Group justify="space-between" wrap="nowrap" gap={8} mb={4}>
         <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
           <Text size="xs" fw={700} lineClamp={1}>
             {d.label}
@@ -217,10 +234,34 @@ export function BusbarNode({ data }: NodeProps) {
               {d.waysLabel}
             </Text>
           )}
-          <Text size="xs">{d.ampacity}</Text>
+          <Text size="xs" style={{ opacity: 0.9 }}>
+            {d.ampacity}
+          </Text>
           <NodeIssues issues={d.issues} />
         </Group>
       </Group>
+      {/* R-S-T-N-PE copper rails — coloured to match the building single-line. */}
+      <Stack gap={3}>
+        {rails.map((r) => (
+          <Group key={r.key} gap={6} wrap="nowrap" align="center">
+            <Text
+              fw={700}
+              style={{ width: 16, fontSize: 9, textAlign: 'right', color: r.color, flexShrink: 0, lineHeight: 1 }}
+            >
+              {r.label}
+            </Text>
+            <Box
+              style={{
+                flex: 1,
+                height: r.thin ? 3 : 5,
+                borderRadius: 3,
+                background: r.color,
+                boxShadow: `0 0 0 0.5px ${r.color}`,
+              }}
+            />
+          </Group>
+        ))}
+      </Stack>
       {/* Top: incomer feed (section 0). Left: radial dropper from the incomer
           for later sections. Bottom: down to this section's branches. */}
       <Handle type="target" position={Position.Top} id="top" />

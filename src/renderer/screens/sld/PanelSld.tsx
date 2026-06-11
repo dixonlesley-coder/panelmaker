@@ -76,6 +76,7 @@ function buildGraph(panel: PanelInput, result: PanelResult, t: TFn): { nodes: No
         waysLabel: multi ? t('vbuilder.waysCount', { count: section.ways }) : undefined,
         inadequate,
         manualBreak: section.manualBreak,
+        threePhase: panel.system === '3ph',
         issues: inadequate ? busbarIssues(result.warnings) : undefined,
       },
       draggable: false,
