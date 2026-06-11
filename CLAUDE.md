@@ -248,6 +248,28 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   React Flow **MiniMap** on the canvas; and **Export PDF / Save** added to the **⌘K command palette**
   (`features/CommandPalette.tsx`, already existed). All localised EN + ID.
 
+### UX batch after v0.1.42 (same branch, latest)
+
+- **Per-circuit cable type:** `CircuitInput.cableType` (NYY/NYM/NYA/NYAF select in the circuit
+  editor) wins over the panel default (NYY 3ph / NYM 1ph, N2XY XLPE, NAYY/NA2XY Al); the effective
+  construction is reported as `GroundingResult.cableType` and `matchCablePart` **prefers parts of
+  that `attributes.type`** (section-only fallback). Sizing itself is unchanged — it's a label +
+  BOM/order-code concern (`tests/engine/cableType.test.ts`).
+- **Cascade delete-confirm:** React Flow `onBeforeDelete` + the panel context menu route through a
+  modal naming the sub-panels that would be orphaned (pure `lib/panelTree.ts` `fedSubPanelNames`);
+  leaf panels still delete with no extra click.
+- **Export all deliverables:** one action emits the system PDF + consolidated BOM `.xlsx` +
+  cable-schedule `.csv` + per-panel SLD/GA `.dxf`. Pure manifest in `lib/deliverables.ts`;
+  orchestration in `lib/exportAll.ts`. Desktop picks ONE folder via new `dialog:chooseDirectory` +
+  `export:writeFile` IPC (no zip dep, no per-file dialogs); web falls back to sequential downloads
+  (PDF is desktop-only). Button on SystemView + ⌘K command.
+- **Save-as-template:** right-click a panel → "Save as template…"; snapshots (feeder ways/links
+  stripped, fresh ids on stamp) persist via localStorage across projects (`lib/userTemplates.ts`,
+  store `userTemplates` + actions) and appear under **"My templates"** in the Add-panel menu with
+  per-template delete.
+- **Parts Catalog brand filter:** clearable/searchable brand Select (derived from loaded parts)
+  combinable with the text search. Everything above localised EN + ID; suite at 434 tests.
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are
