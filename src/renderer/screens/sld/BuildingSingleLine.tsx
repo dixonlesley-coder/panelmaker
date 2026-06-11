@@ -655,6 +655,10 @@ function UnifiedPanelNode({ data }: NodeProps) {
   const { zoom } = useViewport();
   const expanded = zoom >= 0.72;
   const width = panelWidth(d.ways.length, d.bus.length);
+  // Reserve the expanded schematic height even in the summary, so the card is a
+  // STABLE size at every zoom. Otherwise the card grows on zoom-in and its loads
+  // (placed below the expanded bottom) float far away when zoomed out.
+  const schematicH = layout(d.system === '3ph', d.ways.some((w) => w.rcd), d.ways.some((w) => w.starter)).height;
   const hasError = (d.issues ?? []).some((i) => i.severity === 'error');
   const [hover, setHover] = useState(false); // highlight the draggable/selectable panel on hover
   // Panel health: the worst cable loading + how many ways are overloaded — shown
@@ -736,10 +740,16 @@ function UnifiedPanelNode({ data }: NodeProps) {
       </Group>
 
       {/* Keyed so the view remounts when the LOD flips — the sld-lod-enter
-          animation then cross-dissolves summary ⇄ detail instead of snapping. */}
-      <Box key={expanded ? 'detail' : 'summary'} className="sld-lod-enter">
+          animation then cross-dissolves summary ⇄ detail instead of snapping.
+          minHeight reserves the schematic's footprint so the card is the same
+          size summary-or-detail: its loads then sit a fixed gap below at any zoom. */}
+      <Box
+        key={expanded ? 'detail' : 'summary'}
+        className="sld-lod-enter"
+        style={{ minHeight: schematicH + 4 }}
+      >
         {!expanded ? (
-          <Group justify="space-between" mt={6}>
+          <Group justify="space-between" h={schematicH + 4} align="center">
             <Text size="xs" c="dimmed">
               {d.incomerA} · {d.ways.length} ways
             </Text>
@@ -855,7 +865,7 @@ function FloatLoadNode({ data }: NodeProps) {
     <Box
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      title="Drag the dot up to a panel to wire it (creates the MCB)"
+      title="Drag onto the nearest panel to wire it automatically (creates the MCB), or drag the dot to a specific panel"
       style={{
         width: LOAD_W + 8,
         background: 'var(--mantine-color-body)',
@@ -1440,7 +1450,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       const hasStarter = res.circuits.some((c) => c.control);
       return {
         w: panelWidth(res.circuits.length, 0),
-        h: layout(panel.system === '3ph', hasRcd, hasStarter).height + 16,
+        // The card now reserves the schematic height at every zoom, so its real
+        // footprint is the schematic plus the title/padding chrome.
+        h: layout(panel.system === '3ph', hasRcd, hasStarter).height + PANEL_CHROME,
       };
     },
     [system, project],
@@ -1451,7 +1463,23 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const onNodeDragStop = useCallback(
     (_e: unknown, node: Node) => {
       if (node.type === 'floatLoad') {
-        moveFloatingLoad(node.id.replace(/^float-/, ''), node.position); // persist float drag
+        // Snap a dropped load onto the nearest panel (within reach) and wire it up
+        // automatically — otherwise just leave it floating where it landed.
+        const fid = node.id.replace(/^float-/, '');
+        const cx = node.position.x + (LOAD_W + 8) / 2;
+        const cy = node.position.y + LOAD_NODE_H / 2;
+        let best: { id: string; dist: number } | null = null;
+        for (const n of nodes) {
+          if (n.type !== 'uPanel') continue;
+          const b = panelBox(n.id);
+          // Distance from the drop point to the panel's box (0 when inside it).
+          const dx = Math.max(n.position.x - cx, 0, cx - (n.position.x + b.w));
+          const dy = Math.max(n.position.y - cy, 0, cy - (n.position.y + b.h));
+          const dist = Math.hypot(dx, dy);
+          if (!best || dist < best.dist) best = { id: n.id, dist };
+        }
+        if (best && best.dist <= 160) attachFloatingLoad(fid, best.id);
+        else moveFloatingLoad(fid, node.position);
         return;
       }
       if (node.type !== 'uPanel') return; // only keep panels from overlapping
@@ -1474,7 +1502,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         return cur.map((n) => (n.id === node.id ? { ...n, position: { x, y } } : n));
       });
     },
-    [panelBox, setNodes, moveFloatingLoad],
+    [panelBox, setNodes, moveFloatingLoad, attachFloatingLoad, nodes],
   );
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
