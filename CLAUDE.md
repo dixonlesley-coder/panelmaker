@@ -223,6 +223,31 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - **Release hygiene:** `.github/workflows/release.yml` has a `concurrency: group=release` guard so
   back-to-back publishes can't race on the GitHub Release assets and break auto-update.
 
+### Multi-manufacturer catalogue + order codes + more UX (same branch, latest — v0.1.42)
+
+- **Multi-manufacturer catalogue (`src/shared/data/catalog/`):** the loader is now a **registry of
+  per-brand JSON files** merged + de-duplicated by SKU (`CATALOG_SOURCES` in `index.ts`;
+  `loadCatalog(file, brand)` stamps `Part.manufacturer`). Adding a brand = one JSON file + one line.
+  Current sources (**~492 verified parts**, every code transcribed from manufacturer/distributor
+  listings — never pattern-generated; conflicting values omitted): **Schneider** (139), **Mitsubishi**
+  (63), **LS Electric** (42), **ABB** (69), **Legrand** (92), **Chint** (71), and **generic cables**
+  (NYY/NYM/NYA/NYAF/BC across the SNI ladder — type+size refs, no brand). Exports: `CATALOG_PARTS` /
+  `CATALOG_ISSUES` (all brands) + the back-compat `SCHNEIDER_CATALOG_*`; the test gate asserts every
+  dataset validates with **globally-unique SKUs**. Seed + renderer defaults load all brands.
+- **Inline order codes + BOM matcher (`engine/bom.ts`):** `circuitOrderCodes(circuit, parts)` (same
+  matcher the BOM uses) surfaces the matched SKU **inline** — on the circuit editor, the single-line
+  MCB hover, and the load node. `matchBreakerPart` now ranks on **class/poles/curve**, not just rating
+  (a rating-only match grabbed wrong-pole parts once the 1P–4P × B/C/D matrix existed).
+- **Brand selector (`partsForBrand` + store `preferredBrand`):** a brand picker (in the project-BOM
+  drawer) scopes which manufacturer's order codes are used **everywhere** — the BOM table + CSV/Excel
+  export, the inline codes, the estimated cost, and the **quotation PDF** (passed brand-filtered parts
+  from the renderer). Generic cables stay available. The active brand shows as a canvas chip. NOTE: the
+  *system* PDF carries no catalog order codes (engine-computed), so the brand filter doesn't apply there.
+- **More UX:** a **project-wide Issues drawer** (`features/issues/ProjectIssues.tsx`) aggregates every
+  panel's warnings with a **"fix all safe"** pass (applies `set-cable` / `clear-breaker-override`); a
+  React Flow **MiniMap** on the canvas; and **Export PDF / Save** added to the **⌘K command palette**
+  (`features/CommandPalette.tsx`, already existed). All localised EN + ID.
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are
