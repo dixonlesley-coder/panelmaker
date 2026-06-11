@@ -3,7 +3,6 @@ import { Alert, Card, Group, Select, Stack, Tabs, Text, TextInput } from '@manti
 import {
   IconAlertTriangle,
   IconBulb,
-  IconDragDrop,
   IconColumns,
   IconCpu,
   IconLayoutGrid,
@@ -16,7 +15,6 @@ import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
 import type { OccupancyType } from '@shared/types';
 import { panelLabel } from '@shared/labels';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
-import { VisualBuilder } from '@renderer/features/builder/VisualBuilder';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
 import { SchematicView } from '@renderer/features/schematic/SchematicView';
@@ -28,9 +26,10 @@ import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
 
 /**
- * The single-panel editor: a full-width tabbed workspace led by the drag-and-drop
- * visual builder (double-click a circuit/cable to edit), with the structured
- * circuit table, diagrams, schedules and results as further tabs.
+ * The single-panel inspector (opened as a drawer from the building single-line):
+ * a tabbed workspace led by the structured circuit table — the fastest way to
+ * type in a load schedule — with diagrams, schedules and results as further
+ * tabs. Visual editing happens on the unified single-line canvas itself.
  */
 export function PanelEditor() {
   const { t } = useTranslation();
@@ -128,11 +127,12 @@ export function PanelEditor() {
       </Group>
 
       <Card withBorder radius="md" padding="md">
-        <Tabs defaultValue="build" keepMounted={false} variant="pills" radius="xl">
+        {/* The old drag-and-drop "Build" tab (VisualBuilder) was retired: the
+            unified building single-line IS the visual builder now, and keeping
+            a second canvas here split features (spares, auto-balance) from the
+            primary surface. The structured table leads for typing-speed entry. */}
+        <Tabs defaultValue="circuits" keepMounted={false} variant="pills" radius="xl">
           <Tabs.List mb="md" style={{ gap: 4 }}>
-            <Tabs.Tab value="build" leftSection={<IconDragDrop size={16} />}>
-              {t('panel.tabBuild')}
-            </Tabs.Tab>
             <Tabs.Tab value="circuits" leftSection={<IconListNumbers size={16} />}>
               {t('panel.tabCircuits')}
             </Tabs.Tab>
@@ -169,9 +169,6 @@ export function PanelEditor() {
             </Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="build">
-            <VisualBuilder panel={panel} result={result} />
-          </Tabs.Panel>
           <Tabs.Panel value="circuits">
             <Group justify="space-between" mb="xs">
               <Text fw={600}>{t('panel.circuitBuilder')}</Text>
