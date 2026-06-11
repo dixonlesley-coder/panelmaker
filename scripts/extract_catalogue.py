@@ -210,7 +210,7 @@ def extract(pdf_path: Path) -> tuple[list[dict], list[str]]:
 
 
 def merge_and_write(entries: list[dict], out: Path) -> None:
-    existing = json.loads(out.read_text()) if out.exists() else {
+    existing = json.loads(out.read_text(encoding="utf-8")) if out.exists() else {
         "catalogVersion": "schneider-0", "manufacturer": "Schneider Electric",
         "source": "", "parts": [],
     }
@@ -230,7 +230,7 @@ def merge_and_write(entries: list[dict], out: Path) -> None:
                    key=lambda p: (p["category"], p.get("series", ""),
                                   p["attributes"].get("ratingA", 0), p["sku"]))
     existing["parts"] = parts
-    out.write_text(json.dumps(existing, indent=2, ensure_ascii=False) + "\n")
+    out.write_text(json.dumps(existing, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"\n  wrote {len(parts)} parts → {out.relative_to(ROOT)}  (+{kept} extracted, {dropped} dropped)")
 
 
@@ -273,6 +273,15 @@ def auto_json(pdf_path: Path, page_range: str | None) -> None:
 
 
 def main() -> None:
+    # Windows consoles/pipes default to cp1252; catalogue tables carry δ, Ω, ²,
+    # ° etc. Force UTF-8 so json.dumps(ensure_ascii=False) prints without a
+    # UnicodeEncodeError (the app reads this stdout as UTF-8).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except Exception:
+            pass
+
     ap = argparse.ArgumentParser(description="Extract catalogue tables → committed parts JSON")
     ap.add_argument("--pdf", required=True, type=Path, help="path to the catalogue PDF")
     ap.add_argument("--out", default=OUT_DEFAULT, type=Path, help="target JSON (default: the committed catalogue)")
