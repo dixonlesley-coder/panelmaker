@@ -5,6 +5,7 @@ import {
   Controls,
   EdgeLabelRenderer,
   Handle,
+  Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -41,6 +42,7 @@ import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
 import { dropIndex, reorderIds } from '@renderer/lib/reorder';
 import { useProjectStore, type FloatingLoad } from '@renderer/state/projectStore';
 import { PanelEditor } from '@renderer/screens/PanelEditor';
+import { CanvasHelp } from '@renderer/screens/sld/CanvasHelp';
 import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
 
 /* Palette: drag a card onto a panel to add the way/sub-panel there. */
@@ -1651,6 +1653,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           >
             <Background gap={GRID} />
             <Controls showInteractive={false} />
+            <Panel position="top-right">
+              <CanvasHelp />
+            </Panel>
           </ReactFlow>
         </ReactFlowProvider>
       </Box>

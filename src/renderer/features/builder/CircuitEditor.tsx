@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
   Button,
   Divider,
   Group,
+  List,
   Modal,
   NumberInput,
   Select,
@@ -12,7 +14,7 @@ import {
   Text,
   TextInput,
 } from '@mantine/core';
-import { IconTrash } from '@tabler/icons-react';
+import { IconBulb, IconTrash } from '@tabler/icons-react';
 import type { CircuitInput, CircuitResult, LoadKind, StarterType } from '@shared/types';
 import {
   LOAD_KINDS,
@@ -85,6 +87,29 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
       ? Math.round((result.designCurrentA / result.cable.deratedIzA) * 100)
       : undefined;
 
+  // Plain-language "why these sizes" — turns the engine's governing constraint
+  // (ampacity vs voltage-drop vs a manual override) into something a junior
+  // engineer can read and trust, instead of leaving the numbers unexplained.
+  const reasons: string[] = [];
+  if (result) {
+    reasons.push(
+      result.breaker.overridden
+        ? t('circuitEditor.whyBreakerManual', { rating: result.breaker.ratingA })
+        : t('circuitEditor.whyBreaker', {
+            rating: result.breaker.ratingA,
+            design: formatAmps(result.designCurrentA),
+          }),
+    );
+    const csa = `${result.cable.runsPerPhase && result.cable.runsPerPhase > 1 ? `${result.cable.runsPerPhase}× ` : ''}${result.cable.csaMm2}`;
+    if (result.cable.overridden) {
+      reasons.push(t('circuitEditor.whyCableManual', { csa }));
+    } else if (result.cable.vdDriven) {
+      reasons.push(t('circuitEditor.whyCableVd', { csa, limit: result.voltageDrop.limitPercent }));
+    } else {
+      reasons.push(t('circuitEditor.whyCableAmpacity', { csa, iz: formatAmps(result.cable.deratedIzA) }));
+    }
+  }
+
   return (
     <Modal
       opened={opened}
@@ -136,6 +161,15 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
               ? ` · ${t('circuitEditor.cumulative', { pct: formatPercent(result.cumulativeDropPercent) })}`
               : ''}
           </Text>
+        )}
+        {reasons.length > 0 && (
+          <Alert variant="light" color="blue" p="xs" icon={<IconBulb size={16} />} title={t('circuitEditor.whyTitle')}>
+            <List size="xs" spacing={3}>
+              {reasons.map((r, i) => (
+                <List.Item key={i}>{r}</List.Item>
+              ))}
+            </List>
+          </Alert>
         )}
 
         <Divider label={focus === 'cable' ? t('circuitEditor.cableSection') : t('circuitEditor.device')} />
