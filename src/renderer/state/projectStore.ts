@@ -33,7 +33,7 @@ export interface FloatingLoad {
 }
 import { buildSchematic, mergeSchematic } from '@shared/engine';
 import { desktopApi, persistSchematic } from '@renderer/api';
-import { createSampleProject } from '@renderer/data/sampleProject';
+import { createBlankProject, createSampleProject } from '@renderer/data/sampleProject';
 import { findPanelTemplate } from '@renderer/data/panelTemplates';
 import { SAMPLE_PARTS, SAMPLE_PRICES } from '@renderer/data/sampleParts';
 import { withCatalog } from '@shared/data/catalog';
@@ -268,8 +268,11 @@ export interface ProjectState {
   // project lifecycle
   /** Replace the entire working project (e.g. autosave restore on launch). Resets history. */
   replaceProject: (project: ProjectInput) => void;
-  /** Start a fresh project (seeded sample with a new id/name). Resets history + persists. */
-  newProject: (name?: string) => Promise<void>;
+  /**
+   * Start a fresh project and persist it: `'blank'` = one empty MDP (a real
+   * job's starting point), `'sample'` (default) = the seeded demo building.
+   */
+  newProject: (name?: string, seed?: 'sample' | 'blank') => Promise<void>;
   /** Load a stored project by id and make it the working project. */
   openProject: (id: string) => Promise<boolean>;
   /** Duplicate the active project under a new id (and "(copy)" name); persists it. */
@@ -1080,9 +1083,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
     });
   },
 
-  newProject: async (name) => {
+  newProject: async (name, seed = 'sample') => {
     const project: ProjectInput = {
-      ...createSampleProject(),
+      ...(seed === 'blank' ? createBlankProject() : createSampleProject()),
       id: freshProjectId(),
       name: name && name.trim().length > 0 ? name.trim() : 'New project',
     };

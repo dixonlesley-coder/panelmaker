@@ -137,3 +137,17 @@ export function createSampleProject(): ProjectInput {
     },
   };
 }
+
+/**
+ * A blank starting point for a real job: one empty utility-fed MDP, nothing
+ * else. The sample building above is for exploring the app; an engineer
+ * starting their own design shouldn't have to delete the demo first.
+ */
+export function createBlankProject(): ProjectInput {
+  seq = 0;
+  return {
+    id: 'PRJ-BLANK',
+    name: 'New project',
+    panels: [panel({ name: 'Main distribution panel', tag: 'MDP', circuits: [] })],
+  };
+}

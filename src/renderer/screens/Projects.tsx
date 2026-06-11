@@ -8,6 +8,7 @@ import {
   Card,
   Group,
   Loader,
+  Menu,
   Modal,
   ScrollArea,
   Stack,
@@ -21,6 +22,7 @@ import {
 } from '@mantine/core';
 import {
   IconBolt,
+  IconChevronDown,
   IconCopy,
   IconDownload,
   IconFileImport,
@@ -29,6 +31,7 @@ import {
   IconPencil,
   IconPlus,
   IconRefresh,
+  IconSitemap,
   IconTrash,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -98,10 +101,10 @@ export function Projects() {
     void refresh();
   }, [refresh]);
 
-  async function onNew() {
+  async function onNew(seed: 'blank' | 'sample') {
     setBusy(true);
     try {
-      await newProject();
+      await newProject(undefined, seed);
       ok(t('projects.createdToast'));
       await refresh();
       setScreen('system');
@@ -208,8 +211,9 @@ export function Projects() {
     try {
       const removed = await registryDeleteProject(target.id);
       if (removed && target.id === project.id) {
-        // The active project was deleted — start fresh so the app stays usable.
-        await newProject();
+        // The active project was deleted — fall back to a blank project (not
+        // the demo building) so the app stays usable without surprise content.
+        await newProject(undefined, 'blank');
       }
       ok(removed ? t('projects.deletedToast', { name: target.name }) : t('projects.nothingToDelete'));
       setDeleting(null);
@@ -274,7 +278,13 @@ export function Projects() {
           icon={<IconPlus size={22} />}
           title={t('projects.heroNew')}
           description={t('projects.heroNewHint')}
-          onClick={() => void onNew()}
+          onClick={() => void onNew('blank')}
+        />
+        <HeroAction
+          icon={<IconSitemap size={22} />}
+          title={t('projects.heroSample')}
+          description={t('projects.heroSampleHint')}
+          onClick={() => void onNew('sample')}
         />
         <HeroAction
           icon={<IconFileImport size={22} />}
@@ -325,9 +335,25 @@ export function Projects() {
             >
               {t('common.import')}
             </Button>
-            <Button leftSection={<IconPlus size={16} />} onClick={onNew} loading={busy}>
-              {t('projects.newProject')}
-            </Button>
+            <Menu position="bottom-end" withinPortal shadow="md" width={230}>
+              <Menu.Target>
+                <Button
+                  leftSection={<IconPlus size={16} />}
+                  rightSection={<IconChevronDown size={14} />}
+                  loading={busy}
+                >
+                  {t('projects.newProject')}
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item leftSection={<IconPlus size={14} />} onClick={() => void onNew('blank')}>
+                  {t('projects.newBlank')}
+                </Menu.Item>
+                <Menu.Item leftSection={<IconSitemap size={14} />} onClick={() => void onNew('sample')}>
+                  {t('projects.newSample')}
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
       </Card>
