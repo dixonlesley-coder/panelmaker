@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { createSampleProject } from '@renderer/data/sampleProject';
+import { computePanel } from '@shared/engine';
 
 describe('canvas workflow store behavior', () => {
   beforeEach(() => {
@@ -82,6 +83,23 @@ describe('canvas workflow store behavior', () => {
       .circuits.find((c) => c.name === 'Sockets')!;
     expect(circuit.demandFactor).toBe(0.7);
     expect(useProjectStore.getState().floatingLoads).toHaveLength(0);
+  });
+
+  it('elevator template stamps a VFD heavy-duty hoist + EN81 ancillaries', () => {
+    const { addPanelFromTemplate } = useProjectStore.getState();
+    addPanelFromTemplate('elevator');
+    const panel = useProjectStore.getState().project.panels.at(-1)!;
+    expect(panel.name).toBe('Elevator machine room');
+    const hoist = panel.circuits.find((c) => c.name.includes('hoist'))!;
+    expect(hoist.starterType).toBe('VFD');
+    expect(hoist.startingDuty).toBe('heavy');
+    expect(hoist.motorKw).toBe(11);
+    expect(panel.circuits).toHaveLength(6);
+
+    // The engine builds the VFD control assembly for the hoist way.
+    const result = computePanel(panel);
+    const hoistRes = result.circuits.find((c) => c.circuitId === hoist.id)!;
+    expect(hoistRes.control?.devices.some((d) => d.category === 'vfd')).toBe(true);
   });
 
   it('addSubPanel names stay unique after deletions too', () => {

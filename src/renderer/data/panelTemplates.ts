@@ -214,6 +214,68 @@ function motorControlCentre(): PanelInput {
   });
 }
 
+/**
+ * Elevator / lift machine-room board: the hoist motor on a VFD with heavy
+ * starting duty (the engine's starting analysis + harmonics pass both key off
+ * this), plus the EN 81-style ancillaries — car/shaft lighting, machine-room
+ * light & socket, pit light & socket, and the machine-room ventilation fan.
+ * Lifts take a dedicated feeder, so stamp it and wire it under the MDP.
+ */
+function elevatorPanel(): PanelInput {
+  return panel({
+    name: 'Elevator machine room',
+    circuits: [
+      branch({
+        name: 'Lift hoist motor (VFD)',
+        loadKind: 'motor',
+        motorKw: 11,
+        starterType: 'VFD',
+        startingDuty: 'heavy',
+        lengthM: 8,
+      }),
+      branch({
+        name: 'Car & shaft lighting',
+        loadW: 800,
+        loadKind: 'lighting',
+        isLighting: true,
+        cosPhi: 0.9,
+        lengthM: 35,
+      }),
+      branch({
+        name: 'Machine-room lighting',
+        loadW: 300,
+        loadKind: 'lighting',
+        isLighting: true,
+        cosPhi: 0.9,
+        lengthM: 8,
+      }),
+      branch({
+        name: 'Machine-room socket outlet',
+        loadW: 1500,
+        loadKind: 'socket',
+        cosPhi: 0.9,
+        demandFactor: 0.7,
+        lengthM: 8,
+      }),
+      branch({
+        name: 'Pit lighting & socket',
+        loadW: 800,
+        loadKind: 'general',
+        cosPhi: 0.9,
+        lengthM: 30,
+      }),
+      branch({
+        name: 'Ventilation fan',
+        loadKind: 'motor',
+        motorKw: 0.75,
+        starterType: 'DOL',
+        startingDuty: 'normal',
+        lengthM: 6,
+      }),
+    ],
+  });
+}
+
 /** The catalog of available panel templates, in picker order. */
 export const PANEL_TEMPLATES: readonly PanelTemplate[] = [
   {
@@ -239,6 +301,12 @@ export const PANEL_TEMPLATES: readonly PanelTemplate[] = [
     label: 'Motor control centre (MCC)',
     description: 'A fleet of motors on DOL, star-delta, VFD and reversing starters.',
     build: motorControlCentre,
+  },
+  {
+    id: 'elevator',
+    label: 'Elevator / lift machine room',
+    description: 'VFD hoist motor (heavy duty) with car/shaft/pit lighting, socket and ventilation.',
+    build: elevatorPanel,
   },
 ];
 

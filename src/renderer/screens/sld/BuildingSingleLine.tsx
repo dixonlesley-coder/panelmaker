@@ -1249,7 +1249,10 @@ function buildUnified(
         bus: busDevicesFor(id),
         ...(supply ? { supply } : {}),
         feederIds: ways.filter((wy) => wy.feeds).map((wy) => wy.id),
-        ...(panel.sourceType === 'utility' && id !== rootId ? { unfed: true } : {}),
+        // "Fed" means a REAL parent feeder exists — a template-stamped panel
+        // arrives with sourceType 'feeder' but no parent, and must read as
+        // not-connected until it's actually wired under one.
+        ...(id !== rootId && !parentOf.has(id) ? { unfed: true } : {}),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
         onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
