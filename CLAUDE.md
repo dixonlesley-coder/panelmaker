@@ -309,6 +309,34 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   `essential-no-backup`, `pv-exceeds-service` (PLN rooftop cap vs daya tersambung). Also fixed:
   `circuits.cable_type` column (cableType silently vanished on desktop save/load). Suite at 454.
 
+### Phases, life-safety, three-tier backup, dual transformer (same branch, latest)
+
+- **Motor phase fix + explicit phases:** `circuitIsThreePhase` no longer forces 3φ just because a
+  starter exists (a 1-ph motor has a DOL contactor too); `CircuitInput.phases (1|3)` overrides the
+  size-based inference for ANY load kind (editor "Supply phase" select; `circuits.phases` column;
+  carried through `FloatingLoad`). Palette: Pump (1φ)/(3φ), Custom load (1φ)/(3φ) replace the old
+  single cards; warning `single-phase-large-motor` (> ~4 kW forced 1φ).
+- **Life-safety circuits (`CircuitInput.lifeSafety`, `circuits.life_safety`):** no RCD even on TT
+  (availability prevails — the old behavior put an RCD on a fire pump), default **FRC** cable (new
+  CableType + generic FRC catalog ladder), warnings `life-safety-cable` (explicit non-FRC),
+  `life-safety-no-backup`, `life-safety-not-backed` (outside the essential bus),
+  `life-safety-manual-transfer`. Palette: **Fire pump** card; also **Industrial socket (3φ)**.
+- **Three-tier backup:** `PanelInput.upsBacked` (`panels.ups_backed`) = the **critical/UPS tier**:
+  battery sizes from the marked panels' actual demand (mirrors `essential`→genset; the shared
+  topmost-flagged-demand helper is generalised), one-line draws a **UPS/critical bus** charged from
+  the essential bus, warning `critical-no-battery`. Generator gains `transfer: 'ats'|'manual'`
+  (COS — one-line + service-head badge + interlock notes adapt).
+- **Tenant sub-metering:** `PanelInput.submeter` (`panels.submeter`) → `submeterFor(demandA)`
+  picks direct vs CT (`PanelResult.submeter`), kWh/CT badge on the card, meter + 3 CTs in the BOM.
+- **Secondary SPDs:** sub-boards > `SECONDARY_SPD_DISTANCE_M` (10 m) of feeder from the origin get
+  a Type 2 recommendation (`PanelResult.spd`) drawn on their canvas bus.
+- **Dual transformer (`ProjectMeta.dualTransformer`, Switch on the supply card):** forces MV (even
+  < 200 kVA) with **2× half-demand transformers** on split bus sections behind a **normally-open
+  coupler** (one-line draws T1/T2 + `il-coupler` interlock; fault study correctly uses ONE unit).
+- **Canvas clipboard:** Shift-click/Shift-drag select; **Ctrl+C/Ctrl+V** copies panels (template
+  machinery: fresh ids, feeders stripped, unique "(copy)" names, one undo step), way circuits and
+  floating loads, pasted offset. Suite at 474.
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are
