@@ -89,10 +89,10 @@ describe('essential (genset-backed) panels', () => {
 
   it('genset motor-start assessment covers only the essential subtree', () => {
     const r = computeSystem(hybridProject({ essential: true, sources: GEN }));
-    const motors = r.sources?.gensetStart?.worst;
-    // The fire pump (essential) is assessed; nothing from the non-essential MDP is.
+    // The fire pump (essential) is the limiting motor; nothing from the
+    // non-essential MDP is assessed (it never runs on the genset).
     expect(r.sources?.gensetStart).toBeDefined();
-    expect(JSON.stringify(motors ?? r.sources?.gensetStart)).toContain('Fire pump');
+    expect(r.sources?.gensetStart?.limitingMotorName).toBe('Fire pump');
   });
 
   it('warns when essential panels exist but no backup source does', () => {
