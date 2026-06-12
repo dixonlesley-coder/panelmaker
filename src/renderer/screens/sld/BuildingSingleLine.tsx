@@ -161,7 +161,10 @@ const LOAD_NODE_H = 74; // approx external load-node height (for layout clearanc
 // `layout().height` only covers the SVG, so loads must clear schematic + chrome
 // or they land inside the card once it expands on zoom-in.
 const PANEL_CHROME = 64;
-const LOAD_DROP_GAP = 40; // panel (expanded) bottom → its external load nodes (room for cable labels)
+// Panel (expanded) bottom → its external load nodes. Tall enough that the drop-
+// cable label sits clear of BOTH the feeder-outlet dot at the panel bottom and
+// the load node below it.
+const LOAD_DROP_GAP = 64;
 const GRID_SRC_W = 158; // utility-supply (grid) node, drawn above a utility panel
 const GRID_SRC_H = 54;
 /** Layout grid: panels + loads snap to it so wiring stays legible. */
@@ -1573,7 +1576,10 @@ function buildUnified(
             util: wy.util,
             panelId: id,
             circuitId: wy.id,
-            offset: i % 2 === 0 ? -10 : 10,
+            // Bias the label DOWN into the lower-middle of the drop (away from
+            // the feeder-outlet dot at the panel bottom), alternating the two
+            // heights so neighbouring drops never share a line.
+            offset: i % 2 === 0 ? 6 : 22,
           },
         });
       });
@@ -1674,6 +1680,36 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // click a panel → its full toolset in a side inspector (no screen change).
   const [editing, setEditing] = useState<{ panelId: string; circuitId: string; focus: 'device' | 'cable' } | null>(null);
   const [inspectPanelId, setInspectPanelId] = useState<string | null>(null);
+  // Draggable palette width (persisted) — long card names ("Industrial socket
+  // (3φ)") were clipped at the fixed 140 px; the user sets the width they want.
+  const [paletteW, setPaletteW] = useState<number>(() => {
+    const saved = typeof localStorage !== 'undefined' ? Number(localStorage.getItem('pm:paletteW')) : NaN;
+    return Number.isFinite(saved) && saved >= 120 ? Math.min(saved, 360) : 150;
+  });
+  const startPaletteResize = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = paletteW;
+      const onMove = (ev: PointerEvent) => {
+        const w = Math.max(120, Math.min(360, startW + (ev.clientX - startX)));
+        setPaletteW(w);
+      };
+      const onUp = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        const w = Math.max(120, Math.min(360, startW + (ev.clientX - startX)));
+        try {
+          localStorage.setItem('pm:paletteW', String(Math.round(w)));
+        } catch {
+          /* storage unavailable — width still applies for the session */
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [paletteW],
+  );
   // Right-click → replacement-parts menu anchored at the cursor.
   const [ctx, setCtx] = useState<{ panelId: string; circuitId: string; x: number; y: number } | null>(null);
   // Right-click a feeder edge → disconnect / edit menu at the cursor.
@@ -2128,8 +2164,23 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
 
   return (
     <Group align="stretch" gap="sm" wrap="nowrap" h="clamp(560px, calc(100vh - 220px), 880px)">
-      {/* Palette — drag a card onto a panel to add it there */}
-      <Card withBorder radius="md" padding="xs" w={140} style={{ flexShrink: 0, overflowY: 'auto' }}>
+      {/* Palette — drag a card onto a panel to add it there. The right-edge
+          handle resizes it (long card names were clipped at a fixed width). */}
+      <Box style={{ position: 'relative', flexShrink: 0, width: paletteW }}>
+        <Box
+          onPointerDown={startPaletteResize}
+          title={t('system.paletteResize')}
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: -3,
+            width: 8,
+            height: '100%',
+            cursor: 'col-resize',
+            zIndex: 5,
+          }}
+        />
+      <Card withBorder radius="md" padding="xs" h="100%" style={{ overflowY: 'auto' }}>
         <Group gap={4} mb={6} wrap="nowrap">
           <IconHandMove size={13} color="var(--mantine-color-dimmed)" />
           <Text size="xs" c="dimmed" fw={600}>
@@ -2190,6 +2241,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           ))}
         </Stack>
       </Card>
+      </Box>
 
       <Box
         style={{ flex: 1, minWidth: 0 }}

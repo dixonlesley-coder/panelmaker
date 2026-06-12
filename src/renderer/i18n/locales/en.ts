@@ -652,6 +652,7 @@ export const en = {
     exportAllDoneWeb_other: 'Downloaded {{count}} deliverables — the system PDF needs the desktop app.',
     exportAllCancelled: 'Export cancelled.',
     panelAddedUnfed: "Panel added — not fed yet. Drag another panel's round outlet onto it to feed it.",
+    paletteResize: 'Drag to resize the palette',
     dualTransformer: 'Dual transformer (split bus + N.O. coupler)',
     myTemplates: 'My templates',
     templateMeta_one: '{{count}} circuit · from {{panel}}',
