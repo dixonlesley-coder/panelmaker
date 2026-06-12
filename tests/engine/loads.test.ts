@@ -110,6 +110,26 @@ describe('grounding / PE conductor sizing (IEC 60364-5-54)', () => {
     const withN = sizeGrounding({ phaseCsaMm2: 16, panelSystem: '3ph', threePhase: true, hasNeutral: true });
     expect(withN.cores).toBe(5); // 3L + N + PE
   });
+
+  it('shows the PE as the Nth core, not an extra conductor (no double-count)', () => {
+    // 3L+N at 50, reduced PE at 25 → "4×50 + 25 mm²", NOT "5×50 (+ 25 PE)".
+    const feeder = sizeGrounding({ phaseCsaMm2: 50, panelSystem: '3ph', threePhase: true });
+    expect(feeder.cableSpec).toBe('NYY 4×50 + 25 mm²');
+    expect(feeder.cableSpec).not.toContain('5×50');
+    expect(feeder.cableSpec).not.toContain('(+'); // PE is a grouped core, not an add-on
+
+    // Motor (no neutral): 3L at 50 + PE 25.
+    const motor = sizeGrounding({ phaseCsaMm2: 50, panelSystem: '3ph', threePhase: true, hasNeutral: false });
+    expect(motor.cableSpec).toBe('NYY 3×50 + 25 mm²');
+
+    // Small cable where PE = phase: all cores equal, single group ("3×2.5").
+    const socket = sizeGrounding({ phaseCsaMm2: 2.5, panelSystem: '3ph', threePhase: false });
+    expect(socket.cableSpec).toBe('NYM 3×2.5 mm²');
+
+    // Parallel runs keep the per-run make-up, prefixed with the run count.
+    const parallel = sizeGrounding({ phaseCsaMm2: 240, panelSystem: '3ph', threePhase: true, runsPerPhase: 2 });
+    expect(parallel.cableSpec).toBe('2× NYY 4×240 + 120 mm²');
+  });
 });
 
 describe('computePanel integration: phase balance + grounding', () => {

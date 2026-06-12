@@ -37,12 +37,30 @@ export function sizeGrounding(i: GroundingInput): GroundingResult {
   const neutral = hasNeutral ? neutralConductorSize(i.phaseCsaMm2, i.reducedNeutral) : 0;
 
   const liveCores = i.threePhase ? 3 : 1;
-  const cores = liveCores + (hasNeutral ? 1 : 0) + 1; // + PE
+  const cores = liveCores + (hasNeutral ? 1 : 0) + 1; // total conductors, incl. PE
   const type = i.cableType ?? (i.threePhase ? 'NYY' : 'NYM');
+
+  // Build the make-up from the ACTUAL conductor sizes: the live + neutral cores
+  // at their sizes, the PE at its (usually reduced) size — then group equal
+  // adjacent sizes. The PE is the Nth core, NOT an extra conductor on top, so a
+  // 3L+N+PE run with a reduced PE reads "4×50 + 25 mm²" (3 phases + neutral at
+  // 50, separate 25 mm² earth), not the old, double-counted "5×50 (+ 25 PE)".
+  const conductors: number[] = [
+    ...Array<number>(liveCores).fill(i.phaseCsaMm2),
+    ...(hasNeutral ? [neutral] : []),
+    pe,
+  ];
+  const groups: { size: number; n: number }[] = [];
+  for (const size of conductors) {
+    const last = groups[groups.length - 1];
+    if (last && last.size === size) last.n += 1;
+    else groups.push({ size, n: 1 });
+  }
+  const makeup = groups.map((g) => (g.n > 1 ? `${g.n}×${g.size}` : `${g.size}`)).join(' + ');
 
   const runs = i.runsPerPhase ?? 1;
   const prefix = runs > 1 ? `${runs}× ` : '';
-  const cableSpec = `${prefix}${type} ${cores}×${i.phaseCsaMm2} mm² (+ ${pe} mm² PE)`;
+  const cableSpec = `${prefix}${type} ${makeup} mm²`;
 
   return { peCsaMm2: pe, neutralCsaMm2: neutral, cores, cableSpec, cableType: type };
 }

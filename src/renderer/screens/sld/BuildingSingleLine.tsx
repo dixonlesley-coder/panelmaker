@@ -1049,6 +1049,9 @@ interface LoadNodeData {
   threePhase: boolean;
   warn: boolean;
   orderCode?: string;
+  /** Owning panel + this load's circuit id — so Delete removes the circuit. */
+  panelId: string;
+  circuitId: string;
   onEdit?: () => void;
   onContext?: (x: number, y: number) => void;
   [key: string]: unknown;
@@ -1526,9 +1529,10 @@ function buildUnified(
           // Clear the FULL expanded card (schematic + header/padding), not just the
           // SVG, so the load never lands inside the panel when it expands on zoom-in.
           position: { x: wayCx - LOAD_W / 2, y: panelH + PANEL_CHROME + LOAD_DROP_GAP },
-          deletable: false,
-          // Glued under its MCB and moved by the panel; dragging it itself would
-          // only reset on the next recompute, so it isn't independently draggable.
+          // Selectable + deletable: Delete (or box-select + Delete) removes the
+          // way's circuit. Glued under its MCB and moved by the panel; dragging
+          // it itself would only reset on the next recompute, so not draggable.
+          deletable: true,
           draggable: false,
           data: {
             kind: wy.kind,
@@ -1539,6 +1543,8 @@ function buildUnified(
             phase: wy.phase,
             threePhase: panel.system === '3ph',
             warn: wy.warn,
+            panelId: id,
+            circuitId: wy.id,
             ...(wy.orderCode ? { orderCode: wy.orderCode } : {}),
             onEdit: () => onEditCircuit(id, wy.id),
             onContext: (mx: number, my: number) => onContextCircuit(id, wy.id, mx, my),
@@ -2255,6 +2261,13 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               for (const n of dn) {
                 if (n.type === 'floatLoad') removeFloatingLoad(n.id.replace(/^float-/, ''));
                 else if (n.type === 'uPanel') removePanel(n.id);
+                else if (n.type === 'load') {
+                  // A way's load node → remove its circuit. Skip when the load's
+                  // own panel is also being deleted (removePanel handles it).
+                  const pid = n.data?.panelId as string | undefined;
+                  const cid = n.data?.circuitId as string | undefined;
+                  if (pid && cid && !removed.has(pid)) removeCircuit(pid, cid);
+                }
               }
             }}
             onEdgeContextMenu={(e, edge) => {
