@@ -33,6 +33,7 @@ import {
   IconCircuitSwitchOpen,
   IconDroplet,
   IconEngine,
+  IconFireHydrant,
   IconFlame,
   IconHandMove,
   IconPlug,
@@ -95,7 +96,11 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   // Pumps split by supply phase: a small 1-ph booster vs a 3-ph transfer pump.
   { key: 'pump1', labelKey: 'vbuilder.pump1ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump1ph', { loadW: 0, motorKw: 0.75, starterType: 'DOL', phases: 1 }) },
   { key: 'pump3', labelKey: 'vbuilder.pump3ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump3ph', { loadW: 0, motorKw: 4, starterType: 'DOL', phases: 3 }) },
+  // Life-safety: fire pump — no RCD, FRC cable, must ride the essential bus.
+  { key: 'firepump', labelKey: 'vbuilder.firePump', icon: <IconFireHydrant size={14} />, action: loadCard('pump', 'vbuilder.firePump', { loadW: 0, motorKw: 15, starterType: 'DOL', startingDuty: 'heavy', lifeSafety: true }) },
   { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
+  // Industrial CEE-form 3φ socket: the 30 mA socket RCD rule still applies.
+  { key: 'socket3', labelKey: 'vbuilder.socket3ph', icon: <IconPlugConnected size={14} />, action: loadCard('socket', 'vbuilder.socket3ph', { loadW: 7500, phases: 3 }) },
   // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
   { key: 'ups', labelKey: 'vbuilder.ups', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
   // Custom/general loads with the phase stated outright — for the odd equipment
@@ -1621,6 +1626,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         ...(action.defaults.motorKw !== undefined ? { motorKw: action.defaults.motorKw } : {}),
         ...(action.defaults.starterType !== undefined ? { starterType: action.defaults.starterType } : {}),
         ...(action.defaults.phases !== undefined ? { phases: action.defaults.phases } : {}),
+        ...(action.defaults.lifeSafety === true ? { lifeSafety: true } : {}),
         position: { x: p.x - (LOAD_W + 8) / 2, y: p.y - 16 },
       });
       notifications.show({ message: t('system.loadDropped'), color: 'teal' });

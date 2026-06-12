@@ -65,6 +65,14 @@ export interface CircuitInput {
   /** Socket-outlet rows on a socket circuit. */
   sockets?: SocketOutlet[];
 
+  /**
+   * Life-safety circuit (fire pump, smoke-control fan, emergency lighting,
+   * fire-service lift). Availability prevails over protection: no RCD (an
+   * earth-fault trip must not stop a fire pump), fire-resistant cable (FRC)
+   * by default, and warnings when it isn't backed by the essential bus.
+   */
+  lifeSafety?: boolean;
+
   /** Manual minimum cable section (mm^2), e.g. from applying a suggested fix. */
   cableOverrideMm2?: number;
   /**

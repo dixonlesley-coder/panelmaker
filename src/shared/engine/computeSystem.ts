@@ -178,6 +178,31 @@ export function computeSystem(project: ProjectInput): SystemResult {
     });
   }
 
+  // Life-safety circuits must remain supplied on mains failure: they need a
+  // backup source, and (when an essential bus exists) they must be ON it.
+  const lifeSafetyPanels = project.panels.filter((p) =>
+    p.circuits.some((c) => c.lifeSafety === true),
+  );
+  if (lifeSafetyPanels.length > 0 && !project.sources?.generator?.enabled) {
+    warnings.push({
+      code: 'life-safety-no-backup',
+      severity: 'warning',
+      message: `Life-safety circuits exist (fire pump / emergency lighting) but no generator is enabled — they would die with the mains. Enable a genset (and mark their panels essential).`,
+    });
+  }
+  if (essential.panelCount > 0) {
+    for (const p of lifeSafetyPanels) {
+      if (p.essential === true || hasEssentialAncestor(p.id)) continue;
+      const names = p.circuits.filter((c) => c.lifeSafety === true).map((c) => c.name).join(', ');
+      warnings.push({
+        code: 'life-safety-not-backed',
+        severity: 'warning',
+        message: `${p.name}: life-safety circuit(s) ${names} sit outside the essential bus — the ATS will drop them on mains failure. Mark this panel essential or move the circuits.`,
+        panelId: p.id,
+      });
+    }
+  }
+
   // Prospective fault at the origin (main LV bus) and the source impedance behind
   // it. Each panel's bus fault decays down its feeder run from its parent's bus.
   const originFaultA = mainBusFaultA(supply);

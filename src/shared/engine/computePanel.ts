@@ -164,28 +164,43 @@ function computeCircuit(
     threePhase,
     hasNeutral,
     runsPerPhase,
-    // Cable family: an explicit per-circuit choice wins; otherwise Cu/PVC keeps
-    // the NYY (3ph) / NYM (1ph) defaults, XLPE is N2XY, and aluminum maps to
-    // NAYY (PVC) / NA2XY (XLPE).
+    // Cable family: an explicit per-circuit choice wins; a life-safety circuit
+    // defaults to fire-resistant cable (FRC); otherwise Cu/PVC keeps the NYY
+    // (3ph) / NYM (1ph) defaults, XLPE is N2XY, aluminum NAYY / NA2XY.
     ...(c.cableType
       ? { cableType: c.cableType }
-      : material === 'Al'
-        ? { cableType: (insulation === 'XLPE' ? 'NA2XY' : 'NAYY') as CableType }
-        : insulation === 'XLPE'
-          ? { cableType: 'N2XY' as CableType }
-          : {}),
+      : c.lifeSafety
+        ? { cableType: 'FRC' as CableType }
+        : material === 'Al'
+          ? { cableType: (insulation === 'XLPE' ? 'NA2XY' : 'NAYY') as CableType }
+          : insulation === 'XLPE'
+            ? { cableType: 'N2XY' as CableType }
+            : {}),
   });
   const rcd = circuitRcd({
     earthingSystem: opts.earthingSystem ?? 'TN-C-S',
     loadKind: c.loadKind,
     isFinalCircuit: !isFeeder,
     designCurrentA,
+    ...(c.lifeSafety ? { lifeSafety: true } : {}),
   });
 
   let modules = threePhase ? 3 : 1; // branch breaker poles
   let heatW = 0;
   let floorGear = false;
   const warnings: Warning[] = [];
+
+  // A life-safety run must survive a fire: an explicit non-fire-rated
+  // construction on it is a specification error worth flagging.
+  if (c.lifeSafety && c.cableType !== undefined && c.cableType !== 'FRC') {
+    warnings.push({
+      code: 'life-safety-cable',
+      severity: 'warning',
+      message: `${c.name}: life-safety circuit specified with ${c.cableType} — use fire-resistant cable (FRC/MICA) so the run survives a fire.`,
+      panelId: panel.id,
+      circuitId: c.id,
+    });
+  }
 
   // A single-phase motor above ~4 kW is impractical (the 1-ph standard data
   // tops out near 3.7 kW); flag a forced 1-phase motor that large.
@@ -228,6 +243,7 @@ function computeCircuit(
     circuitId: c.id,
     name: c.name,
     loadKind: c.loadKind,
+    ...(c.lifeSafety ? { lifeSafety: true } : {}),
     designCurrentA,
     phase: threePhase ? '3ph' : 'L1', // single-phase assignment finalised after balancing
     breaker,

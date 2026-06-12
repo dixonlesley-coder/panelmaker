@@ -84,12 +84,24 @@ export interface CircuitRcdInput {
   loadKind: LoadKind;
   isFinalCircuit: boolean;
   designCurrentA: number;
+  /** Life-safety circuit (fire pump etc.) — availability prevails, no RCD. */
+  lifeSafety?: boolean;
 }
 
 /** Decide whether a circuit needs an RCD and at what sensitivity. */
 export function circuitRcd(i: CircuitRcdInput): RcdSpec {
   // A spare way has no load and no cable run — nothing for an RCD to protect.
   if (i.loadKind === 'spare') return { required: false, ratingMa: 0, reason: '' };
+  // Life-safety: an earth-fault trip must not stop a fire pump mid-fire —
+  // availability prevails over additional protection (fault protection is by
+  // the overcurrent device / earthing design instead).
+  if (i.lifeSafety) {
+    return {
+      required: false,
+      ratingMa: 0,
+      reason: 'Life-safety circuit — RCD deliberately omitted (availability prevails).',
+    };
+  }
   if (i.earthingSystem === 'TT' && i.isFinalCircuit) {
     return {
       required: true,

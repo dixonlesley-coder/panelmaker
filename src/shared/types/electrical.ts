@@ -2,7 +2,7 @@
 
 export type SystemType = '1ph' | '3ph';
 
-export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF' | 'N2XY' | 'NAYY' | 'NA2XY';
+export type CableType = 'NYA' | 'NYM' | 'NYY' | 'NYAF' | 'N2XY' | 'NAYY' | 'NA2XY' | 'FRC';
 
 /**
  * Conductor insulation family: PVC (70 °C — NYM/NYY) or XLPE (90 °C — N2XY).

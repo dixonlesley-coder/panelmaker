@@ -378,6 +378,16 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
           </Text>
         )}
 
+        {!isFeederCircuit && circuit.loadKind !== 'spare' && (
+          <Switch
+            label={t('circuitEditor.lifeSafety')}
+            description={t('circuitEditor.lifeSafetyHint')}
+            color="red"
+            checked={circuit.lifeSafety === true}
+            onChange={(e) => patch({ lifeSafety: e.currentTarget.checked ? true : undefined })}
+          />
+        )}
+
         <Divider label={t('circuitEditor.busbarSection')} />
         <Switch
           label={t('circuitEditor.busbarBreak')}

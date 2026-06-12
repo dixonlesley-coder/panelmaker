@@ -119,6 +119,8 @@ export interface CircuitResult {
   name: string;
   /** The input circuit's load kind — lets schedules/BOM treat spares/feeders specially. */
   loadKind: LoadKind;
+  /** Life-safety circuit (fire pump / emergency lighting): no RCD, FRC cable. */
+  lifeSafety?: boolean;
   designCurrentA: number;
   /** 1-phase circuits report their assigned phase; 3-phase report '3ph'. */
   phase: PhaseAssignment;

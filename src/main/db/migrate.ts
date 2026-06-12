@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   sensing TEXT,
   cable_override_mm2 REAL,
   cable_type TEXT,
+  life_safety INTEGER,
   breaker_override_a REAL,
   busbar_break_before INTEGER,
   phase_override TEXT,
@@ -234,6 +235,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'panels', column: 'essential', ddl: 'ALTER TABLE panels ADD COLUMN essential INTEGER' },
   // Explicit supply phase count (1 or 3) for a circuit.
   { table: 'circuits', column: 'phases', ddl: 'ALTER TABLE circuits ADD COLUMN phases INTEGER' },
+  // Life-safety circuit flag (fire pump / emergency lighting).
+  { table: 'circuits', column: 'life_safety', ddl: 'ALTER TABLE circuits ADD COLUMN life_safety INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

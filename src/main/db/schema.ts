@@ -136,6 +136,8 @@ export const circuits = sqliteTable('circuits', {
   cableOverrideMm2: real('cable_override_mm2'),
   /** Explicit cable construction (NYY/NYM/NYA/NYAF…); null = panel default. */
   cableType: text('cable_type'),
+  /** Life-safety circuit (fire pump etc.): no RCD, FRC cable. */
+  lifeSafety: integer('life_safety', { mode: 'boolean' }),
   /** Manual breaker rating override (A). */
   breakerOverrideA: real('breaker_override_a'),
   /** Force a new busbar section to start at this circuit (manual bus break). */
