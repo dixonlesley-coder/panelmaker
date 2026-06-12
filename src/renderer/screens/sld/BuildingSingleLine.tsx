@@ -186,6 +186,8 @@ interface SupplyHead {
   transformer?: string; // "630 kVA"
   generator?: boolean;
   ats?: boolean;
+  /** Transfer arrangement: automatic (ATS) or manual changeover (COS). */
+  transfer?: 'ats' | 'manual';
   meter?: string; // "kWh" or "CT 300/5"
   solar?: string; // "PV 40 kWp"
   battery?: string; // "Batt 20 kWh"
@@ -235,6 +237,8 @@ interface UnifiedPanelData {
   essential?: boolean;
   /** UPS-backed (critical) panel — shown as a chip on the card. */
   critical?: boolean;
+  /** Tenant kWh sub-meter label ("kWh" or "CT 150/5"), when fitted. */
+  submeter?: string;
   feederIds: string[];
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
@@ -822,6 +826,11 @@ function UnifiedPanelNode({ data }: NodeProps) {
               {t('sldNode.critical')}
             </Badge>
           )}
+          {d.submeter && (
+            <Badge size="xs" variant="light" color="cyan" title={t('sldNode.submeterHint')}>
+              {d.submeter}
+            </Badge>
+          )}
           <Badge
             size="xs"
             variant="light"
@@ -1003,6 +1012,7 @@ interface GridSourceData {
   transformer?: string; // "630 kVA" — shown when fed at MV
   meter?: string; // "kWh" or "CT 300/5"
   generator?: boolean;
+  transfer?: 'ats' | 'manual';
   solar?: string; // "PV 40 kWp"
   battery?: string; // "Batt 20 kWh"
   [key: string]: unknown;
@@ -1047,7 +1057,7 @@ function GridSourceNode({ data }: NodeProps) {
           )}
           {d.generator && (
             <Badge size="xs" variant="light" color="orange">
-              ATS
+              {d.transfer === 'manual' ? 'COS' : 'ATS'}
             </Badge>
           )}
           {d.solar && (
@@ -1171,12 +1181,17 @@ function buildUnified(
   const rootId = serviceRootId(project, system);
   const threePh = (id: string) => byId.get(id)?.system === '3ph';
   const busDevicesFor = (id: string): BusDevice[] => {
-    if (id !== rootId) return [];
     const out: BusDevice[] = [];
-    if (system.spd?.recommended) out.push({ kind: 'spd', label: system.spd.type, threePhase: threePh(id) });
-    if (system.powerFactor.needed && system.powerFactor.bankKvar > 0) {
-      out.push({ kind: 'cap', label: `${system.powerFactor.bankKvar} kvar`, threePhase: threePh(id) });
+    if (id === rootId) {
+      if (system.spd?.recommended) out.push({ kind: 'spd', label: system.spd.type, threePhase: threePh(id) });
+      if (system.powerFactor.needed && system.powerFactor.bankKvar > 0) {
+        out.push({ kind: 'cap', label: `${system.powerFactor.bankKvar} kvar`, threePhase: threePh(id) });
+      }
+      return out;
     }
+    // Secondary SPD at a sub-board far from the origin (engine recommendation).
+    const sub = system.panels[id]?.spd;
+    if (sub?.recommended) out.push({ kind: 'spd', label: sub.type, threePhase: threePh(id) });
     return out;
   };
   const supplyFor = (id: string): SupplyHead | undefined => {
@@ -1186,6 +1201,7 @@ function buildUnified(
     if (system.sources?.generator) {
       head.generator = true;
       head.ats = true;
+      head.transfer = system.sources.generator.transfer;
     }
     // Solar / battery hang off the main bus too — show them at the service
     // head so an enabled source is visible right where it was dropped.
@@ -1280,6 +1296,9 @@ function buildUnified(
         ...(id !== rootId && !parentOf.has(id) ? { unfed: true } : {}),
         ...(panel.essential === true ? { essential: true } : {}),
         ...(panel.upsBacked === true ? { critical: true } : {}),
+        ...(res.submeter
+          ? { submeter: res.submeter.metering === 'ct' ? `CT ${res.submeter.ctRatio}` : 'kWh' }
+          : {}),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
         onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
@@ -1313,6 +1332,7 @@ function buildUnified(
             ...(data.supply?.transformer ? { transformer: data.supply.transformer } : {}),
             ...(data.supply?.meter ? { meter: data.supply.meter } : {}),
             ...(data.supply?.generator ? { generator: true } : {}),
+            ...(data.supply?.transfer ? { transfer: data.supply.transfer } : {}),
             ...(data.supply?.solar ? { solar: data.supply.solar } : {}),
             ...(data.supply?.battery ? { battery: data.supply.battery } : {}),
           } satisfies GridSourceData,
@@ -2142,6 +2162,21 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             }}
           >
             {t(ctxPanel?.upsBacked ? 'sldMenu.unmarkCritical' : 'sldMenu.markCritical')}
+          </Menu.Item>
+          <Menu.Item
+            onClick={() => {
+              const panelId = nodeCtx?.panelId;
+              const was = ctxPanel?.submeter === true;
+              setNodeCtx(null);
+              if (!panelId) return;
+              updatePanel(panelId, { submeter: was ? undefined : true });
+              notifications.show({
+                message: t(was ? 'sldMenu.submeterOff' : 'sldMenu.submeterOn'),
+                color: was ? 'gray' : 'teal',
+              });
+            }}
+          >
+            {t(ctxPanel?.submeter ? 'sldMenu.removeSubmeter' : 'sldMenu.addSubmeter')}
           </Menu.Item>
           {ctxPanel?.system === '3ph' && (
             <Menu.Item

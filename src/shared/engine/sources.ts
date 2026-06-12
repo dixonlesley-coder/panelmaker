@@ -50,14 +50,20 @@ export function sizeGenerator(
   const required = cfg.mode === 'prime' ? backupKva * 1.25 : backupKva;
   const ratingKva = selectGeneratorKva(required);
   const duty = cfg.mode === 'prime' ? 'Prime (continuous)' : 'Standby';
+  const transfer = cfg.transfer ?? 'ats';
+  const transferText =
+    transfer === 'manual'
+      ? 'Manual changeover (COS) — an operator must transfer; expect an outage until switched.'
+      : 'Transfers automatically on mains failure via ATS.';
   return {
     ratingKva,
     backupKva: round(backupKva, 1),
     mode: cfg.mode,
     ...(useEssential ? { essentialPanelCount: essential.panelCount } : {}),
+    transfer,
     note: useEssential
-      ? `${duty} genset backing the ${essential.panelCount} essential panel(s) (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. The ATS transfers the essential bus on mains failure.`
-      : `${duty} genset backing up ${Math.round(cfg.backupFraction * 100)}% of demand (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. Transfers on mains failure via ATS.`,
+      ? `${duty} genset backing the ${essential.panelCount} essential panel(s) (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. ${transferText}`
+      : `${duty} genset backing up ${Math.round(cfg.backupFraction * 100)}% of demand (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. ${transferText}`,
   };
 }
 

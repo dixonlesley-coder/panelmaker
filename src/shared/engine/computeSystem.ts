@@ -9,7 +9,7 @@ import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
 import { computeMetering } from './metering';
-import { recommendSpd } from './spd';
+import { recommendSpd, SECONDARY_SPD_DISTANCE_M } from './spd';
 import {
   type Impedance,
   SELECTIVITY_RATIO,
@@ -209,6 +209,18 @@ export function computeSystem(project: ProjectInput): SystemResult {
       code: 'life-safety-no-backup',
       severity: 'warning',
       message: `Life-safety circuits exist (fire pump / emergency lighting) but no generator is enabled — they would die with the mains. Enable a genset (and mark their panels essential).`,
+    });
+  }
+  if (
+    lifeSafetyPanels.length > 0 &&
+    project.sources?.generator?.enabled &&
+    project.sources.generator.transfer === 'manual'
+  ) {
+    warnings.push({
+      code: 'life-safety-manual-transfer',
+      severity: 'warning',
+      message:
+        'Life-safety circuits are backed through a MANUAL changeover (COS) — the fire pump waits for an operator. Use an automatic transfer switch (ATS).',
     });
   }
   if (essential.panelCount > 0) {
@@ -432,6 +444,32 @@ export function computeSystem(project: ProjectInput): SystemResult {
   );
   // PF correction sized to the project's target (meta override or 0.95). When
   // any panel reports non-trivial harmonics, the bank must be detuned.
+  // Secondary SPDs: a sub-board far from the origin (> ~10 m of feeder) sits
+  // outside the origin SPD's protective distance — recommend a Type 2 there
+  // (IEC 61643-12 oscillation/distance rule).
+  {
+    const cumFeederM = new Map<string, number>();
+    for (const id of [...postOrder].reverse()) {
+      const parentId = parentOf.get(id);
+      if (parentId === undefined) {
+        cumFeederM.set(id, 0);
+        continue;
+      }
+      const feeder = byId.get(parentId)?.circuits.find((c) => c.feedsPanelId === id);
+      const dist = (cumFeederM.get(parentId) ?? 0) + (feeder?.lengthM ?? 0);
+      cumFeederM.set(id, dist);
+      const pr = results[id];
+      if (pr && dist > SECONDARY_SPD_DISTANCE_M) {
+        pr.spd = recommendSpd({
+          earthingSystem,
+          hasExternalLps: project.site?.externalLps ?? false,
+          overheadSupply: project.site?.overheadSupply ?? false,
+          atOrigin: false,
+        });
+      }
+    }
+  }
+
   const harmonicRich = Object.values(results).some(
     (pr) => pr.harmonics !== undefined && pr.harmonics.thdBand !== 'low',
   );

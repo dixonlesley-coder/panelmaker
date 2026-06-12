@@ -48,9 +48,14 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
   const essentialCount = gen?.essentialPanelCount ?? 0;
   // Where backed loads (battery inverter) connect: the essential bus when split.
   let backedBus = 'bus';
+  const manualTransfer = gen?.transfer === 'manual';
   if (gen) {
     nodes.push({ id: 'gen', kind: 'generator', label: 'Generator', sub: `${gen.ratingKva} kVA ${gen.mode}` });
-    nodes.push({ id: 'ats', kind: 'ats', label: 'ATS', sub: 'transfer switch' });
+    nodes.push(
+      manualTransfer
+        ? { id: 'ats', kind: 'ats', label: 'COS', sub: 'manual changeover' }
+        : { id: 'ats', kind: 'ats', label: 'ATS', sub: 'transfer switch' },
+    );
     if (essentialCount > 0) {
       nodes.push({
         id: 'ess-bus',
@@ -74,7 +79,9 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
       aId: 'utility',
       bId: 'gen',
       relation: 'mutual_exclusion',
-      note: 'Mains and generator must never be paralleled — mechanical interlock at the ATS.',
+      note: manualTransfer
+        ? 'Mains and generator must never be paralleled — the changeover (COS) is break-before-make by construction.'
+        : 'Mains and generator must never be paralleled — mechanical interlock at the ATS.',
     });
     interlocks.push({
       id: 'il-ats-elec',
@@ -82,7 +89,9 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
       aId: 'utility',
       bId: 'gen',
       relation: 'mutual_exclusion',
-      note: 'Cross-wired electrical interlock + break-before-make transfer (mains-failure sensing).',
+      note: manualTransfer
+        ? 'Manual transfer: an operator must start the genset and switch — the backed loads see an outage until then.'
+        : 'Cross-wired electrical interlock + break-before-make transfer (mains-failure sensing).',
     });
   } else {
     edge(utilityOut, 'bus', 'mains');

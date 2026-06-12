@@ -17,6 +17,25 @@ import {
 import type { SystemType } from '../types/electrical';
 import { round } from './util';
 
+/** A tenant/check kWh sub-meter at a distribution board. */
+export interface SubmeterResult {
+  /** Whole-current meter, or CT-operated above the direct limit. */
+  metering: 'direct' | 'ct';
+  /** CT ratio, e.g. "150/5", when CT-operated. */
+  ctRatio?: string;
+}
+
+/**
+ * Select a tenant sub-meter for a panel from its demand current: a direct
+ * (whole-current) kWh meter up to the standard limit, CT-operated above it.
+ */
+export function submeterFor(demandCurrentA: number): SubmeterResult {
+  if (demandCurrentA <= DIRECT_METER_MAX_A) return { metering: 'direct' };
+  const primary =
+    CT_PRIMARY_A.find((p) => p >= demandCurrentA) ?? CT_PRIMARY_A[CT_PRIMARY_A.length - 1]!;
+  return { metering: 'ct', ctRatio: `${primary}/5` };
+}
+
 export interface MeteringResult {
   /** Connected power to subscribe (VA) — the PLN step, or raw demand for MV. */
   serviceVa: number;

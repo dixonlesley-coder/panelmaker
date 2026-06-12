@@ -127,6 +127,30 @@ export function circuitOrderCodes(
 export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
   const lines: BomLine[] = [];
 
+  // Tenant/check kWh sub-meter (+ its CTs when CT-operated).
+  if (panel.submeter) {
+    const meterId = matchFirstOfCategory('panel_meter', parts);
+    lines.push({
+      partId: meterId,
+      sku: skuOf(parts, meterId),
+      description: `kWh sub-meter (${panel.submeter.metering === 'ct' ? `CT ${panel.submeter.ctRatio}` : 'direct'}) — ${panel.name}`,
+      category: 'panel_meter',
+      qty: 1,
+      matched: meterId !== undefined,
+    });
+    if (panel.submeter.metering === 'ct') {
+      const ctId = matchFirstOfCategory('current_transformer', parts);
+      lines.push({
+        partId: ctId,
+        sku: skuOf(parts, ctId),
+        description: `Current transformer ${panel.submeter.ctRatio} — ${panel.name}`,
+        category: 'current_transformer',
+        qty: 3,
+        matched: ctId !== undefined,
+      });
+    }
+  }
+
   for (const circuit of panel.circuits) {
     // Branch breaker — match class/poles/curve, not just rating.
     const breakerPartId = matchBreakerPart(

@@ -12,6 +12,12 @@ export interface GeneratorConfig {
   backupFraction: number;
   /** standby = intermittent (mains failure); prime = continuous duty (needs headroom). */
   mode: GeneratorMode;
+  /**
+   * Transfer arrangement: automatic transfer switch (default) or a manual
+   * changeover (COS) — common on small installs; an operator must switch, so
+   * expect an outage until they do.
+   */
+  transfer?: 'ats' | 'manual';
 }
 
 export interface SolarConfig {
@@ -49,6 +55,8 @@ export interface GeneratorResult {
    * the whole-building demand was used instead.
    */
   essentialPanelCount?: number;
+  /** Transfer arrangement the design assumes (ATS vs manual changeover). */
+  transfer: 'ats' | 'manual';
   note: string;
 }
 

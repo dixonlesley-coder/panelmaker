@@ -143,6 +143,23 @@ export function Sources() {
                   onChange={(v) => setGen({ mode: v as GeneratorMode })}
                 />
               </div>
+              <div>
+                <Text size="sm" fw={500} mb={4}>
+                  {t('sources.transfer')}
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  data={[
+                    { value: 'ats', label: t('sources.transferAts') },
+                    { value: 'manual', label: t('sources.transferManual') },
+                  ]}
+                  value={gen.transfer ?? 'ats'}
+                  onChange={(v) => setGen({ transfer: v as 'ats' | 'manual' })}
+                />
+                <Text size="xs" c="dimmed" mt={4}>
+                  {t('sources.transferHint')}
+                </Text>
+              </div>
             </SimpleGrid>
             {res?.generator && (
               <ResultBlock

@@ -170,6 +170,12 @@ export interface PanelInput {
    * the manual `backupKw`, and the one-line draws a UPS/critical bus.
    */
   upsBacked?: boolean;
+  /**
+   * Tenant/check kWh sub-meter at this board (multi-tenant buildings meter
+   * every tenant DB). The engine picks direct vs CT metering from the panel
+   * demand; the meter (+ CTs) lands in the BOM.
+   */
+  submeter?: boolean;
   circuits: CircuitInput[];
 }
 

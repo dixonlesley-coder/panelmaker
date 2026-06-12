@@ -101,6 +101,8 @@ export const panels = sqliteTable('panels', {
   essential: integer('essential', { mode: 'boolean' }),
   /** UPS-backed (critical) panel — drives battery/UPS backup sizing. */
   upsBacked: integer('ups_backed', { mode: 'boolean' }),
+  /** Tenant/check kWh sub-meter at this board. */
+  submeter: integer('submeter', { mode: 'boolean' }),
 });
 
 export const circuits = sqliteTable('circuits', {

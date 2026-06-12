@@ -9,7 +9,7 @@ import type { SourcesResult } from './sources';
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
 import type { SpdResult } from '../engine/spd';
 import type { ElectrodeResult } from '../engine/electrode';
-import type { MeteringResult } from '../engine/metering';
+import type { MeteringResult, SubmeterResult } from '../engine/metering';
 import type { BusbarWithstandResult } from '../engine/busbarFault';
 import type { EnclosureThermalResult } from '../engine/enclosureThermal';
 import type { FinalCircuitResult } from '../engine/fixtures';
@@ -395,6 +395,10 @@ export interface PanelResult {
   circuits: CircuitResult[];
   /** The panel's incoming device (main breaker), specified to a standard rating. */
   incomer: IncomerResult;
+  /** Tenant/check kWh sub-meter at this board, when requested on the input. */
+  submeter?: SubmeterResult;
+  /** Secondary SPD recommended at this board (long feeder run from the origin). */
+  spd?: SpdResult;
   busbar: BusbarResult;
   /**
    * The panel bus split into capacity-bounded sections (always ≥ 1). With few

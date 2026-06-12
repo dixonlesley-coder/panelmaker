@@ -6,6 +6,7 @@ import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/
 import type { CircuitInput, PanelInput } from '../types/project';
 import type { CableType, SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
+import { submeterFor } from './metering';
 import { applyPumpControl } from './control/pumpControl';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC, motorFLC1ph } from './control/motorFLC';
@@ -581,6 +582,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     ...(panel.tag ? { tag: panel.tag } : {}),
     circuits,
     incomer,
+    ...(panel.submeter === true ? { submeter: submeterFor(totalDemandCurrentA) } : {}),
     busbar,
     busbarSections,
     enclosure,

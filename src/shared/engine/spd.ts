@@ -33,6 +33,13 @@ import {
 } from '../standards/spd';
 import type { EarthingSystem } from '../types/electrical';
 
+/**
+ * Beyond this feeder distance from the origin SPD, protection no longer covers
+ * the sub-board (oscillation doubling, IEC 61643-12) — a secondary Type 2 SPD
+ * is recommended there.
+ */
+export const SECONDARY_SPD_DISTANCE_M = 10;
+
 /** Inputs to {@link recommendSpd}. */
 export interface SpdSelectionInput {
   /** Installation earthing arrangement — drives Uc and the connection mode. */

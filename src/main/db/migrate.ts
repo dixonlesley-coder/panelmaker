@@ -77,7 +77,8 @@ CREATE TABLE IF NOT EXISTS panels (
   source_type TEXT NOT NULL DEFAULT 'utility',
   fed_by_circuit_id TEXT,
   essential INTEGER,
-  ups_backed INTEGER
+  ups_backed INTEGER,
+  submeter INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS circuits (
@@ -240,6 +241,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'life_safety', ddl: 'ALTER TABLE circuits ADD COLUMN life_safety INTEGER' },
   // UPS-backed (critical) panel flag.
   { table: 'panels', column: 'ups_backed', ddl: 'ALTER TABLE panels ADD COLUMN ups_backed INTEGER' },
+  // Tenant kWh sub-meter flag.
+  { table: 'panels', column: 'submeter', ddl: 'ALTER TABLE panels ADD COLUMN submeter INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

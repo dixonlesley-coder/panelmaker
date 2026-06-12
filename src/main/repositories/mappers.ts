@@ -220,6 +220,7 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     fedByCircuitId: undefToNull(p.fedByCircuitId),
     essential: p.essential === true ? true : null,
     upsBacked: p.upsBacked === true ? true : null,
+    submeter: p.submeter === true ? true : null,
   };
 }
 
@@ -248,6 +249,7 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (material !== undefined) p.material = material as PanelInput['material'];
   if (r.essential) p.essential = true;
   if (r.upsBacked) p.upsBacked = true;
+  if (r.submeter) p.submeter = true;
   return p;
 }
 
