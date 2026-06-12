@@ -106,7 +106,7 @@ function freshProjectId(): string {
  * suffixes (`panels.length + 1`) collide after deletions; panel names land on
  * drawings and schedules, so keep them unique by construction.
  */
-function uniquePanelName(panels: PanelInput[], base: string): string {
+function uniquePanelName(panels: { name: string }[], base: string): string {
   const taken = new Set(panels.map((p) => p.name));
   if (!taken.has(base)) return base;
   for (let n = 2; ; n += 1) {
@@ -228,6 +228,17 @@ export interface ProjectState {
   removeUserTemplate: (templateId: string) => void;
   /** Stamp a user template into the project (fresh ids) and select the panel. */
   addPanelFromUserTemplate: (templateId: string) => void;
+  /**
+   * Paste copied panel snapshots (canvas Ctrl+V): fresh panel/circuit ids,
+   * feeder ways and cross-links stripped, unique "(copy)" names — ONE undoable
+   * step. Returns the new panel ids so the canvas can place them.
+   */
+  pastePanels: (snapshots: PanelInput[]) => string[];
+  /**
+   * Paste copied circuits back onto their panels (canvas Ctrl+V): fresh ids,
+   * "(copy)" names, feeder links stripped — one undoable step.
+   */
+  pasteCircuits: (items: { panelId: string; circuit: CircuitInput }[]) => void;
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
@@ -905,6 +916,44 @@ export const useProjectStore = create<ProjectState>((set) => ({
         activeScreen: 'system',
       };
     }),
+
+  pastePanels: (snapshots) => {
+    const ids: string[] = [];
+    set((s) => {
+      const taken = s.project.panels.map((p) => ({ name: p.name }));
+      const newPanels = snapshots.map((snap) => {
+        // The template machinery already does exactly what paste needs: deep
+        // clone, strip feeder ways/links, stamp fresh panel + circuit ids.
+        const panel = instantiateTemplate(createUserTemplate(`${snap.name} (copy)`, snap));
+        panel.name = uniquePanelName(taken, panel.name);
+        taken.push({ name: panel.name });
+        ids.push(panel.id);
+        return panel;
+      });
+      return {
+        ...withHistory(s, (project) => ({ ...project, panels: [...project.panels, ...newPanels] })),
+        ...(ids.length > 0 ? { activePanelId: ids[ids.length - 1]! } : {}),
+      };
+    });
+    return ids;
+  },
+
+  pasteCircuits: (items) =>
+    set((s) =>
+      withHistory(s, (project) => ({
+        ...project,
+        panels: project.panels.map((panel) => {
+          const mine = items.filter((it) => it.panelId === panel.id);
+          if (mine.length === 0) return panel;
+          const copies = mine.map(({ circuit }) => {
+            // Feeder links point at panels the copy doesn't feed — strip them.
+            const { feedsPanelId: _f, ...rest } = circuit;
+            return { ...rest, id: nextId('c'), name: `${circuit.name} (copy)` };
+          });
+          return { ...panel, circuits: [...panel.circuits, ...copies] };
+        }),
+      })),
+    ),
 
   saveAsTemplate: (panelId, label) =>
     set((s) => {

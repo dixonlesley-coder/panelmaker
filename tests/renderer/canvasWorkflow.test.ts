@@ -102,6 +102,44 @@ describe('canvas workflow store behavior', () => {
     expect(hoistRes.control?.devices.some((d) => d.category === 'vfd')).toBe(true);
   });
 
+  it('pastePanels clones with fresh ids, stripped feeders and unique (copy) names', () => {
+    const { addPanel, addSubPanel, pastePanels, undo } = useProjectStore.getState();
+    const rootId = addPanel();
+    addSubPanel(rootId); // gives the root a feeder way
+    const root = useProjectStore.getState().project.panels.find((p) => p.id === rootId)!;
+    const before = useProjectStore.getState().project.panels.length;
+
+    const ids = pastePanels([root, root]); // paste the same panel twice
+    const after = useProjectStore.getState().project.panels;
+    expect(after.length).toBe(before + 2);
+    expect(new Set(ids).size).toBe(2);
+    const copies = after.filter((p) => ids.includes(p.id));
+    // Names disambiguated, feeder ways stripped, standalone roots.
+    expect(new Set(copies.map((p) => p.name)).size).toBe(2);
+    expect(copies.every((p) => p.name.includes('(copy)'))).toBe(true);
+    expect(copies.every((p) => p.circuits.every((c) => c.feedsPanelId === undefined))).toBe(true);
+    expect(copies.every((p) => p.fedByCircuitId === undefined)).toBe(true);
+
+    // ONE undo removes the whole paste.
+    undo();
+    expect(useProjectStore.getState().project.panels.length).toBe(before);
+  });
+
+  it('pasteCircuits appends fresh-id copies and strips feeder links', () => {
+    const { addPanel, pasteCircuits, addSpareWays } = useProjectStore.getState();
+    const panelId = addPanel();
+    addSpareWays(panelId, 1);
+    const src = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits[0]!;
+
+    pasteCircuits([{ panelId, circuit: { ...src, feedsPanelId: 'ghost' } }]);
+    const circuits = useProjectStore.getState().project.panels.find((p) => p.id === panelId)!.circuits;
+    expect(circuits).toHaveLength(2);
+    const copy = circuits[1]!;
+    expect(copy.id).not.toBe(src.id);
+    expect(copy.name).toBe(`${src.name} (copy)`);
+    expect(copy.feedsPanelId).toBeUndefined();
+  });
+
   it('addSubPanel names stay unique after deletions too', () => {
     const { addPanel, addSubPanel, removePanel } = useProjectStore.getState();
     const root = addPanel();

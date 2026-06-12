@@ -42,7 +42,7 @@ import {
   IconSitemap,
   IconSolarPanel,
 } from '@tabler/icons-react';
-import type { CircuitInput, LoadKind, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import type { CircuitInput, LoadKind, PanelInput, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { circuitOrderCodes } from '@shared/engine/bom';
 import { balancePhases, type PhaseCircuit } from '@shared/engine';
 import { partsForBrand } from '@shared/data/catalog';
@@ -1483,6 +1483,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // Where a just-created panel should land (the drop point), consumed once by
   // the node-sync effect — new nodes otherwise get the auto-layout position.
   const pendingPanelPos = useRef(new Map<string, { x: number; y: number }>());
+  const pastePanels = useProjectStore((s) => s.pastePanels);
+  const pasteCircuits = useProjectStore((s) => s.pasteCircuits);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
@@ -1753,6 +1755,90 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     },
     [panelBox, setNodes, moveFloatingLoad, attachFloatingLoad, nodes],
   );
+
+  // Canvas clipboard: Ctrl/Cmd+C snapshots the SELECTED nodes (panels, ways'
+  // loads, floating loads); Ctrl/Cmd+V pastes copies offset from the originals.
+  // Held outside project history so undo never clears what was copied.
+  const canvasClipboard = useRef<{
+    panels: { snapshot: PanelInput; position: { x: number; y: number } }[];
+    circuits: { panelId: string; circuit: CircuitInput }[];
+    floats: FloatingLoad[];
+  } | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'c' && key !== 'v') return;
+      // Never hijack copy/paste from text fields or open editors.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const state = useProjectStore.getState();
+
+      if (key === 'c') {
+        const selected = nodes.filter((n) => n.selected);
+        if (selected.length === 0) return;
+        const panels: { snapshot: PanelInput; position: { x: number; y: number } }[] = [];
+        const circuits: { panelId: string; circuit: CircuitInput }[] = [];
+        const floats: FloatingLoad[] = [];
+        const copiedPanelIds = new Set(
+          selected.filter((n) => n.type === 'uPanel').map((n) => n.id),
+        );
+        for (const n of selected) {
+          if (n.type === 'uPanel') {
+            const p = state.project.panels.find((x) => x.id === n.id);
+            if (p) panels.push({ snapshot: structuredClone(p), position: { ...n.position } });
+          } else if (n.type === 'load') {
+            // A way's load node: copy its circuit — unless its whole panel is
+            // also selected (the panel copy already carries it).
+            const circuitId = n.id.replace(/^load-/, '');
+            const owner = state.project.panels.find((p) =>
+              p.circuits.some((c) => c.id === circuitId),
+            );
+            const circuit = owner?.circuits.find((c) => c.id === circuitId);
+            if (owner && circuit && !copiedPanelIds.has(owner.id)) {
+              circuits.push({ panelId: owner.id, circuit: structuredClone(circuit) });
+            }
+          } else if (n.type === 'floatLoad') {
+            const f = state.floatingLoads.find((x) => `float-${x.id}` === n.id);
+            if (f) floats.push(structuredClone(f));
+          }
+        }
+        if (panels.length === 0 && circuits.length === 0 && floats.length === 0) return;
+        canvasClipboard.current = { panels, circuits, floats };
+        e.preventDefault();
+        notifications.show({
+          message: t('sldClipboard.copied', { count: panels.length + circuits.length + floats.length }),
+          color: 'teal',
+        });
+        return;
+      }
+
+      const clip = canvasClipboard.current;
+      if (!clip) return;
+      e.preventDefault();
+      const OFFSET = GRID * 2;
+      if (clip.panels.length > 0) {
+        const newIds = pastePanels(clip.panels.map((p) => p.snapshot));
+        newIds.forEach((id, i) => {
+          const src = clip.panels[i];
+          if (src) pendingPanelPos.current.set(id, { x: snap(src.position.x + OFFSET), y: snap(src.position.y + OFFSET) });
+        });
+      }
+      if (clip.circuits.length > 0) pasteCircuits(clip.circuits);
+      for (const f of clip.floats) {
+        const { id: _id, position, ...rest } = f;
+        addFloatingLoad({ ...rest, position: { x: position.x + OFFSET, y: position.y + OFFSET } });
+      }
+      notifications.show({
+        message: t('sldClipboard.pasted', {
+          count: clip.panels.length + clip.circuits.length + clip.floats.length,
+        }),
+        color: 'teal',
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [nodes, pastePanels, pasteCircuits, addFloatingLoad, t]);
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
   const editingCircuit = editingPanel?.circuits.find((c) => c.id === editing?.circuitId);

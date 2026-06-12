@@ -5,6 +5,7 @@ import {
   IconBackspace,
   IconBolt,
   IconClick,
+  IconCopy,
   IconDragDrop,
   IconHelp,
   IconPlugConnected,
@@ -26,6 +27,7 @@ const HELP_ITEMS: { icon: React.ReactNode; key: string }[] = [
   { icon: <IconBolt size={14} />, key: 'system.helpLoad' },
   { icon: <IconClick size={14} />, key: 'system.helpCable' },
   { icon: <IconBackspace size={14} />, key: 'system.helpDelete' },
+  { icon: <IconCopy size={14} />, key: 'system.helpCopy' },
   { icon: <IconArrowsLeftRight size={14} />, key: 'system.helpReorder' },
   { icon: <IconZoomIn size={14} />, key: 'system.helpZoom' },
 ];
