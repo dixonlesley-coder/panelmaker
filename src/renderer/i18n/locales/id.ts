@@ -632,6 +632,7 @@ export const id: TranslationKeys = {
   sldSources: {
     enabled: '{{name}} diaktifkan — tampil di kepala layanan; atur ukurannya di Sumber energi.',
     already: '{{name}} sudah aktif — atur di Sumber energi.',
+    disabled: '{{name}} dihapus dari suplai.',
   },
   sldDelete: {
     title: 'Hapus panel distribusi?',

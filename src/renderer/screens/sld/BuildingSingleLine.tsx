@@ -1200,28 +1200,13 @@ function GridSourceNode({ data }: NodeProps) {
           </Text>
         </Box>
       </Group>
-      {(d.meter || d.generator || d.solar || d.battery) && (
+      {/* Revenue meter stays on the intake; generator/solar/battery are now
+          their own external source nodes beside this one. */}
+      {d.meter && (
         <Group gap={4} mt={3} wrap="wrap">
-          {d.meter && (
-            <Badge size="xs" variant="light" color="indigo">
-              {d.meter}
-            </Badge>
-          )}
-          {d.generator && (
-            <Badge size="xs" variant="light" color="orange">
-              {d.transfer === 'manual' ? 'COS' : 'ATS'}
-            </Badge>
-          )}
-          {d.solar && (
-            <Badge size="xs" variant="light" color="teal">
-              {d.solar}
-            </Badge>
-          )}
-          {d.battery && (
-            <Badge size="xs" variant="light" color="grape">
-              {d.battery}
-            </Badge>
-          )}
+          <Badge size="xs" variant="light" color="indigo">
+            {d.meter}
+          </Badge>
         </Group>
       )}
       {/* Feeds down into the panel's incomer ('in' target). Display-only. */}
@@ -1230,7 +1215,62 @@ function GridSourceNode({ data }: NodeProps) {
   );
 }
 
-const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode, floatLoad: FloatLoadNode, grid: GridSourceNode };
+/** An energy source (generator / solar / battery) drawn as its own node. */
+interface SourceNodeData {
+  kind: 'generator' | 'solar' | 'battery';
+  sub: string;
+  badge?: string; // e.g. "ATS" / "COS" on the generator
+  [key: string]: unknown;
+}
+
+const SOURCE_NODE_STYLE: Record<SourceNodeData['kind'], { color: string; icon: React.ReactNode }> = {
+  generator: { color: 'var(--mantine-color-orange-4)', icon: <IconEngine size={18} /> },
+  solar: { color: 'var(--mantine-color-teal-4)', icon: <IconSolarPanel size={18} /> },
+  battery: { color: 'var(--mantine-color-grape-4)', icon: <IconBattery2 size={18} /> },
+};
+
+function SourceNode({ data, selected }: NodeProps) {
+  const d = data as SourceNodeData;
+  const { t } = useTranslation();
+  const s = SOURCE_NODE_STYLE[d.kind];
+  return (
+    <Box
+      style={{
+        width: GRID_SRC_W,
+        background: 'var(--mantine-color-body)',
+        border: `1.5px solid ${s.color}`,
+        borderRadius: 'var(--mantine-radius-md)',
+        boxShadow: selected ? `${SELECT_RING}, var(--mantine-shadow-xs)` : 'var(--mantine-shadow-xs)',
+        padding: '6px 8px',
+      }}
+    >
+      <Group gap={6} wrap="nowrap" align="center">
+        <ThemeIcon size="md" variant="light" color={s.color} style={{ flexShrink: 0 }}>
+          {s.icon}
+        </ThemeIcon>
+        <Box style={{ minWidth: 0 }}>
+          <Group gap={5} wrap="nowrap">
+            <Text size="xs" fw={700} lineClamp={1}>
+              {t(`vbuilder.${d.kind}`)}
+            </Text>
+            {d.badge && (
+              <Badge size="xs" variant="light" color={s.color}>
+                {d.badge}
+              </Badge>
+            )}
+          </Group>
+          <Text style={{ fontSize: 9 }} c="dimmed" lineClamp={1}>
+            {d.sub}
+          </Text>
+        </Box>
+      </Group>
+      {/* Feeds down into the main bus ('in' target on the service panel). */}
+      <Handle type="source" id="out" position={Position.Bottom} isConnectable={false} />
+    </Box>
+  );
+}
+
+const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode, floatLoad: FloatLoadNode, grid: GridSourceNode, source: SourceNode };
 
 /**
  * Feeder edge between panels. Sibling feeders from the same parent share a
@@ -1515,6 +1555,49 @@ function buildUnified(
           type: 'smoothstep',
           style: { stroke: 'var(--mantine-color-indigo-5)', strokeWidth: 2 },
         });
+
+        // Distributed energy sources as their OWN external nodes beside the PLN
+        // intake (generator/solar/battery), each feeding the main bus. Deleting
+        // a node disables that source. The detailed ATS/inverter interlocks live
+        // on the Power one-line tab; here they read as parallel sources.
+        const src = system.sources;
+        const srcList: SourceNodeData[] = [];
+        if (src?.generator) {
+          srcList.push({
+            kind: 'generator',
+            sub: `${src.generator.ratingKva} kVA · ${src.generator.mode}`,
+            badge: src.generator.transfer === 'manual' ? 'COS' : 'ATS',
+          });
+        }
+        if (src?.solar) {
+          srcList.push({ kind: 'solar', sub: `${src.solar.arrayKwp} kWp · ${src.solar.inverterKw} kW` });
+        }
+        if (src?.battery) {
+          srcList.push({ kind: 'battery', sub: `${src.battery.installedKwh} kWh · ${src.battery.inverterKw} kW` });
+        }
+        const plnX = w / 2 - GRID_SRC_W / 2;
+        const SRC_GAP = 16;
+        srcList.forEach((sd, k) => {
+          const srcId = `src-${sd.kind}-${id}`;
+          nodes.push({
+            id: srcId,
+            type: 'source',
+            parentId: id,
+            // To the LEFT of the PLN intake, on the same row.
+            position: { x: plnX - (k + 1) * (GRID_SRC_W + SRC_GAP), y: -(GRID_SRC_H + 30) },
+            draggable: false,
+            data: sd,
+          });
+          edges.push({
+            id: `e-${srcId}`,
+            source: srcId,
+            sourceHandle: 'out',
+            target: id,
+            targetHandle: 'in',
+            type: 'smoothstep',
+            style: { stroke: SOURCE_NODE_STYLE[sd.kind].color, strokeWidth: 2, strokeDasharray: '5 3' },
+          });
+        });
       }
 
       // Each non-feeder way's LOAD hangs outside the panel as its own CHILD node,
@@ -1796,6 +1879,18 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         updateSources({ battery: { ...DEFAULT_BATTERY, ...sources?.battery, enabled: true } });
       }
       notifications.show({ message: t('sldSources.enabled', { name }), color: 'teal' });
+    },
+    [updateSources, t],
+  );
+
+  // Delete a source node → disable that source (the counterpart to dropping it).
+  const disableSource = useCallback(
+    (kind: SourceKind) => {
+      const sources = useProjectStore.getState().project.sources;
+      const cfg = sources?.[kind];
+      if (!cfg) return;
+      updateSources({ [kind]: { ...cfg, enabled: false } });
+      notifications.show({ message: t('sldSources.disabled', { name: t(`vbuilder.${kind}`) }), color: 'gray' });
     },
     [updateSources, t],
   );
@@ -2289,7 +2384,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               if (!c.source || !c.target || c.source === c.target) return;
               const isFloat = (id: string) => id.startsWith('float-');
               const isPanel = (id: string) =>
-                !id.startsWith('float-') && !id.startsWith('load-') && !id.startsWith('grid-');
+                !id.startsWith('float-') && !id.startsWith('load-') && !id.startsWith('grid-') && !id.startsWith('src-');
               // Wire a floating load to a panel → create its MCB; or panel→panel feeder.
               if (isFloat(c.source) && isPanel(c.target)) attachFloatingLoad(c.source.replace(/^float-/, ''), c.target);
               else if (isFloat(c.target) && isPanel(c.source)) attachFloatingLoad(c.target.replace(/^float-/, ''), c.source);
@@ -2333,6 +2428,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
                   const pid = n.data?.panelId as string | undefined;
                   const cid = n.data?.circuitId as string | undefined;
                   if (pid && cid && !removed.has(pid)) removeCircuit(pid, cid);
+                } else if (n.type === 'source') {
+                  disableSource((n.data as { kind: SourceKind }).kind);
                 }
               }
             }}

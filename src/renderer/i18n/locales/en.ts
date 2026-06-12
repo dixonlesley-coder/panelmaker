@@ -628,6 +628,7 @@ export const en = {
   sldSources: {
     enabled: '{{name}} enabled — it shows at the service head; size and tune it under Energy sources.',
     already: '{{name}} is already enabled — configure it under Energy sources.',
+    disabled: '{{name}} removed from the supply.',
   },
   sldDelete: {
     title: 'Delete a distribution panel?',
