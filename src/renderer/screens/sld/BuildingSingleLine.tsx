@@ -508,8 +508,8 @@ function layout(threePhase: boolean, hasRcd: boolean, hasStarter: boolean): Layo
     y = starterTop + STARTER_BAND;
   }
   const outY = y + 12;
-  // Height must clear the output-terminal amp label drawn at outY + 11 (~outY + 14
-  // with the glyph descenders), else the bottom row of labels gets clipped.
+  // Margin below the output terminals (the rating is no longer repeated there;
+  // it lives at each way's breaker glyph).
   return { bars, brkTop, rcdTop, starterTop, outY, height: outY + 18 };
 }
 
@@ -698,22 +698,40 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
             <line x1={cx + 12} y1={barY('PE')} x2={cx + 12} y2={L.outY} stroke={PHASE_COLOR.PE} strokeWidth={1.5} strokeDasharray="4 2" />
             <line x1={cx} y1={L.brkTop + BRK_H} x2={cx} y2={L.outY} stroke={runColor} strokeWidth={1.8} />
             {breaker(cx, L.brkTop, w.warn ? 'var(--mantine-color-red-6)' : FG)}
-            <text x={cx + 9} y={L.brkTop + 13} fontSize={8} fill={DIM}>
+            {/* Labels sit PAST the dashed N/PE drops (cx+8/+12) and carry a
+                body-coloured halo so crossing conductors never strike the text. */}
+            <text
+              x={cx + 16}
+              y={L.brkTop + 13}
+              fontSize={9}
+              fontWeight={700}
+              fill={FG}
+              stroke="var(--mantine-color-body)"
+              strokeWidth={3}
+              paintOrder="stroke"
+            >
               {w.breakerA}
             </text>
             {L.rcdTop !== undefined && w.rcd && rcd(cx, L.rcdTop)}
             {L.starterTop !== undefined && w.starter && contactor(cx, L.starterTop)}
             {L.starterTop !== undefined && w.starter && w.overload && overload(cx, L.starterTop + 14)}
             {L.starterTop !== undefined && w.starter && (
-              <text x={cx + 9} y={L.starterTop + 9} fontSize={7} fill={DIM}>
+              <text
+                x={cx + 16}
+                y={L.starterTop + 9}
+                fontSize={8}
+                fontWeight={600}
+                fill={DIM}
+                stroke="var(--mantine-color-body)"
+                strokeWidth={3}
+                paintOrder="stroke"
+              >
                 {w.starter.replace('_', '-')}
               </text>
             )}
-            {/* Output terminal — the LOAD is a separate node wired to here. */}
+            {/* Output terminal — the LOAD is a separate node wired to here. The
+                rating is NOT repeated here; it lives at the breaker above. */}
             <circle cx={cx} cy={L.outY} r={2.4} fill={runColor} />
-            <text x={cx} y={L.outY + 11} fontSize={6.5} textAnchor="middle" fill={DIM}>
-              {w.breakerA}
-            </text>
           </g>
         );
       })}
