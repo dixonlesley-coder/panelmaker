@@ -1259,11 +1259,11 @@ function FeederEdge({
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: 700,
               background: 'var(--mantine-color-body)',
-              padding: '0 4px',
-              borderRadius: 3,
+              padding: '1px 6px',
+              borderRadius: 4,
               whiteSpace: 'nowrap',
               ...(color ? { color } : {}),
             }}
@@ -1278,9 +1278,14 @@ function FeederEdge({
 
 const UNIFIED_EDGE_TYPES = { feeder: FeederEdge };
 
-/** Outgoing-cable size, e.g. "4×16 mm²" or "2×(4×95) mm²" for parallel runs. */
-function cableLabel(csaMm2: number, cores: number, runs?: number): string {
-  return runs && runs > 1 ? `${runs}×(${cores}×${csaMm2}) mm²` : `${cores}×${csaMm2} mm²`;
+/**
+ * The cable make-up without its construction type: "NYY 4×50 + 25 mm²" →
+ * "4×50 + 25 mm²" (a leading "2× " parallel-run prefix is kept). Labels reuse
+ * the engine's grouped spec so a reduced PE shows truthfully ("35 + 16 mm²"),
+ * instead of the old cores×csa shorthand that hid it ("2×35 mm²").
+ */
+function makeupOnly(cableSpec: string): string {
+  return cableSpec.replace(/^(\d+× )?\S+ /, '$1');
 }
 
 const THERMAL_OVERLOAD_STARTERS = new Set(['DOL', 'STAR_DELTA', 'REVERSING', 'PUMP']);
@@ -1412,7 +1417,7 @@ function buildUnified(
           ...(c.rcd.required ? { rcd: true } : {}),
           ...(starter ? { starter } : {}),
           ...(starter && THERMAL_OVERLOAD_STARTERS.has(starter) ? { overload: true } : {}),
-          cable: cableLabel(c.cable.csaMm2, c.grounding.cores, c.cable.runsPerPhase),
+          cable: makeupOnly(c.grounding.cableSpec),
           cableFull: c.grounding.cableSpec,
           ...(c.cable.deratedIzA > 0 ? { util: Math.round((c.designCurrentA / c.cable.deratedIzA) * 100) } : {}),
           ...(orderCode ? { orderCode } : {}),
@@ -1595,7 +1600,7 @@ function buildUnified(
           ? Math.round((feederWay.designCurrentA / feederWay.cable.deratedIzA) * 100)
           : undefined;
       const feederLabel = feederWay
-        ? `${feederWay.breaker.ratingA}A · ${cableLabel(feederWay.cable.csaMm2, feederWay.grounding.cores, feederWay.cable.runsPerPhase)}${
+        ? `${feederWay.breaker.ratingA}A · ${makeupOnly(feederWay.grounding.cableSpec)}${
             util !== undefined ? ` · ${util}%` : ''
           }`
         : undefined;
@@ -1850,13 +1855,23 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   useEffect(() => {
     setNodes((cur) => {
       const posById = new Map(cur.map((n) => [n.id, n.position]));
+      // Keep the user's selection across model rebuilds — every edit regenerates
+      // the nodes, and losing `selected` here made select→Delete/copy flows
+      // appear broken whenever a recompute landed in between.
+      const selected = new Set(cur.filter((n) => n.selected).map((n) => n.id));
       return built.nodes.map((n) => {
         const dropped = pendingPanelPos.current.get(n.id);
+        const sel = selected.has(n.id) ? { selected: true } : {};
         if (dropped) {
           pendingPanelPos.current.delete(n.id);
-          return { ...n, position: dropped };
+          return { ...n, ...sel, position: dropped };
         }
-        return { ...n, position: posById.get(n.id) ?? n.position };
+        // Only USER-PLACED nodes keep their dragged position. Layout-managed
+        // children (a panel's grid-supply head and its load nodes) must take
+        // the fresh layout position — preserving theirs left them stranded at
+        // stale offsets whenever the panel's width/way count changed.
+        const userPlaced = n.type === 'uPanel' || n.type === 'floatLoad';
+        return { ...n, ...sel, position: userPlaced ? (posById.get(n.id) ?? n.position) : n.position };
       });
     });
   }, [built.nodes, setNodes]);
@@ -2206,14 +2221,13 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             nodesConnectable
             nodesDraggable
             elementsSelectable
-            // CAD-style selection: left-drag on empty canvas draws a selection
+            // CAD-style gestures: left-drag on empty canvas draws a selection
             // box (touching a node selects it — Partial, like a crossing
-            // window). Panning moves to middle-drag / trackpad scroll, zoom to
-            // Ctrl+scroll / pinch, so the left button is purely select + move.
+            // window); the SCROLL WHEEL zooms; middle-button (wheel-click) drag
+            // pans. The left button is purely select + move.
             selectionOnDrag
             selectionMode={SelectionMode.Partial}
             panOnDrag={[1]}
-            panOnScroll
             deleteKeyCode={['Backspace', 'Delete']}
             zoomOnDoubleClick={false}
             onInit={(inst) => {

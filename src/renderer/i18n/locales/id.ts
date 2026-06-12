@@ -688,7 +688,7 @@ export const id: TranslationKeys = {
     helpDelete: 'Pilih panel atau beban lepas lalu tekan Delete; klik kanan jalur untuk menghapusnya',
     helpCopy: 'Seret kotak di kanvas kosong (atau Shift-klik) untuk memilih beberapa; Ctrl+C, lalu Ctrl+V menempel di posisi kursor (jalur salinan masuk ke panel terdekat)',
     helpReorder: 'Seret kolom di dalam panel untuk menata ulang jalurnya',
-    helpZoom: 'Ctrl+gulir atau cubit untuk zoom (panel menampilkan isinya saat didekati); gulir atau seret tombol tengah untuk menggeser',
+    helpZoom: 'Gulir untuk zoom (panel menampilkan isinya saat didekati); seret tombol tengah untuk menggeser',
     supplyMv: 'Tegangan menengah + trafo',
     supplyLv: 'Tegangan rendah (langsung PLN)',
     demandKva: 'kebutuhan {{kva}} kVA',
