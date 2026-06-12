@@ -731,8 +731,11 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
   );
 }
 
+/** Selection ring: an unmistakable halo on any node React Flow has selected. */
+const SELECT_RING = '0 0 0 3px var(--mantine-color-indigo-4)';
+
 /** A panel that renders summary-or-detail from the current viewport zoom. */
-function UnifiedPanelNode({ data }: NodeProps) {
+function UnifiedPanelNode({ data, selected }: NodeProps) {
   const d = data as UnifiedPanelData;
   const { t } = useTranslation();
   const { zoom } = useViewport();
@@ -760,12 +763,18 @@ function UnifiedPanelNode({ data }: NodeProps) {
         border: `1px solid ${
           hasError
             ? 'var(--mantine-color-red-5)'
-            : hover
+            : selected || hover
               ? 'var(--mantine-color-indigo-5)'
               : 'var(--mantine-color-default-border)'
         }`,
         borderRadius: 'var(--mantine-radius-md)',
-        boxShadow: hover ? 'var(--mantine-shadow-md)' : 'var(--mantine-shadow-sm)',
+        // The selection ring stacks UNDER the hover shadow so both read at once
+        // — a selected panel is unambiguous (it's what Ctrl+C will copy).
+        boxShadow: selected
+          ? `${SELECT_RING}, var(--mantine-shadow-md)`
+          : hover
+            ? 'var(--mantine-shadow-md)'
+            : 'var(--mantine-shadow-sm)',
         padding: 10,
         transition: 'box-shadow 120ms ease, border-color 120ms ease',
       }}
@@ -916,7 +925,7 @@ interface LoadNodeData {
   [key: string]: unknown;
 }
 
-function LoadNode({ data }: NodeProps) {
+function LoadNode({ data, selected }: NodeProps) {
   const d = data as LoadNodeData;
   const [hover, setHover] = useState(false);
   // loadSymbol() only reads .kind/.feeds — give it a minimal way-shaped object.
@@ -934,9 +943,13 @@ function LoadNode({ data }: NodeProps) {
       style={{
         width: LOAD_W,
         background: 'var(--mantine-color-body)',
-        border: `1px solid ${d.warn ? 'var(--mantine-color-red-5)' : hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-default-border)'}`,
+        border: `1px solid ${d.warn ? 'var(--mantine-color-red-5)' : selected || hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-default-border)'}`,
         borderRadius: 'var(--mantine-radius-md)',
-        boxShadow: hover ? 'var(--mantine-shadow-md)' : 'var(--mantine-shadow-xs)',
+        boxShadow: selected
+          ? `${SELECT_RING}, var(--mantine-shadow-md)`
+          : hover
+            ? 'var(--mantine-shadow-md)'
+            : 'var(--mantine-shadow-xs)',
         padding: 5,
         cursor: 'pointer',
         transition: 'box-shadow 120ms ease, border-color 120ms ease',
@@ -965,7 +978,7 @@ function LoadNode({ data }: NodeProps) {
 }
 
 /** A load on the canvas, not yet wired to a panel — drag its outlet to a panel. */
-function FloatLoadNode({ data }: NodeProps) {
+function FloatLoadNode({ data, selected }: NodeProps) {
   const d = data as { kind: LoadKind; name: string; loadW: number };
   const [hover, setHover] = useState(false);
   const symW = { kind: d.kind, feeds: undefined } as unknown as UnifiedWay;
@@ -978,9 +991,13 @@ function FloatLoadNode({ data }: NodeProps) {
       style={{
         width: LOAD_W + 8,
         background: 'var(--mantine-color-body)',
-        border: `1.5px dashed ${hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-orange-5)'}`,
+        border: `1.5px dashed ${selected || hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-orange-5)'}`,
         borderRadius: 'var(--mantine-radius-md)',
-        boxShadow: hover ? 'var(--mantine-shadow-md)' : 'var(--mantine-shadow-xs)',
+        boxShadow: selected
+          ? `${SELECT_RING}, var(--mantine-shadow-md)`
+          : hover
+            ? 'var(--mantine-shadow-md)'
+            : 'var(--mantine-shadow-xs)',
         padding: 5,
         cursor: 'grab',
       }}
@@ -1326,6 +1343,9 @@ function buildUnified(
           position: { x: w / 2 - GRID_SRC_W / 2, y: -(GRID_SRC_H + 30) },
           deletable: false,
           draggable: false,
+          // Display-only: it can't be copied or deleted, so a click-selection
+          // here would only muddy what Ctrl+C is about to copy.
+          selectable: false,
           data: {
             supplyType,
             voltage:
