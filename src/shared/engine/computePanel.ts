@@ -1,5 +1,5 @@
 import { STANDARDS_VERSION } from '../standards/version';
-import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
+import { DIN_MODULE_WIDTH_MM, sheetThicknessMm } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
 import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
 import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
@@ -259,7 +259,16 @@ function computeCircuit(
   // Protection / fault analysis (only when the panel's prospective fault is known).
   if (opts.faultLevelA !== undefined) {
     const prospectiveKa = round(opts.faultLevelA / 1000, 1);
-    const ka = checkBreakerKa(breaker, prospectiveKa);
+    let ka = checkBreakerKa(result.breaker, prospectiveKa);
+    // Breaking capacity is a SELECTION criterion (IEC 61439: Icu >= Isc), not
+    // just a check: when even the highest-Icu miniature breaker (25 kA) can't
+    // clear the bus fault, the same rating goes into an MCCB frame — mirroring
+    // the incomer upgrade. The error then only fires when NO standard device
+    // can break the fault.
+    if (!ka.adequate && result.breaker.deviceClass === 'MCB') {
+      result.breaker = { ...result.breaker, deviceClass: 'MCCB' };
+      ka = checkBreakerKa(result.breaker, prospectiveKa);
+    }
     result.breakerKa = ka.breakerKa;
     result.kaAdequate = ka.adequate;
 
@@ -486,22 +495,45 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     }
   }
   const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
-  // Verify the internal temperature rise (IEC 61439-1 / 60890) and recommend an IP
-  // rating; floor-standing assemblies dissipate through different faces than wall-
-  // mounted ones.
-  enclosure.thermal = verifyEnclosureThermal({
-    widthMm: enclosure.widthMm,
-    heightMm: enclosure.heightMm,
-    depthMm: enclosure.depthMm,
-    totalHeatW,
-    mounting: hasFloorGear ? 'free-standing' : 'wall',
-    ambientC: panel.ambientTempC,
-  });
+  // Verify the internal temperature rise (IEC 61439-1 / 60890) COUNTING the
+  // cooling the enclosure already specifies — it used to verify as if naturally
+  // convected, flagging designs whose chosen fan/heat-exchanger was already
+  // adequate. When the rise is still over the limit, the engine DESIGNS the
+  // problem out instead of warning about it: escalate the ventilation first,
+  // then grow the enclosure (more dissipating surface) toward practical cabinet
+  // limits. Only a heat load that defeats all of that still warns.
+  const verifyThermal = () =>
+    verifyEnclosureThermal({
+      widthMm: enclosure.widthMm,
+      heightMm: enclosure.heightMm,
+      depthMm: enclosure.depthMm,
+      totalHeatW,
+      mounting: hasFloorGear ? 'free-standing' : 'wall',
+      ambientC: panel.ambientTempC,
+      forcedVentilation: enclosure.ventilation !== 'natural',
+    });
+  enclosure.thermal = verifyThermal();
+  if (!enclosure.thermal.withinLimit && enclosure.ventilation === 'natural') {
+    enclosure.ventilation = 'fan-filter';
+    enclosure.thermal = verifyThermal();
+  }
+  while (!enclosure.thermal.withinLimit) {
+    // Height is cheap wall space — grow it first, then width; stop at practical
+    // cabinet limits (2.2 m tall, 1.6 m wide).
+    if (enclosure.heightMm < 2200) enclosure.heightMm += 100;
+    else if (enclosure.widthMm < 1600) enclosure.widthMm += 100;
+    else break;
+    enclosure.thermal = verifyThermal();
+  }
+  // Sheet thickness follows the (possibly grown) largest dimension.
+  enclosure.sheetThicknessMm = sheetThicknessMm(
+    Math.max(enclosure.widthMm, enclosure.heightMm, enclosure.depthMm),
+  );
   if (!enclosure.thermal.withinLimit) {
     warnings.push({
       code: 'enclosure-overtemp',
       severity: 'warning',
-      message: `${panel.name}: estimated internal temperature rise ${enclosure.thermal.tempRiseK} K (≈ ${enclosure.thermal.internalTempC} °C internal) exceeds the recommended limit — add ventilation/cooling or use a larger enclosure.`,
+      message: `${panel.name}: estimated internal temperature rise ${enclosure.thermal.tempRiseK} K (≈ ${enclosure.thermal.internalTempC} °C internal) even at ${enclosure.widthMm}×${enclosure.heightMm} mm with ${enclosure.ventilation} cooling — split the board or fit active cooling (AC unit / heat exchanger).`,
       panelId: panel.id,
     });
   }

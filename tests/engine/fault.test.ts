@@ -105,24 +105,35 @@ describe('fault decay down a feeder', () => {
 });
 
 describe('breaker breaking-capacity adequacy', () => {
-  it('an MCB tops out at 10 kA, so a 15 kA fault is inadequate; an MCCB covers it', () => {
-    // The helper specifies the smallest adequate Icu; an MCB family maxes at 10 kA.
+  it('specifies the smallest adequate Icu within the class ladder', () => {
     const mcbOk = checkBreakerKa({ ratingA: 32, deviceClass: 'MCB', curve: 'C' }, 8);
     expect(mcbOk.breakerKa).toBe(10); // upsized from 6 to the 10 kA variant
     expect(mcbOk.adequate).toBe(true);
 
-    const mcbBad = checkBreakerKa({ ratingA: 32, deviceClass: 'MCB', curve: 'C' }, 15);
-    expect(mcbBad.adequate).toBe(false); // 10 kA ceiling < 15 kA fault
-    expect(mcbBad.breakerKa).toBe(10);
+    // Industrial 15/25 kA miniature classes (iC60H/L, S200P/S800) cover a
+    // 16 kA bus without leaving the MCB class.
+    const mcbStiff = checkBreakerKa({ ratingA: 32, deviceClass: 'MCB', curve: 'C' }, 16);
+    expect(mcbStiff.breakerKa).toBe(25);
+    expect(mcbStiff.adequate).toBe(true);
+
+    // Beyond 25 kA the MCB ladder is exhausted — inadequate within the class.
+    const mcbBad = checkBreakerKa({ ratingA: 32, deviceClass: 'MCB', curve: 'C' }, 30);
+    expect(mcbBad.adequate).toBe(false);
+    expect(mcbBad.breakerKa).toBe(25);
 
     const mccb = checkBreakerKa({ ratingA: 250, deviceClass: 'MCCB', curve: 'C' }, 30);
     expect(mccb.adequate).toBe(true);
     expect(mccb.breakerKa).toBeGreaterThanOrEqual(30);
+
+    // Even the biggest MCCB tops out at 70 kA — the only case that still warns.
+    const mccbBad = checkBreakerKa({ ratingA: 100, deviceClass: 'MCCB', curve: 'C' }, 80);
+    expect(mccbBad.adequate).toBe(false);
   });
 
-  it('emits an error when a panel breaker cannot break the prospective fault', () => {
-    // A large load forces an MV transformer supply with a high (~29 kA) bus fault;
-    // a small 6/10 kA MCB branch on that bus cannot break it.
+  it('DESIGNS OUT an inadequate branch device: MCB upgrades to an MCCB frame', () => {
+    // A large load forces an MV transformer supply with a high (~29 kA) bus
+    // fault. The 25 kA MCB ceiling is exceeded, so the branch keeps its rating
+    // but moves into an MCCB frame (mirroring the incomer upgrade) — no error.
     const project: ProjectInput = {
       id: 'PRJ',
       name: 'B',
@@ -140,13 +151,13 @@ describe('breaker breaking-capacity adequacy', () => {
     const sys = computeSystem(project);
     expect(sys.supply.type).toBe('MV');
     const main = sys.panels['MAIN']!;
-    expect(main.faultLevelKa).toBeGreaterThan(10);
+    expect(main.faultLevelKa).toBeGreaterThan(25);
 
     const small = main.circuits.find((c) => c.circuitId === 'sm')!;
-    expect(small.breaker.deviceClass).toBe('MCB');
-    expect(small.breakerKa).toBeDefined();
-    expect(small.kaAdequate).toBe(false); // MCB Icu (<=10 kA) < ~29 kA fault
-    expect(sys.warnings.some((w) => w.code === 'breaking-capacity-inadequate')).toBe(true);
+    expect(small.breaker.deviceClass).toBe('MCCB'); // upgraded, same rating
+    expect(small.kaAdequate).toBe(true);
+    expect(small.breakerKa).toBeGreaterThanOrEqual(main.faultLevelKa!);
+    expect(sys.warnings.some((w) => w.code === 'breaking-capacity-inadequate')).toBe(false);
   });
 });
 

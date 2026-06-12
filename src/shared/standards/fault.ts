@@ -115,11 +115,13 @@ export const CURVE_TRIP_MULTIPLE_LOWER: Readonly<Record<BreakerCurve, number>> =
 
 /**
  * Standard short-circuit breaking capacities (Icu, kA rms symmetrical) offered
- * for each device class. MCBs per IEC 60898 (typ. 6 / 10 kA); MCCBs per
+ * for each device class. MCBs: 6/10 kA per IEC 60898, plus the industrial
+ * IEC 60947-2 miniature classes at 15/25 kA (e.g. Acti9 iC60H/iC60L,
+ * ABB S200P/S800 — verify the exact Icu at 400 V on the datasheet). MCCBs per
  * IEC 60947-2 across common frame ratings. Ascending.
  */
 export const BREAKING_CAPACITY_KA: Readonly<Record<BreakerClass, readonly number[]>> = {
-  MCB: [6, 10],
+  MCB: [6, 10, 15, 25],
   MCCB: [16, 25, 36, 50, 70],
 };
 
