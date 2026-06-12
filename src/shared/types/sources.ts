@@ -74,6 +74,13 @@ export interface BatteryResult {
   moduleKwh: number;
   moduleCount: number;
   inverterKw: number;
+  /** The backup power the bank was sized for (kW) — critical demand or manual. */
+  backupKw: number;
+  /**
+   * Number of UPS-backed (critical) panels the backup power was derived from.
+   * Absent (or 0) when none is marked and the manual `backupKw` was used.
+   */
+  criticalPanelCount?: number;
   note: string;
 }
 

@@ -126,6 +126,42 @@ describe('essential (genset-backed) panels', () => {
   });
 });
 
+describe('UPS-backed (critical) panels', () => {
+  const BATT: SourcesConfig = {
+    battery: { enabled: true, backupKw: 50, autonomyHours: 2, chemistry: 'lifepo4' },
+  };
+
+  it('battery sizes from the critical panels, not the manual backupKw', () => {
+    const manual = computeSystem(hybridProject({ sources: BATT }));
+    expect(manual.sources?.battery?.backupKw).toBe(50);
+    expect(manual.sources?.battery?.criticalPanelCount).toBeUndefined();
+
+    const prj = hybridProject({ sources: BATT });
+    prj.panels.find((p) => p.id === 'ep')!.upsBacked = true;
+    const critical = computeSystem(prj);
+    // The ~10 kW essential panel demand, not the manual 50 kW.
+    expect(critical.sources?.battery?.backupKw).toBeLessThan(20);
+    expect(critical.sources?.battery?.criticalPanelCount).toBe(1);
+    expect(critical.sources?.battery?.note).toContain('UPS-backed');
+  });
+
+  it('warns when critical panels exist but no battery does', () => {
+    const prj = hybridProject({});
+    prj.panels.find((p) => p.id === 'ep')!.upsBacked = true;
+    expect(computeSystem(prj).warnings.some((w) => w.code === 'critical-no-battery')).toBe(true);
+  });
+
+  it('draws a UPS/critical bus on the one-line fed by the battery inverter', () => {
+    const prj = hybridProject({ essential: true, sources: { ...GEN, ...BATT } });
+    prj.panels.find((p) => p.id === 'ep')!.upsBacked = true;
+    const ol = computePowerOneline(computeSystem(prj));
+    expect(ol.nodes.some((n) => n.id === 'ups-bus')).toBe(true);
+    // Charged from the essential bus, feeding the UPS bus.
+    expect(ol.edges.some((e) => e.from === 'ess-bus' && e.to === 'battinv')).toBe(true);
+    expect(ol.edges.some((e) => e.from === 'battinv' && e.to === 'ups-bus')).toBe(true);
+  });
+});
+
 describe('hybrid PV rules', () => {
   it('adds the genset-PV interlock when both exist', () => {
     const r = computeSystem(

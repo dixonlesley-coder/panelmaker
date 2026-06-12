@@ -91,14 +91,28 @@ export function sizeSolar(cfg: SolarConfig, sunHours = PEAK_SUN_HOURS): SolarRes
 }
 
 /** Size a backup battery bank and its inverter/charger for a load + autonomy. */
-export function sizeBattery(cfg: BatteryConfig, module: BatteryModule = BATTERY_MODULE_LFP): BatteryResult {
+/** Which panels the battery/UPS actually backs: marked critical panels, or the manual kW. */
+export interface CriticalDemand {
+  /** Aggregate demand of the marked UPS-backed panels (kW, double-count free). */
+  demandKw: number;
+  /** How many panels are marked (0 = none — fall back to the manual backupKw). */
+  panelCount: number;
+}
+
+export function sizeBattery(
+  cfg: BatteryConfig,
+  module: BatteryModule = BATTERY_MODULE_LFP,
+  critical?: CriticalDemand,
+): BatteryResult {
+  const useCritical = critical !== undefined && critical.panelCount > 0;
+  const backupKw = useCritical ? critical.demandKw : cfg.backupKw;
   const dod = DEPTH_OF_DISCHARGE[cfg.chemistry];
   // Backup autonomy only loses the discharge path, not the full round trip.
-  const requiredKwh = (cfg.backupKw * cfg.autonomyHours) / (dod * BATTERY_DISCHARGE_EFFICIENCY);
+  const requiredKwh = (backupKw * cfg.autonomyHours) / (dod * BATTERY_DISCHARGE_EFFICIENCY);
   const moduleCount = Math.max(1, Math.ceil(requiredKwh / module.kwh));
   const installedKwh = round(moduleCount * module.kwh, 2);
   const usableKwh = round(installedKwh * dod, 2);
-  const inverterKw = selectInverterKw(cfg.backupKw);
+  const inverterKw = selectInverterKw(backupKw);
 
   return {
     chemistry: cfg.chemistry,
@@ -108,7 +122,9 @@ export function sizeBattery(cfg: BatteryConfig, module: BatteryModule = BATTERY_
     moduleKwh: module.kwh,
     moduleCount,
     inverterKw,
-    note: `${cfg.backupKw} kW for ${cfg.autonomyHours} h (${cfg.chemistry}, DoD ${Math.round(
+    backupKw: round(backupKw, 1),
+    ...(useCritical ? { criticalPanelCount: critical.panelCount } : {}),
+    note: `${useCritical ? `${round(backupKw, 1)} kW (the ${critical.panelCount} UPS-backed critical panel(s))` : `${cfg.backupKw} kW`} for ${cfg.autonomyHours} h (${cfg.chemistry}, DoD ${Math.round(
       dod * 100,
     )}%, discharge eff ${Math.round(BATTERY_DISCHARGE_EFFICIENCY * 100)}%) → ${round(requiredKwh, 1)} kWh ⇒ ${moduleCount} x ${module.kwh} kWh = ${installedKwh} kWh; ${inverterKw} kW inverter/charger.`,
   };
@@ -120,6 +136,7 @@ export function computeSources(
   buildingDemandKva: number,
   motors: GensetMotor[] = [],
   essential?: EssentialDemand,
+  critical?: CriticalDemand,
 ): SourcesResult | undefined {
   if (!config) return undefined;
   const out: SourcesResult = {};
@@ -129,6 +146,6 @@ export function computeSources(
     out.gensetStart = assessGensetStart({ gensetKva: out.generator.ratingKva, motors });
   }
   if (config.solar?.enabled) out.solar = sizeSolar(config.solar);
-  if (config.battery?.enabled) out.battery = sizeBattery(config.battery);
+  if (config.battery?.enabled) out.battery = sizeBattery(config.battery, undefined, critical);
   return out;
 }

@@ -163,6 +163,13 @@ export interface PanelInput {
    * power one-line splits an essential bus behind the ATS.
    */
   essential?: boolean;
+  /**
+   * UPS-backed (critical) panel: rides the battery/central-UPS through any
+   * outage (servers, fire alarm, BMS). When any panel is marked, the battery
+   * backup power derives from the critical panels' actual demand instead of
+   * the manual `backupKw`, and the one-line draws a UPS/critical bus.
+   */
+  upsBacked?: boolean;
   circuits: CircuitInput[];
 }
 

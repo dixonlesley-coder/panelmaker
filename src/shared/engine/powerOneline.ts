@@ -118,21 +118,42 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
   }
 
   // Battery via inverter/charger, with transfer/island interlock. With an
-  // essential-bus split the battery backs that bus, not the whole building.
+  // essential-bus split the battery backs that bus, not the whole building;
+  // with UPS-backed (critical) panels it feeds a dedicated UPS bus instead.
   const batt = system.sources?.battery;
   if (batt) {
     nodes.push({ id: 'batt', kind: 'battery', label: 'Battery', sub: `${batt.installedKwh} kWh` });
     nodes.push({ id: 'battinv', kind: 'battery-inverter', label: 'Battery inverter', sub: `${batt.inverterKw} kW` });
     edge('batt', 'battinv');
-    edge('battinv', backedBus, 'AC');
-    interlocks.push({
-      id: 'il-batt',
-      kind: 'electrical',
-      aId: 'battinv',
-      bId: backedBus,
-      relation: 'sequence',
-      note: 'Battery inverter transfers the essential load on outage (UPS / island mode).',
-    });
+    const critCount = batt.criticalPanelCount ?? 0;
+    if (critCount > 0) {
+      nodes.push({
+        id: 'ups-bus',
+        kind: 'bus',
+        label: 'UPS / critical bus',
+        sub: `${critCount} panel(s) · ${batt.backupKw} kW`,
+      });
+      edge(backedBus, 'battinv', 'charge');
+      edge('battinv', 'ups-bus', 'UPS');
+      interlocks.push({
+        id: 'il-batt',
+        kind: 'electrical',
+        aId: 'battinv',
+        bId: 'ups-bus',
+        relation: 'sequence',
+        note: 'Double-conversion UPS: the critical bus rides the battery through any transfer gap (genset start, ATS changeover).',
+      });
+    } else {
+      edge('battinv', backedBus, 'AC');
+      interlocks.push({
+        id: 'il-batt',
+        kind: 'electrical',
+        aId: 'battinv',
+        bId: backedBus,
+        relation: 'sequence',
+        note: 'Battery inverter transfers the essential load on outage (UPS / island mode).',
+      });
+    }
   }
 
   return { nodes, edges, interlocks };

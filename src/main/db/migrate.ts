@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS panels (
   diversity_factor REAL NOT NULL DEFAULT 0.8,
   source_type TEXT NOT NULL DEFAULT 'utility',
   fed_by_circuit_id TEXT,
-  essential INTEGER
+  essential INTEGER,
+  ups_backed INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS circuits (
@@ -237,6 +238,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'phases', ddl: 'ALTER TABLE circuits ADD COLUMN phases INTEGER' },
   // Life-safety circuit flag (fire pump / emergency lighting).
   { table: 'circuits', column: 'life_safety', ddl: 'ALTER TABLE circuits ADD COLUMN life_safety INTEGER' },
+  // UPS-backed (critical) panel flag.
+  { table: 'panels', column: 'ups_backed', ddl: 'ALTER TABLE panels ADD COLUMN ups_backed INTEGER' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

@@ -233,6 +233,8 @@ interface UnifiedPanelData {
   unfed?: boolean;
   /** Essential (genset-backed) panel — shown as a chip on the card. */
   essential?: boolean;
+  /** UPS-backed (critical) panel — shown as a chip on the card. */
+  critical?: boolean;
   feederIds: string[];
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
@@ -815,6 +817,11 @@ function UnifiedPanelNode({ data }: NodeProps) {
               {t('sldNode.essential')}
             </Badge>
           )}
+          {d.critical && (
+            <Badge size="xs" variant="light" color="grape" title={t('sldNode.criticalHint')}>
+              {t('sldNode.critical')}
+            </Badge>
+          )}
           <Badge
             size="xs"
             variant="light"
@@ -1272,6 +1279,7 @@ function buildUnified(
         // not-connected until it's actually wired under one.
         ...(id !== rootId && !parentOf.has(id) ? { unfed: true } : {}),
         ...(panel.essential === true ? { essential: true } : {}),
+        ...(panel.upsBacked === true ? { critical: true } : {}),
         issues: toNodeIssues(res.warnings),
         onEditCircuit: (cid) => onEditCircuit(id, cid),
         onContextCircuit: (cid, x, y) => onContextCircuit(id, cid, x, y),
@@ -2119,6 +2127,21 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             }}
           >
             {t(ctxPanel?.essential ? 'sldMenu.unmarkEssential' : 'sldMenu.markEssential')}
+          </Menu.Item>
+          <Menu.Item
+            onClick={() => {
+              const panelId = nodeCtx?.panelId;
+              const was = ctxPanel?.upsBacked === true;
+              setNodeCtx(null);
+              if (!panelId) return;
+              updatePanel(panelId, { upsBacked: was ? undefined : true });
+              notifications.show({
+                message: t(was ? 'sldMenu.criticalOff' : 'sldMenu.criticalOn'),
+                color: was ? 'gray' : 'teal',
+              });
+            }}
+          >
+            {t(ctxPanel?.upsBacked ? 'sldMenu.unmarkCritical' : 'sldMenu.markCritical')}
           </Menu.Item>
           {ctxPanel?.system === '3ph' && (
             <Menu.Item

@@ -99,6 +99,8 @@ export const panels = sqliteTable('panels', {
   fedByCircuitId: text('fed_by_circuit_id'),
   /** Essential (genset-backed) panel — drives generator backup sizing. */
   essential: integer('essential', { mode: 'boolean' }),
+  /** UPS-backed (critical) panel — drives battery/UPS backup sizing. */
+  upsBacked: integer('ups_backed', { mode: 'boolean' }),
 });
 
 export const circuits = sqliteTable('circuits', {

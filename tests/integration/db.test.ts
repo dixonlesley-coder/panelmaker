@@ -62,7 +62,9 @@ describe('SQLite persistence', () => {
     lighting.cableOverrideMm2 = 4;
     // Per-circuit cable construction + the essential (genset-backed) panel flag.
     lighting.cableType = 'NYA';
+    lighting.lifeSafety = true;
     lp.essential = true;
+    lp.upsBacked = true;
     // Explicit motor supply phase must survive the round-trip.
     const mccPump = project.panels.find((p) => p.name.includes('MCC'))!.circuits.find((c) => c.motorKw)!;
     mccPump.phases = 1;
@@ -122,6 +124,7 @@ describe('SQLite persistence', () => {
     expect(lpdb.tag).toBe('LP-1');
     expect(lpdb.occupancy).toBe('office');
     expect(lpdb.essential).toBe(true);
+    expect(lpdb.upsBacked).toBe(true);
     // an unmarked panel keeps the field absent (not false)
     expect(loaded!.panels.find((p) => p.name.includes('MCC'))!.essential).toBeUndefined();
 
@@ -132,6 +135,7 @@ describe('SQLite persistence', () => {
     expect(loadedLighting.breakerOverrideA).toBe(20);
     expect(loadedLighting.cableOverrideMm2).toBe(4);
     expect(loadedLighting.cableType).toBe('NYA');
+    expect(loadedLighting.lifeSafety).toBe(true);
     const loadedSocketHost = lpdb.circuits.find((c) => (c.sockets ?? []).length > 0)!;
     expect(loadedSocketHost.sockets).toEqual(socketHost.sockets);
     // a circuit without point detail keeps the fields absent (no empty arrays)

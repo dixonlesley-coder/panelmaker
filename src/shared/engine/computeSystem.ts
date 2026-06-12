@@ -132,26 +132,39 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const lvVoltageV = roots[0]?.voltageV ?? 400;
   const totalDemandKva = rootDemandW / 1000 / ASSUMED_BUILDING_PF;
   const supply = determineSupply(totalDemandKva, lvVoltageV);
-  // Essential (genset-backed) panels: their aggregate demand drives the genset
-  // sizing. A panel under an essential ancestor is already inside that
-  // ancestor's demand, so only the topmost essential panels are summed.
-  const hasEssentialAncestor = (id: string): boolean => {
+  // Flagged-panel demand (essential → genset, UPS-backed → battery): a panel
+  // under a flagged ancestor is already inside that ancestor's demand, so only
+  // the TOPMOST flagged panels are summed (double-count free).
+  const hasFlaggedAncestor = (id: string, flagged: (p: (typeof panels)[number]) => boolean): boolean => {
     let cur = parentOf.get(id);
     const seen = new Set<string>();
     while (cur !== undefined && !seen.has(cur)) {
-      if (byId.get(cur)?.essential === true) return true;
+      const p = byId.get(cur);
+      if (p && flagged(p)) return true;
       seen.add(cur);
       cur = parentOf.get(cur);
     }
     return false;
   };
-  const essentialPanels = project.panels.filter((p) => p.essential === true);
-  const essentialTopW = essentialPanels
-    .filter((p) => !hasEssentialAncestor(p.id))
-    .reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
+  const topmostFlaggedW = (flagged: (p: (typeof panels)[number]) => boolean): number =>
+    project.panels
+      .filter((p) => flagged(p) && !hasFlaggedAncestor(p.id, flagged))
+      .reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
+
+  const isEssential = (p: (typeof panels)[number]) => p.essential === true;
+  const hasEssentialAncestor = (id: string) => hasFlaggedAncestor(id, isEssential);
+  const essentialPanels = project.panels.filter(isEssential);
   const essential = {
-    demandKva: round(essentialTopW / 1000 / ASSUMED_BUILDING_PF, 1),
+    demandKva: round(topmostFlaggedW(isEssential) / 1000 / ASSUMED_BUILDING_PF, 1),
     panelCount: essentialPanels.length,
+  };
+
+  // UPS-backed (critical) panels drive the battery backup power (real kW).
+  const isCritical = (p: (typeof panels)[number]) => p.upsBacked === true;
+  const criticalPanels = project.panels.filter(isCritical);
+  const critical = {
+    demandKw: round(topmostFlaggedW(isCritical) / 1000, 1),
+    panelCount: criticalPanels.length,
   };
 
   // Building motors (for the genset motor-start voltage-dip check). With an
@@ -165,7 +178,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
       .filter((c) => c.motorKw !== undefined && c.motorKw > 0)
       .map((c) => ({ name: c.name, kW: c.motorKw!, starterType: c.starterType })),
   );
-  const sources = computeSources(project.sources, totalDemandKva, motors, essential);
+  const sources = computeSources(project.sources, totalDemandKva, motors, essential, critical);
 
   if (
     essential.panelCount > 0 &&
@@ -175,6 +188,14 @@ export function computeSystem(project: ProjectInput): SystemResult {
       code: 'essential-no-backup',
       severity: 'warning',
       message: `${essential.panelCount} panel(s) are marked essential but no generator or battery is enabled — nothing keeps them alive on mains failure.`,
+    });
+  }
+
+  if (critical.panelCount > 0 && !project.sources?.battery?.enabled) {
+    warnings.push({
+      code: 'critical-no-battery',
+      severity: 'warning',
+      message: `${critical.panelCount} panel(s) are marked UPS-backed but no battery is enabled — nothing rides them through an outage. Enable the battery under Energy sources.`,
     });
   }
 
