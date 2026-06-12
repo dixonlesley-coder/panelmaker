@@ -147,8 +147,8 @@ Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.1.
   (`Iz ≥ max(In, 1.25·Ib)` + minimums + voltage drop), breaker (MCB/MCCB), busbar
   (per-phase line current), enclosure (W×H×D + sheet + ventilation from heat).
 - **Phases & loads:** 12 load types; single- vs three-phase determination; phase balancing
-  across L1/L2/L3 with imbalance warning; neutral-aware **cable cores** (lighting 2-core,
-  neutral loads 3-core, motors 4-core, distribution 5-core).
+  across L1/L2/L3 with imbalance warning; neutral-aware **cable cores** (every 1φ final is
+  3-core L+N+PE — lighting included, 3×1.5; 3φ motors 4-core; 3φ distribution 5-core).
 - **Control & motor control (IEC 60947):** DOL / Star-Delta / Reversing / Soft-starter /
   VFD / ATS / Pump templates; contactor (AC-3 + Y-Δ 58%), overload, control transformer,
   VFD sizing; interlocks; **starting analysis** (inrush × FLC + torque per method); a

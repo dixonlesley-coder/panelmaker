@@ -169,11 +169,13 @@ function computeCircuit(
     isLighting: c.isLighting,
     material,
   });
-  // Cores follow the load's neutral need: single-phase lighting fixtures and
-  // line-only loads = 2-core (L+PE); items with a neutral = 3-core (L+N+PE).
+  // Cores follow the load's neutral need. EVERY single-phase circuit on a
+  // phase-neutral system carries the neutral — the current must return — so
+  // 1φ finals are 3-core L+N+PE (lighting included: 3×1.5; the "no neutral"
+  // case is the SWITCH DROP inside the room, not the final leaving the panel).
   // Three-phase: motors/resistive line loads = 4-core (3L+PE); loads with a
   // neutral (distribution, single-phase parts) = 5-core (3L+N+PE).
-  const hasNeutral = threePhase ? def.needsNeutral && !def.motorLike : c.loadKind !== 'lighting';
+  const hasNeutral = threePhase ? def.needsNeutral && !def.motorLike : true;
   const grounding = sizeGrounding({
     phaseCsaMm2: cable.csaMm2,
     panelSystem: panel.system,

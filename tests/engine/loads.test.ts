@@ -155,8 +155,8 @@ describe('computePanel integration: phase balance + grounding', () => {
     const phases = r.circuits.map((c) => c.phase).sort();
     expect(phases).toEqual(['L1', 'L2', 'L3']);
     expect(r.phaseBalance.imbalancePct).toBe(0);
-    // cores follow the neutral need: a lighting fixture = 2-core (L+PE)
-    expect(r.circuits[0]!.grounding.cores).toBe(2);
+    // Every 1ph final carries the neutral: lighting = 3-core L+N+PE.
+    expect(r.circuits[0]!.grounding.cores).toBe(3);
     const socket = r.circuits.find((c) => c.name === 'Sockets')!;
     expect(socket.grounding.cores).toBe(3); // socket = L+N+PE
     expect(r.circuits[0]!.grounding.peCsaMm2).toBeGreaterThan(0);

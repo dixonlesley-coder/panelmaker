@@ -64,7 +64,7 @@ describe('circuitRcd', () => {
 });
 
 describe('cable cores by neutral need', () => {
-  it('lighting = 2-core (L+PE), neutral loads = 3-core, motors = 4-core, 3ph distribution = 5-core', () => {
+  it('1ph finals = 3-core L+N+PE (lighting included), motors = 4-core, 3ph distribution = 5-core', () => {
     const r = computePanel(
       panel([
         branch({ id: 'lt', name: 'Light', loadKind: 'lighting', isLighting: true, loadW: 2000 }),
@@ -74,7 +74,9 @@ describe('cable cores by neutral need', () => {
       ]),
     );
     const cores = (name: string) => r.circuits.find((c) => c.name === name)!.grounding.cores;
-    expect(cores('Light')).toBe(2); // 1ph lighting, no neutral
+    // Every 1ph circuit carries the neutral — the current must return. The
+    // neutral-less leg is the switch drop in the room, not the panel final.
+    expect(cores('Light')).toBe(3); // 1ph lighting = L+N+PE (3×1.5)
     expect(cores('Socket')).toBe(3); // 1ph + neutral
     expect(cores('Motor')).toBe(4); // 3ph, no neutral
     expect(cores('Sub-DB load')).toBe(5); // 3ph + neutral
