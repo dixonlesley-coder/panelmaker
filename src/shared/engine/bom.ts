@@ -94,6 +94,13 @@ function matchFirstOfCategory(category: Part['category'], parts: Part[]): string
 }
 
 /**
+ * Cable constructions that are SEPARATE single-core conductors pulled into a
+ * containment (vs a finished multicore cable with its integral G/Y PE core).
+ * Their BOM lines are per-conductor, with the PE as its own green-yellow wire.
+ */
+const SINGLE_CORE_TYPES: ReadonlySet<string> = new Set(['NYA', 'NYAF']);
+
+/**
  * Matched catalog order codes (SKUs) for a circuit's breaker and cable, using the
  * SAME matchers the BOM uses — so what's surfaced inline on a component is exactly
  * what lands in the bill of materials. Absent when no catalog part matches.
@@ -171,19 +178,48 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
       matched: breakerPartId !== undefined,
     });
 
-    // Cable run (priced per metre — qty 1 here as the run length is not modelled
-    // as a separate quantity in the result; kept as one line for the summary).
-    // Spare ways are breaker provision only: no cable is installed for them.
+    // Cable run (priced per metre — qty is the CONDUCTOR count for single-core
+    // wiring, 1 for a multicore cable; run length is not modelled as a separate
+    // quantity). Spare ways are breaker provision only: no cable for them.
     if (circuit.loadKind !== 'spare') {
-      const cablePartId = matchCablePart(circuit.cable.csaMm2, parts, circuit.grounding.cableType);
-      lines.push({
-        partId: cablePartId,
-        sku: skuOf(parts, cablePartId),
-        description: `Cable ${circuit.grounding.cableType} ${circuit.cable.csaMm2} mm² — ${circuit.name}`,
-        category: 'cable',
-        qty: 1,
-        matched: cablePartId !== undefined,
-      });
+      const type = circuit.grounding.cableType;
+      const runs = circuit.cable.runsPerPhase ?? 1;
+      if (SINGLE_CORE_TYPES.has(type)) {
+        // NYA/NYAF conduit wiring is SEPARATE single-core conductors: the
+        // lives + neutral at the phase size, and the protective earth as its
+        // own green-yellow conductor at the (usually reduced) PE size.
+        const livesAndN = (circuit.grounding.cores - 1) * runs;
+        const phaseId = matchCablePart(circuit.cable.csaMm2, parts, type);
+        lines.push({
+          partId: phaseId,
+          sku: skuOf(parts, phaseId),
+          description: `Wire ${type} ${circuit.cable.csaMm2} mm² (L/N) — ${circuit.name}`,
+          category: 'cable',
+          qty: livesAndN,
+          matched: phaseId !== undefined,
+        });
+        const peId = matchCablePart(circuit.grounding.peCsaMm2, parts, type);
+        lines.push({
+          partId: peId,
+          sku: skuOf(parts, peId),
+          description: `Wire ${type} ${circuit.grounding.peCsaMm2} mm² G/Y (PE) — ${circuit.name}`,
+          category: 'cable',
+          qty: runs,
+          matched: peId !== undefined,
+        });
+      } else {
+        // Multicore cable (NYY/NYM/N2XY/FRC…): the PE is the integral
+        // green-yellow core inside the cable — one product, one line.
+        const cablePartId = matchCablePart(circuit.cable.csaMm2, parts, type);
+        lines.push({
+          partId: cablePartId,
+          sku: skuOf(parts, cablePartId),
+          description: `Cable ${type} ${circuit.grounding.cableSpec.replace(`${type} `, '')} — ${circuit.name}`,
+          category: 'cable',
+          qty: 1,
+          matched: cablePartId !== undefined,
+        });
+      }
     }
 
     // Control gear, if any.
@@ -239,10 +275,45 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
 
 /** Flatten an entire system into BOM lines (every panel, root-first). */
 export function buildSystemBom(system: SystemResult, parts: Part[]): BomLine[] {
-  return system.order.flatMap((panelId) => {
+  const lines = system.order.flatMap((panelId) => {
     const panel = system.panels[panelId];
     return panel ? buildPanelBom(panel, parts) : [];
   });
+
+  // Earthing system: the main earthing + bonding conductors are BARE COPPER
+  // (BC) runs — circuit PEs live inside their cables / as G/Y wires, but the
+  // electrode tail and equipotential bonding are the BC the installer buys.
+  const earthing = system.earthing;
+  if (earthing) {
+    const mainId = matchCablePart(earthing.mainEarthingConductorMm2, parts, 'BC');
+    lines.push({
+      partId: mainId,
+      sku: skuOf(parts, mainId),
+      description: `Main earthing conductor — BC ${earthing.mainEarthingConductorMm2} mm² (to electrode)`,
+      category: 'cable',
+      qty: 1,
+      matched: mainId !== undefined,
+    });
+    const bondId = matchCablePart(earthing.mainBondingConductorMm2, parts, 'BC');
+    lines.push({
+      partId: bondId,
+      sku: skuOf(parts, bondId),
+      description: `Main equipotential bonding — BC ${earthing.mainBondingConductorMm2} mm²`,
+      category: 'cable',
+      qty: 1,
+      matched: bondId !== undefined,
+    });
+    if (earthing.electrode) {
+      const e = earthing.electrode;
+      lines.push({
+        description: `Earth electrode rod ${e.rodLengthM} m × Ø${e.rodDiameterMm} mm (array → ${e.achievedOhm} Ω)`,
+        category: 'accessory',
+        qty: e.rodCount,
+        matched: false,
+      });
+    }
+  }
+  return lines;
 }
 
 /** Cost a single panel by deriving and pricing its BOM. */
