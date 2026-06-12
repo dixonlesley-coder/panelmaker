@@ -229,6 +229,10 @@ interface UnifiedPanelData {
   loadKw: string;
   incomerA: string;
   incomer: string; // "MCCB 250A/4P"
+  /** "400 V · 3φ" — shown on the zoomed-out summary. */
+  voltage?: string;
+  /** Per-phase line currents (A) for the summary's R/S/T strip. */
+  phaseBalance?: { L1: number; L2: number; L3: number };
   busSpec: string;
   neutralSpec: string;
   peSpec: string;
@@ -738,6 +742,134 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
 /** Selection ring: an unmistakable halo on any node React Flow has selected. */
 const SELECT_RING = '0 0 0 3px var(--mantine-color-indigo-4)';
 
+/** One labelled value in the zoomed-out panel summary. */
+function SummaryStat({ v, k, big }: { v: string; k: string; big?: boolean }) {
+  return (
+    <Box style={{ minWidth: 0 }}>
+      <Text size={big ? 'lg' : 'sm'} fw={700} lineClamp={1}>
+        {v}
+      </Text>
+      <Text c="dimmed" tt="uppercase" style={{ fontSize: 9, letterSpacing: '0.04em' }} lineClamp={1}>
+        {k}
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * Zoomed-out panel summary: the at-a-glance facts an engineer scans a board
+ * for — load/demand, the incomer device spec, system, ways (+spares) and the
+ * R/S/T phase loading — plus a miniature bus strip whose way stubs sit at the
+ * SAME x positions as the detail schematic's columns, so the zoom
+ * cross-dissolve lines up and the card still reads as a board.
+ */
+function PanelSummary({ d, width, height }: { d: UnifiedPanelData; width: number; height: number }) {
+  const { t } = useTranslation();
+  const spares = d.ways.filter((w) => w.kind === 'spare').length;
+  const pb = d.phaseBalance;
+  const colX = (i: number) => LEFT + i * WAY_W + WAY_W / 2;
+
+  return (
+    <Stack gap={6} justify="space-between" style={{ height }} py={6}>
+      <Group gap={18} wrap="wrap" align="flex-start">
+        <SummaryStat big v={d.loadKw} k={t('sldSummary.load')} />
+        <SummaryStat v={d.incomerA} k={t('sldSummary.demand')} />
+        <SummaryStat v={d.incomer} k={t('sldSummary.incomer')} />
+        {d.voltage && <SummaryStat v={d.voltage} k={t('sldSummary.system')} />}
+        <SummaryStat
+          v={
+            spares > 0
+              ? t('sldSummary.waysWithSpares', { count: d.ways.length, spares })
+              : String(d.ways.length)
+          }
+          k={t('sldSummary.ways')}
+        />
+        {d.busSpec && <SummaryStat v={d.busSpec} k={t('sldSummary.busbar')} />}
+      </Group>
+
+      {pb && d.system === '3ph' && (
+        <Group gap={14} wrap="nowrap">
+          {([
+            ['R', 'L1', pb.L1],
+            ['S', 'L2', pb.L2],
+            ['T', 'L3', pb.L3],
+          ] as const).map(([label, key, amps]) => (
+            <Group key={key} gap={5} wrap="nowrap">
+              <Box
+                w={14}
+                h={14}
+                style={{
+                  borderRadius: 4,
+                  background: PHASE_COLOR[key],
+                  color: '#fff',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {label}
+              </Box>
+              <Text size="xs" fw={600}>
+                {formatAmps(amps)}
+              </Text>
+            </Group>
+          ))}
+        </Group>
+      )}
+
+      {/* Miniature bus: a stub per way at its true column x — phase-coloured,
+          dashed for spares, a board marker for feeders, rating beneath. */}
+      <svg width={width} height={38} style={{ display: 'block', overflow: 'hidden' }}>
+        <line
+          x1={LEFT - 26}
+          y1={6}
+          x2={Math.min(colX(Math.max(d.ways.length - 1, 0)) + 26, width - 2)}
+          y2={6}
+          stroke={FG}
+          strokeWidth={3}
+          strokeLinecap="round"
+          opacity={0.75}
+        />
+        {d.ways.map((w, i) => {
+          const x = colX(i);
+          if (x > width - 6) return null;
+          const color = w.feeds
+            ? 'var(--mantine-color-indigo-4)'
+            : (PHASE_COLOR[w.phase] ?? 'var(--mantine-color-gray-5)');
+          const hot = w.util !== undefined && w.util >= 100;
+          const warm = w.util !== undefined && w.util >= 85;
+          return (
+            <g key={w.id}>
+              <line
+                x1={x}
+                y1={6}
+                x2={x}
+                y2={20}
+                stroke={color}
+                strokeWidth={2.4}
+                strokeDasharray={w.kind === 'spare' ? '2.5 2.5' : undefined}
+              />
+              {w.feeds && <rect x={x - 4} y={16} width={8} height={7} fill="none" stroke={color} strokeWidth={1.4} />}
+              <text
+                x={x}
+                y={33}
+                fontSize={9}
+                textAnchor="middle"
+                fontWeight={600}
+                fill={hot ? 'var(--mantine-color-red-6)' : warm ? 'var(--mantine-color-orange-6)' : DIM}
+              >
+                {w.breakerA}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </Stack>
+  );
+}
+
 /** A panel that renders summary-or-detail from the current viewport zoom. */
 function UnifiedPanelNode({ data, selected }: NodeProps) {
   const d = data as UnifiedPanelData;
@@ -869,14 +1001,7 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
         style={{ minHeight: schematicH + 4 }}
       >
         {!expanded ? (
-          <Group justify="space-between" h={schematicH + 4} align="center">
-            <Text size="xs" c="dimmed">
-              {d.incomerA} · {d.ways.length} ways
-            </Text>
-            <Text size="sm" fw={700}>
-              {d.loadKw}
-            </Text>
-          </Group>
+          <PanelSummary d={d} width={width - 20} height={schematicH + 4} />
         ) : (
           <Box mt={4} style={{ overflow: 'hidden' }}>
             <PanelSchematic d={d} width={width - 20} />
@@ -1307,6 +1432,12 @@ function buildUnified(
         loadKw: formatKw(res.totalConnectedLoadW),
         incomerA: formatAmps(res.totalDemandCurrentA),
         incomer: `${res.incomer.breaker.deviceClass} ${res.incomer.breaker.ratingA}A/${res.incomer.poles}P`,
+        voltage: `${panel.voltageV} V · ${panel.system === '3ph' ? '3φ' : '1φ'}`,
+        phaseBalance: {
+          L1: res.phaseBalance.L1,
+          L2: res.phaseBalance.L2,
+          L3: res.phaseBalance.L3,
+        },
         busSpec,
         neutralSpec: bus.neutralCsaMm2 ? `${bus.neutralCsaMm2} mm²` : '—',
         peSpec: bus.peCsaMm2 ? `${bus.peCsaMm2} mm²` : '—',

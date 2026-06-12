@@ -605,6 +605,15 @@ export const id: TranslationKeys = {
     pasted_one: '{{count}} item ditempel.',
     pasted_other: '{{count}} item ditempel.',
   },
+  sldSummary: {
+    load: 'beban',
+    demand: 'kebutuhan',
+    incomer: 'incomer',
+    system: 'sistem',
+    ways: 'jalur',
+    waysWithSpares: '{{count}} ({{spares}} cadangan)',
+    busbar: 'busbar',
+  },
   sldNode: {
     supply: 'PLN',
     fed: 'disuplai',

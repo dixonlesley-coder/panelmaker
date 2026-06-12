@@ -601,6 +601,15 @@ export const en = {
     pasted_one: '{{count}} item pasted.',
     pasted_other: '{{count}} items pasted.',
   },
+  sldSummary: {
+    load: 'load',
+    demand: 'demand',
+    incomer: 'incomer',
+    system: 'system',
+    ways: 'ways',
+    waysWithSpares: '{{count}} ({{spares}} spare)',
+    busbar: 'busbar',
+  },
   sldNode: {
     supply: 'PLN',
     fed: 'fed',
