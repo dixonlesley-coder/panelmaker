@@ -140,7 +140,10 @@ const SOURCE_PALETTE: { key: SourceKind; labelKey: string; icon: React.ReactNode
 
 /* ----------------------------- schematic geometry -------------------------- */
 const LEFT = 52; // gutter for the bar labels (L1/L2/L3/N/PE)
-const WAY_W = 76; // horizontal pitch per outgoing way / bus-tapped device
+// Horizontal pitch per outgoing way / bus-tapped device. Wide enough that a
+// way's breaker-rating + starter text and its drop-cable label ("4×50 mm² ·
+// 68%") clear the neighbouring column — 76 px packed them illegibly.
+const WAY_W = 108;
 const RIGHT_PAD = 16;
 const INCOMER_Y = 8;
 const INCOMER_H = 26;
@@ -158,7 +161,7 @@ const LOAD_NODE_H = 74; // approx external load-node height (for layout clearanc
 // `layout().height` only covers the SVG, so loads must clear schematic + chrome
 // or they land inside the card once it expands on zoom-in.
 const PANEL_CHROME = 64;
-const LOAD_DROP_GAP = 16; // panel (expanded) bottom → its external load nodes
+const LOAD_DROP_GAP = 40; // panel (expanded) bottom → its external load nodes (room for cable labels)
 const GRID_SRC_W = 158; // utility-supply (grid) node, drawn above a utility panel
 const GRID_SRC_H = 54;
 /** Layout grid: panels + loads snap to it so wiring stays legible. */
@@ -1421,7 +1424,15 @@ function buildUnified(
           targetHandle: 'in',
           type: 'feeder',
           style: { stroke: PHASE_COLOR[wy.phase] ?? 'var(--mantine-color-gray-5)', strokeWidth: 1.6 },
-          data: { label: loadLabel, util: wy.util, panelId: id, circuitId: wy.id },
+          // Alternate the label height on neighbouring drops so even long
+          // labels ("4×50 mm² · 68%") never sit side-by-side on one line.
+          data: {
+            label: loadLabel,
+            util: wy.util,
+            panelId: id,
+            circuitId: wy.id,
+            offset: i % 2 === 0 ? -10 : 10,
+          },
         });
       });
       x += w + GAP;

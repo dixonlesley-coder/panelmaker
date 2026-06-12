@@ -8,6 +8,7 @@ import {
   IconFolder,
   IconSitemap,
   IconGauge,
+  IconInfoSquareRounded,
   IconChartLine,
   IconBox,
   IconReceipt,
@@ -31,6 +32,7 @@ import {
 } from '@renderer/state/projectStore';
 import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
+import { SystemInfo } from '@renderer/screens/SystemInfo';
 import { Dashboard } from '@renderer/screens/Dashboard';
 import { Coordination } from '@renderer/screens/Coordination';
 import { PartsCatalog } from '@renderer/screens/PartsCatalog';
@@ -69,7 +71,10 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     labelKey: 'nav.sectionInsight',
-    items: [{ screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> }],
+    items: [
+      { screen: 'overview', labelKey: 'nav.overview', icon: <IconInfoSquareRounded size={18} /> },
+      { screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> },
+    ],
   },
   {
     labelKey: 'nav.sectionCommercial',
@@ -187,6 +192,8 @@ function ActiveScreen({ screen }: { screen: Screen }) {
       return <Projects />;
     case 'system':
       return <SystemView />;
+    case 'overview':
+      return <SystemInfo />;
     case 'dashboard':
       return <Dashboard />;
     case 'panel':

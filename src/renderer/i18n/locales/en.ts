@@ -20,6 +20,7 @@ export const en = {
     sectionSetup: 'Setup',
     projects: 'Projects',
     system: 'System',
+    overview: 'System overview',
     dashboard: 'Dashboard',
     panel: 'Panel Editor',
     coordination: 'Coordination',

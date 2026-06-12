@@ -59,6 +59,7 @@ import {
 export type Screen =
   | 'projects'
   | 'system'
+  | 'overview'
   | 'dashboard'
   | 'panel'
   | 'coordination'

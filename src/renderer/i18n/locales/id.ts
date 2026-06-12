@@ -23,6 +23,7 @@ export const id: TranslationKeys = {
     sectionSetup: 'Pengaturan',
     projects: 'Proyek',
     system: 'Sistem',
+    overview: 'Ringkasan sistem',
     dashboard: 'Dasbor',
     panel: 'Editor Panel',
     coordination: 'Koordinasi',

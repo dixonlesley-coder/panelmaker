@@ -11,6 +11,7 @@ import {
   IconFileTypePdf,
   IconFolder,
   IconGauge,
+  IconInfoSquareRounded,
   IconLayoutGridAdd,
   IconMoon,
   IconPackageExport,
@@ -42,6 +43,7 @@ interface Command {
 const SCREEN_ICONS: Record<Screen, React.ReactNode> = {
   projects: <IconFolder size={16} />,
   system: <IconSitemap size={16} />,
+  overview: <IconInfoSquareRounded size={16} />,
   dashboard: <IconGauge size={16} />,
   panel: <IconAdjustmentsBolt size={16} />,
   coordination: <IconChartLine size={16} />,
@@ -57,6 +59,7 @@ const SCREEN_ICONS: Record<Screen, React.ReactNode> = {
 const SCREENS: Screen[] = [
   'projects',
   'system',
+  'overview',
   'dashboard',
   'coordination',
   'parts',
