@@ -1002,7 +1002,23 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
         }
       }}
     >
-      <Handle type="target" position={Position.Top} id="in" />
+      {/* Feed-in target: as big and obvious as the outlet dot below, so the
+          drag-to-feed gesture has an easy landing zone at both ends. */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="in"
+        style={{
+          left: '50%',
+          top: -14,
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          background: 'var(--mantine-color-indigo-5)',
+          border: '3px solid var(--mantine-color-body)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+        }}
+      />
 
       <Group justify="space-between" wrap="nowrap" gap={6} align="flex-start">
         <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
