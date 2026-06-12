@@ -10,6 +10,7 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   getSmoothStepPath,
   useNodesState,
   useViewport,
@@ -2057,6 +2058,14 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             nodesConnectable
             nodesDraggable
             elementsSelectable
+            // CAD-style selection: left-drag on empty canvas draws a selection
+            // box (touching a node selects it — Partial, like a crossing
+            // window). Panning moves to middle-drag / trackpad scroll, zoom to
+            // Ctrl+scroll / pinch, so the left button is purely select + move.
+            selectionOnDrag
+            selectionMode={SelectionMode.Partial}
+            panOnDrag={[1]}
+            panOnScroll
             deleteKeyCode={['Backspace', 'Delete']}
             zoomOnDoubleClick={false}
             onInit={(inst) => {
