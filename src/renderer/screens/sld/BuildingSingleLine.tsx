@@ -745,6 +745,54 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
 /** Selection ring: an unmistakable halo on any node React Flow has selected. */
 const SELECT_RING = '0 0 0 3px var(--mantine-color-indigo-4)';
 
+/**
+ * Visible resize grip on the palette's right edge: a grip bar you can see and
+ * grab (the previous invisible hover strip was undiscoverable). Drag to
+ * resize; double-click to snap back to the fit-everything width.
+ */
+function PaletteGrip({
+  onPointerDown,
+  onDoubleClick,
+  title,
+}: {
+  onPointerDown: (e: React.PointerEvent) => void;
+  onDoubleClick: () => void;
+  title: string;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <Box
+      onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={title}
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: -7,
+        width: 14,
+        height: '100%',
+        cursor: 'col-resize',
+        zIndex: 5,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Box
+        style={{
+          width: 4,
+          height: 48,
+          borderRadius: 2,
+          background: hover ? 'var(--mantine-color-indigo-5)' : 'var(--mantine-color-default-border)',
+          transition: 'background 120ms ease',
+        }}
+      />
+    </Box>
+  );
+}
+
 /** One labelled value in the zoomed-out panel summary. */
 function SummaryStat({ v, k, big }: { v: string; k: string; big?: boolean }) {
   return (
@@ -1763,30 +1811,34 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // click a panel → its full toolset in a side inspector (no screen change).
   const [editing, setEditing] = useState<{ panelId: string; circuitId: string; focus: 'device' | 'cable' } | null>(null);
   const [inspectPanelId, setInspectPanelId] = useState<string | null>(null);
-  // Draggable palette width (persisted) — long card names ("Industrial socket
-  // (3φ)") were clipped at the fixed 140 px; the user sets the width they want.
+  // Draggable palette width (persisted). Default WIDE ENOUGH that no card name
+  // is clipped out of the box ("Industrial socket (3φ)", "Solar PV + inverter");
+  // the grip bar resizes 130–420 px, double-click resets to the fit width.
+  const PALETTE_FIT_W = 210;
+  const clampPaletteW = (w: number) => Math.max(130, Math.min(420, w));
   const [paletteW, setPaletteW] = useState<number>(() => {
     const saved = typeof localStorage !== 'undefined' ? Number(localStorage.getItem('pm:paletteW')) : NaN;
-    return Number.isFinite(saved) && saved >= 120 ? Math.min(saved, 360) : 150;
+    return Number.isFinite(saved) && saved >= 130 ? clampPaletteW(saved) : PALETTE_FIT_W;
   });
+  const persistPaletteW = (w: number) => {
+    try {
+      localStorage.setItem('pm:paletteW', String(Math.round(w)));
+    } catch {
+      /* storage unavailable — width still applies for the session */
+    }
+  };
   const startPaletteResize = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
       const startX = e.clientX;
       const startW = paletteW;
       const onMove = (ev: PointerEvent) => {
-        const w = Math.max(120, Math.min(360, startW + (ev.clientX - startX)));
-        setPaletteW(w);
+        setPaletteW(clampPaletteW(startW + (ev.clientX - startX)));
       };
       const onUp = (ev: PointerEvent) => {
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
-        const w = Math.max(120, Math.min(360, startW + (ev.clientX - startX)));
-        try {
-          localStorage.setItem('pm:paletteW', String(Math.round(w)));
-        } catch {
-          /* storage unavailable — width still applies for the session */
-        }
+        persistPaletteW(clampPaletteW(startW + (ev.clientX - startX)));
       };
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
@@ -2259,21 +2311,17 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
 
   return (
     <Group align="stretch" gap="sm" wrap="nowrap" h="clamp(560px, calc(100vh - 220px), 880px)">
-      {/* Palette — drag a card onto a panel to add it there. The right-edge
-          handle resizes it (long card names were clipped at a fixed width). */}
+      {/* Palette — drag a card onto a panel to add it there. The VISIBLE grip
+          bar on the right edge resizes it; double-click resets to the width
+          that fits every card name. */}
       <Box style={{ position: 'relative', flexShrink: 0, width: paletteW }}>
-        <Box
+        <PaletteGrip
           onPointerDown={startPaletteResize}
-          title={t('system.paletteResize')}
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: -3,
-            width: 8,
-            height: '100%',
-            cursor: 'col-resize',
-            zIndex: 5,
+          onDoubleClick={() => {
+            setPaletteW(PALETTE_FIT_W);
+            persistPaletteW(PALETTE_FIT_W);
           }}
+          title={t('system.paletteResize')}
         />
       <Card withBorder radius="md" padding="xs" h="100%" style={{ overflowY: 'auto' }}>
         <Group gap={4} mb={6} wrap="nowrap">
