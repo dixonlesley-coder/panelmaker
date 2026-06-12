@@ -37,10 +37,22 @@ npx drizzle-kit generate
 # as a PyInstaller binary the app spawns — end users need no Python)
 python scripts/extract_catalogue.py --pdf catalogue.pdf --auto-json   # prints JSON
 python scripts/extract_catalogue.py --pdf catalogue.pdf --inspect 1-20  # debug headers
-
-# package + publish a release (enables auto-update for installed apps)
-GH_TOKEN=<token> npx electron-builder --publish always   # bump package.json "version" first
 ```
+
+**Releasing (only when the user says "publish").** The release is cut by CI, not locally:
+
+1. Run the workflow's EXACT gate first: `npx tsc --noEmit -p tsconfig.json` (the FULL scope —
+   it includes `tests/`, which the per-commit web/node typechecks do not) + `npx vitest run`.
+2. Bump the version (`npm version X.Y.Z --no-git-tag-version`), commit `Release vX.Y.Z: …`, push.
+3. Trigger `.github/workflows/release.yml` via **workflow_dispatch with `publish=true`** on this
+   branch (GitHub MCP `actions_run_trigger`). The sandbox git credential can push `claude/*`
+   branches but NOT tags (HTTP 403) — the workflow creates and pushes the `vX.Y.Z` tag itself.
+4. Verify: the run concludes `success` AND the release at that tag carries all three assets —
+   `PanelMaker-X.Y.Z-setup.exe`, its `.blockmap`, and `latest.yml` (the auto-update feed).
+
+**Version number is Claude's call** (user-delegated): patch (`0.1.x`) for fixes/small UX
+batches, minor (`0.x.0`) when a batch meaningfully expands the design domain (new engineering
+capabilities, model/DB additions). electron-updater only needs the number to increase.
 
 **Verification reality:** the Electron GUI and a headless browser cannot run in this
 environment (no display; the sandbox blocks the Playwright/Chromium CDN). Verify changes
@@ -129,7 +141,7 @@ shared on-disk DB.
 
 ## Implemented feature set (current progress)
 
-All committed on branch `claude/cool-edison-f8wTp`; full suite green.
+Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.1.43**; full suite green.
 
 - **Sizing engine (PUIL/IEC):** load current (1ph/3ph), derating, cable sizing
   (`Iz ≥ max(In, 1.25·Ib)` + minimums + voltage drop), breaker (MCB/MCCB), busbar
@@ -187,7 +199,7 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   / unpackaged), so dev, CI, and the web preview are unaffected. The gate lives entirely in the main
   process; the renderer only reads status via `license:*` IPC. Setup in `LICENSING.md`.
 
-### Edit-on-canvas single-line + catalogue pipeline (same branch, latest)
+### Edit-on-canvas single-line + catalogue pipeline (same branch)
 
 - **Unified single-line canvas (`screens/sld/BuildingSingleLine.tsx`):** every panel on ONE
   @xyflow/react canvas with zoom-driven LOD — a summary card zoomed out, the full internal
@@ -223,7 +235,7 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - **Release hygiene:** `.github/workflows/release.yml` has a `concurrency: group=release` guard so
   back-to-back publishes can't race on the GitHub Release assets and break auto-update.
 
-### Multi-manufacturer catalogue + order codes + more UX (same branch, latest — v0.1.42)
+### Multi-manufacturer catalogue + order codes + more UX (released as v0.1.42)
 
 - **Multi-manufacturer catalogue (`src/shared/data/catalog/`):** the loader is now a **registry of
   per-brand JSON files** merged + de-duplicated by SKU (`CATALOG_SOURCES` in `index.ts`;
@@ -248,7 +260,7 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   React Flow **MiniMap** on the canvas; and **Export PDF / Save** added to the **⌘K command palette**
   (`features/CommandPalette.tsx`, already existed). All localised EN + ID.
 
-### UX batch after v0.1.42 (same branch, latest)
+### UX batch after v0.1.42 (same branch)
 
 - **Per-circuit cable type:** `CircuitInput.cableType` (NYY/NYM/NYA/NYAF select in the circuit
   editor) wins over the panel default (NYY 3ph / NYM 1ph, N2XY XLPE, NAYY/NA2XY Al); the effective
@@ -270,7 +282,7 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - **Parts Catalog brand filter:** clearable/searchable brand Select (derived from loaded parts)
   combinable with the text search. Everything above localised EN + ID; suite at 434 tests.
 
-### Canvas-workflow audit fixes (same branch, latest)
+### Canvas-workflow audit fixes (same branch)
 
 - **One service entrance:** the PLN intake/meter/SPD/PFC chrome hangs only on the service root
   (`serviceRootId` in `lib/panelTree.ts`: utility root with feeder children → highest demand →
@@ -290,7 +302,7 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - Unique panel names by construction; `addCircuit` default aligned with the palette (2 kW);
   help-legend Delete line corrected; dead `'panel'` ⌘K nav entry removed. Suite at 445 tests.
 
-### Palette + hybrid backup (same branch, latest)
+### Palette + hybrid backup (same branch)
 
 - **Palette = standards:** every load card derives cos φ + demand factor from `LOAD_DEFAULTS`
   (`loadCard()` helper) — no hand-coded values that drift from the wizard/table; `FloatingLoad`
@@ -309,7 +321,7 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
   `essential-no-backup`, `pv-exceeds-service` (PLN rooftop cap vs daya tersambung). Also fixed:
   `circuits.cable_type` column (cableType silently vanished on desktop save/load). Suite at 454.
 
-### Phases, life-safety, three-tier backup, dual transformer (same branch, latest)
+### Phases, life-safety, three-tier backup, dual transformer (same branch)
 
 - **Motor phase fix + explicit phases:** `circuitIsThreePhase` no longer forces 3φ just because a
   starter exists (a 1-ph motor has a DOL contactor too); `CircuitInput.phases (1|3)` overrides the
@@ -336,6 +348,23 @@ All committed on branch `claude/cool-edison-f8wTp`; full suite green.
 - **Canvas clipboard:** Shift-click/Shift-drag select; **Ctrl+C/Ctrl+V** copies panels (template
   machinery: fresh ids, feeders stripped, unique "(copy)" names, one undo step), way circuits and
   floating loads, pasted offset. Suite at 474.
+
+### Selection & gestures (released as v0.1.43)
+
+- **Visible selection:** clicked/box-selected nodes draw an indigo halo (`SELECT_RING` box-shadow,
+  stacks under hover so error borders still read) — what's lit is what Ctrl+C copies. The
+  display-only PLN grid node is `selectable: false`.
+- **Paste at the cursor:** the canvas tracks the last mouse position; pasted panels/floats anchor
+  their group there (relative layout preserved, grid-snapped; offset-from-original fallback), and
+  copied way circuits land in the panel **nearest the cursor** (`nearestPanelId`, same box-distance
+  rule as drag-to-wire), falling back to their source panel.
+- **CAD gesture scheme (deliberate change):** `selectionOnDrag` + `SelectionMode.Partial` — plain
+  left-drag on empty canvas is a crossing-window box select; **pan = middle-drag or trackpad scroll
+  (`panOnScroll`), zoom = Ctrl+scroll / pinch**. Right button stays reserved for context menus.
+  The "?" help legend documents the scheme; revert = drop `selectionOnDrag`/`panOnScroll`.
+- **v0.1.43 released** via workflow_dispatch publish (see Releasing above): all three assets
+  verified on the GitHub Release; CI gate caught that the full `tsconfig.json` typecheck also
+  covers `tests/` — run it before tagging.
 
 ## README
 
