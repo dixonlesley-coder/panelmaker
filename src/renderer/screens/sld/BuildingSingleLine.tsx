@@ -1669,10 +1669,11 @@ function buildUnified(
           // SVG, so the load never lands inside the panel when it expands on zoom-in.
           position: { x: wayCx - LOAD_W / 2, y: panelH + PANEL_CHROME + LOAD_DROP_GAP },
           // Selectable + deletable: Delete (or box-select + Delete) removes the
-          // way's circuit. Glued under its MCB and moved by the panel; dragging
-          // it itself would only reset on the next recompute, so not draggable.
+          // way's circuit. Draggable to REORDER: drop it left/right of its
+          // siblings and the panel's ways re-sequence (the node then snaps to
+          // its new column on the rebuild).
           deletable: true,
-          draggable: false,
+          draggable: true,
           data: {
             kind: wy.kind,
             name: wy.name,
@@ -2082,6 +2083,30 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // using expanded sizes, so panels don't collide once you zoom in.
   const onNodeDragStop = useCallback(
     (_e: unknown, node: Node) => {
+      if (node.type === 'load') {
+        // Drag a way's load left/right to REORDER the panel's ways: the drop
+        // x (parent-relative) picks the target column among ALL ways (feeders
+        // and spares hold columns too, even without a load node).
+        const pid = node.data?.panelId as string | undefined;
+        const cid = node.data?.circuitId as string | undefined;
+        const panel = pid ? project.panels.find((p) => p.id === pid) : undefined;
+        if (!panel || !cid) return;
+        const count = panel.circuits.length;
+        const cx = node.position.x + LOAD_W / 2;
+        const target = Math.max(0, Math.min(count - 1, Math.round((cx - LEFT - WAY_W / 2) / WAY_W)));
+        const ids = panel.circuits.map((c) => c.id);
+        const from = ids.indexOf(cid);
+        if (from !== -1 && from !== target) {
+          ids.splice(from, 1);
+          ids.splice(target, 0, cid);
+          reorderCircuits(panel.id, ids); // rebuild snaps the node to its new column
+        } else {
+          // Order unchanged — no rebuild will come, so snap it back ourselves.
+          const home = built.nodes.find((n) => n.id === node.id);
+          if (home) setNodes((cur) => cur.map((n) => (n.id === node.id ? { ...n, position: home.position } : n)));
+        }
+        return;
+      }
       if (node.type === 'floatLoad') {
         // Snap a dropped load onto the nearest panel (within reach) and wire it up
         // automatically — otherwise just leave it floating where it landed.
@@ -2122,7 +2147,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         return cur.map((n) => (n.id === node.id ? { ...n, position: { x, y } } : n));
       });
     },
-    [panelBox, setNodes, moveFloatingLoad, attachFloatingLoad, nodes],
+    [panelBox, setNodes, moveFloatingLoad, attachFloatingLoad, nodes, project, built.nodes, reorderCircuits],
   );
 
   /** Nearest panel to a canvas point (distance to its expanded box; 0 inside). */

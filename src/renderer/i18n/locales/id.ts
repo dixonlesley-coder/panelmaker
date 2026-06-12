@@ -689,7 +689,7 @@ export const id: TranslationKeys = {
     helpCable: 'Klik ganda kabel untuk mengatur panjang dan ukurannya',
     helpDelete: 'Pilih panel atau beban lepas lalu tekan Delete; klik kanan jalur untuk menghapusnya',
     helpCopy: 'Seret kotak di kanvas kosong (atau Shift-klik) untuk memilih beberapa; Ctrl+C, lalu Ctrl+V menempel di posisi kursor (jalur salinan masuk ke panel terdekat)',
-    helpReorder: 'Seret kolom di dalam panel untuk menata ulang jalurnya',
+    helpReorder: 'Seret beban (atau kolom di dalam panel) ke kiri/kanan untuk menata ulang jalur',
     helpZoom: 'Gulir untuk zoom (panel menampilkan isinya saat didekati); seret tombol tengah untuk menggeser',
     supplyMv: 'Tegangan menengah + trafo',
     supplyLv: 'Tegangan rendah (langsung PLN)',

@@ -685,7 +685,7 @@ export const en = {
     helpCable: 'Double-click a cable to set its length and size',
     helpDelete: 'Select a panel or floating load and press Delete; right-click a way to delete it',
     helpCopy: 'Drag a box on empty canvas (or Shift-click) to select several; Ctrl+C, then Ctrl+V pastes at the cursor (copied ways join the nearest panel)',
-    helpReorder: 'Drag a column inside a panel to reorder its ways',
+    helpReorder: 'Drag a load (or a column inside the panel) left/right to reorder the ways',
     helpZoom: 'Scroll to zoom (panels reveal their internals up close); middle-button drag to pan',
     supplyMv: 'Medium voltage + transformer',
     supplyLv: 'Low voltage (direct PLN)',
