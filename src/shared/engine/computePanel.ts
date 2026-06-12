@@ -33,6 +33,12 @@ import { circuitWarnings, protectionWarnings, validateInterlocks } from './warni
 export interface ComputePanelOptions {
   /** Aggregated downstream demand (W) keyed by the child panel id a feeder serves. */
   feederLoadW?: Record<string, number>;
+  /**
+   * Each panel's system keyed by panel id. A feeder follows the FED panel:
+   * a single-phase sub-board takes a single-phase L+N+PE feeder (3×2.5 / 3×4
+   * by capacity), not a forced 3-phase run.
+   */
+  panelSystems?: Record<string, SystemType>;
   /** Installation earthing system (drives RCD requirements). */
   earthingSystem?: EarthingSystem;
   /** Prospective 3-phase symmetrical fault current at this panel's bus (A). */
@@ -84,14 +90,21 @@ function computeCircuit(
   const def = LOAD_DEFAULTS[c.loadKind];
   const isFeeder = c.loadKind === 'feeder' || c.feedsPanelId !== undefined;
 
-  const threePhase = circuitIsThreePhase({
-    panelSystem: panel.system,
-    kind: c.loadKind,
-    loadW,
-    motorKw: c.motorKw,
-    phases: c.phases,
-    isFeeder,
-  });
+  // A feeder's phase follows the panel it FEEDS: a single-phase sub-board is
+  // supplied by one phase (L+N+PE), even from a three-phase parent — it then
+  // joins the L1/L2/L3 balancing like any single-phase circuit.
+  const fedSystem = c.feedsPanelId ? opts.panelSystems?.[c.feedsPanelId] : undefined;
+  const threePhase =
+    fedSystem === '1ph'
+      ? false
+      : circuitIsThreePhase({
+          panelSystem: panel.system,
+          kind: c.loadKind,
+          loadW,
+          motorKw: c.motorKw,
+          phases: c.phases,
+          isFeeder,
+        });
   const motorLike = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
   const isMotor = motorLike && threePhase;
 
@@ -115,9 +128,11 @@ function computeCircuit(
     overrideA: c.breakerOverrideA,
   });
   const isTrunk = c.role === 'incomer' || isFeeder;
-  // PUIL final-circuit minimums: 1.5 mm² for lighting, 2.5 mm² for power/sockets,
-  // 4 mm² for mains/feeders.
-  const baseMinSection = isTrunk ? 4 : c.isLighting ? 1.5 : 2.5;
+  // PUIL final-circuit minimums: 1.5 mm² for lighting, 2.5 mm² for power/sockets.
+  // Trunk (mains/feeder) floor: 4 mm² for THREE-PHASE distribution; a
+  // single-phase feeder may run 2.5 mm² when its capacity allows (ampacity and
+  // voltage drop still govern upward).
+  const baseMinSection = isTrunk ? (threePhase ? 4 : 2.5) : c.isLighting ? 1.5 : 2.5;
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const insulation = panel.insulation ?? 'PVC';
   const material = panel.material ?? 'Cu';

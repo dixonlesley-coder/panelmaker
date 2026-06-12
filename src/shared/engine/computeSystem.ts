@@ -45,6 +45,23 @@ export function computeSystem(project: ProjectInput): SystemResult {
     }
   }
 
+  // Each panel's system, so feeders can follow the panel they FEED (a 1-ph
+  // sub-board gets a 1-ph feeder). A 3-ph child under a 1-ph parent is
+  // physically impossible — one phase cannot supply three.
+  const panelSystems = Object.fromEntries(panels.map((p) => [p.id, p.system]));
+  for (const [childId, parentId] of parentOf) {
+    const child = byId.get(childId);
+    const parent = byId.get(parentId);
+    if (child?.system === '3ph' && parent?.system === '1ph') {
+      warnings.push({
+        code: 'feeder-phase-mismatch',
+        severity: 'error',
+        message: `${child.name}: a three-phase panel cannot be fed from the single-phase ${parent.name} — change one of the panel systems or re-parent the feeder.`,
+        panelId: childId,
+      });
+    }
+  }
+
   // Post-order DFS from roots so children are computed before parents.
   const visited = new Set<string>();
   const inStack = new Set<string>();
@@ -280,6 +297,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
 
     const pr = computePanel(panel, {
       feederLoadW: feederLoadWByPanel.get(id) ?? {},
+      panelSystems,
       earthingSystem,
       faultLevelA: faultA,
       sourceZ,
