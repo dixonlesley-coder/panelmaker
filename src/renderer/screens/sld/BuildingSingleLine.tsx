@@ -1503,6 +1503,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // Where a just-created panel should land (the drop point), consumed once by
   // the node-sync effect — new nodes otherwise get the auto-layout position.
   const pendingPanelPos = useRef(new Map<string, { x: number; y: number }>());
+  // Last mouse position over the canvas (screen coords) — paste anchors here.
+  const mousePos = useRef<{ x: number; y: number } | null>(null);
   const pastePanels = useProjectStore((s) => s.pastePanels);
   const pasteCircuits = useProjectStore((s) => s.pasteCircuits);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
@@ -1776,8 +1778,26 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     [panelBox, setNodes, moveFloatingLoad, attachFloatingLoad, nodes],
   );
 
+  /** Nearest panel to a canvas point (distance to its expanded box; 0 inside). */
+  const nearestPanelId = useCallback(
+    (pt: { x: number; y: number }): string | null => {
+      let best: { id: string; dist: number } | null = null;
+      for (const n of nodes) {
+        if (n.type !== 'uPanel') continue;
+        const b = panelBox(n.id);
+        const dx = Math.max(n.position.x - pt.x, 0, pt.x - (n.position.x + b.w));
+        const dy = Math.max(n.position.y - pt.y, 0, pt.y - (n.position.y + b.h));
+        const dist = Math.hypot(dx, dy);
+        if (!best || dist < best.dist) best = { id: n.id, dist };
+      }
+      return best?.id ?? null;
+    },
+    [nodes, panelBox],
+  );
+
   // Canvas clipboard: Ctrl/Cmd+C snapshots the SELECTED nodes (panels, ways'
-  // loads, floating loads); Ctrl/Cmd+V pastes copies offset from the originals.
+  // loads, floating loads); Ctrl/Cmd+V pastes them AT THE CURSOR (panels keep
+  // their relative layout; copied ways land in the panel nearest the mouse).
   // Held outside project history so undo never clears what was copied.
   const canvasClipboard = useRef<{
     panels: { snapshot: PanelInput; position: { x: number; y: number } }[];
@@ -1837,17 +1857,41 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       if (!clip) return;
       e.preventDefault();
       const OFFSET = GRID * 2;
+      // Paste lands AT THE CURSOR, not on top of the originals: the copied
+      // group keeps its relative layout, anchored at the mouse position
+      // (last-known canvas position; offset-from-original as the fallback).
+      const at = mousePos.current ? rfRef.current?.screenToFlowPosition(mousePos.current) : undefined;
+      const anchors = [
+        ...clip.panels.map((p) => p.position),
+        ...clip.floats.map((f) => f.position),
+      ];
+      const minX = Math.min(...anchors.map((p) => p.x));
+      const minY = Math.min(...anchors.map((p) => p.y));
+      const placed = (orig: { x: number; y: number }) =>
+        at
+          ? { x: snap(at.x + (orig.x - minX)), y: snap(at.y + (orig.y - minY)) }
+          : { x: snap(orig.x + OFFSET), y: snap(orig.y + OFFSET) };
+
       if (clip.panels.length > 0) {
         const newIds = pastePanels(clip.panels.map((p) => p.snapshot));
         newIds.forEach((id, i) => {
           const src = clip.panels[i];
-          if (src) pendingPanelPos.current.set(id, { x: snap(src.position.x + OFFSET), y: snap(src.position.y + OFFSET) });
+          if (src) pendingPanelPos.current.set(id, placed(src.position));
         });
       }
-      if (clip.circuits.length > 0) pasteCircuits(clip.circuits);
+      if (clip.circuits.length > 0) {
+        // Copied ways land in the panel NEAREST THE CURSOR — that's where the
+        // user is pointing — falling back to their source panel without one.
+        const target = at ? nearestPanelId(at) : null;
+        pasteCircuits(
+          target
+            ? clip.circuits.map((it) => ({ ...it, panelId: target }))
+            : clip.circuits,
+        );
+      }
       for (const f of clip.floats) {
         const { id: _id, position, ...rest } = f;
-        addFloatingLoad({ ...rest, position: { x: position.x + OFFSET, y: position.y + OFFSET } });
+        addFloatingLoad({ ...rest, position: placed(position) });
       }
       notifications.show({
         message: t('sldClipboard.pasted', {
@@ -1858,7 +1902,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [nodes, pastePanels, pasteCircuits, addFloatingLoad, t]);
+  }, [nodes, pastePanels, pasteCircuits, addFloatingLoad, nearestPanelId, t]);
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
   const editingCircuit = editingPanel?.circuits.find((c) => c.id === editing?.circuitId);
@@ -1985,6 +2029,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
 
       <Box
         style={{ flex: 1, minWidth: 0 }}
+        onMouseMove={(e) => {
+          mousePos.current = { x: e.clientX, y: e.clientY };
+        }}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes(SLD_DND)) {
             e.preventDefault();

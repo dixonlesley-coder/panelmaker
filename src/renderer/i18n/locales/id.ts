@@ -676,7 +676,7 @@ export const id: TranslationKeys = {
     helpLoad: 'Seret beban ke panel untuk mengkabelkannya (membuat MCB)',
     helpCable: 'Klik ganda kabel untuk mengatur panjang dan ukurannya',
     helpDelete: 'Pilih panel atau beban lepas lalu tekan Delete; klik kanan jalur untuk menghapusnya',
-    helpCopy: 'Shift-klik / Shift-seret untuk memilih banyak; Ctrl+C lalu Ctrl+V menyalin panel & beban',
+    helpCopy: 'Shift-klik / Shift-seret untuk memilih banyak; Ctrl+C, lalu Ctrl+V menempel di posisi kursor (jalur salinan masuk ke panel terdekat)',
     helpReorder: 'Seret kolom di dalam panel untuk menata ulang jalurnya',
     helpZoom: 'Gulir untuk memperbesar — panel menampilkan isinya saat didekati',
     supplyMv: 'Tegangan menengah + trafo',
