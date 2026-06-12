@@ -11,6 +11,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Table,
   Tabs,
   Text,
@@ -66,6 +67,7 @@ export function SystemView() {
   const preferredBrand = useProjectStore((s) => s.preferredBrand);
   // Costing + order codes use the selected manufacturer (cables stay available).
   const bomParts = useMemo(() => partsForBrand(parts, preferredBrand), [parts, preferredBrand]);
+  const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
   const addPanel = useProjectStore((s) => s.addPanel);
   const addPanelFromTemplate = useProjectStore((s) => s.addPanelFromTemplate);
   const userTemplates = useProjectStore((s) => s.userTemplates);
@@ -324,13 +326,26 @@ export function SystemView() {
               {sup.type === 'MV' ? t('system.supplyMv') : t('system.supplyLv')}
             </Badge>
           </Group>
-          <Text size="sm" fw={600}>
-            {t('system.demandKva', { kva: sup.demandKva })}
-          </Text>
+          <Group gap="md">
+            <Switch
+              size="xs"
+              label={t('system.dualTransformer')}
+              checked={project.meta?.dualTransformer === true}
+              onChange={(e) =>
+                setProjectMeta({ dualTransformer: e.currentTarget.checked ? true : undefined })
+              }
+            />
+            <Text size="sm" fw={600}>
+              {t('system.demandKva', { kva: sup.demandKva })}
+            </Text>
+          </Group>
         </Group>
         {sup.type === 'MV' && (
           <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xs">
-            <KeyStat k={t('system.transformer')} v={`${sup.transformerKva} kVA`} />
+            <KeyStat
+              k={t('system.transformer')}
+              v={`${(sup.transformerCount ?? 1) >= 2 ? '2× ' : ''}${sup.transformerKva} kVA`}
+            />
             <KeyStat k={t('system.mvVoltage')} v={`${(sup.mvVoltageV ?? 0) / 1000} kV`} />
             <KeyStat k={t('system.impedance')} v={`${sup.transformerImpedancePct}%`} />
             <KeyStat

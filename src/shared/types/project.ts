@@ -241,6 +241,12 @@ export interface ProjectMeta {
    * 0.85 PLN penalty threshold. The capacitor bank is sized to reach this.
    */
   targetPf?: number;
+  /**
+   * Dual-transformer supply (hotels, data centers): forces an MV service with
+   * TWO transformers — each sized for half the demand — on split bus sections
+   * behind a normally-open bus coupler. Fault level is one unit's (N.O. coupler).
+   */
+  dualTransformer?: boolean;
 }
 
 /**

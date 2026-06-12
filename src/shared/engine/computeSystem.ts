@@ -131,7 +131,9 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const rootDemandW = roots.reduce((s, p) => s + (panelDemandW.get(p.id) ?? 0), 0);
   const lvVoltageV = roots[0]?.voltageV ?? 400;
   const totalDemandKva = rootDemandW / 1000 / ASSUMED_BUILDING_PF;
-  const supply = determineSupply(totalDemandKva, lvVoltageV);
+  const supply = determineSupply(totalDemandKva, lvVoltageV, {
+    dual: project.meta?.dualTransformer === true,
+  });
   // Flagged-panel demand (essential → genset, UPS-backed → battery): a panel
   // under a flagged ancestor is already inside that ancestor's demand, so only
   // the TOPMOST flagged panels are summed (double-count free).

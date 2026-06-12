@@ -640,6 +640,7 @@ export const id: TranslationKeys = {
     exportAllDoneWeb_other: '{{count}} berkas diunduh — PDF sistem memerlukan aplikasi desktop.',
     exportAllCancelled: 'Ekspor dibatalkan.',
     panelAddedUnfed: 'Panel ditambahkan — belum disuplai. Seret outlet bundar panel lain ke panel ini untuk menyuplainya.',
+    dualTransformer: 'Trafo ganda (bus terpisah + kopler N.O.)',
     myTemplates: 'Templat saya',
     templateMeta_one: '{{count}} sirkuit · dari {{panel}}',
     templateMeta_other: '{{count}} sirkuit · dari {{panel}}',

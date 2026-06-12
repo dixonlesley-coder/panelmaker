@@ -91,6 +91,46 @@ describe('tenant sub-metering', () => {
   });
 });
 
+describe('dual-transformer supply', () => {
+  const prj = (dual: boolean, loadW = 100000): ProjectInput => ({
+    id: 'x',
+    name: 'X',
+    ...(dual ? { meta: { dualTransformer: true } } : {}),
+    panels: [panel({ id: 'P', name: 'MDP', circuits: [branch({ id: 'c1', name: 'Load', loadW })] })],
+  });
+
+  it('forces an MV service even below the 200 kVA LV ceiling', () => {
+    const single = computeSystem(prj(false));
+    expect(single.supply.type).toBe('LV'); // ~118 kVA — normally direct LV
+    const dual = computeSystem(prj(true));
+    expect(dual.supply.type).toBe('MV');
+    expect(dual.supply.transformerCount).toBe(2);
+  });
+
+  it('sizes each unit for half the demand; fault level stays one unit', () => {
+    const big = computeSystem(prj(false, 400000)); // ~470 kVA → single MV
+    const dual = computeSystem(prj(true, 400000));
+    expect(dual.supply.transformerKva).toBeLessThan(big.supply.transformerKva ?? Infinity);
+    expect(dual.supply.note).toContain('2 ×');
+    expect(dual.supply.note).toContain('NORMALLY OPEN'.toLowerCase().includes('x') ? 'x' : 'coupler');
+    // Fault basis = per-unit kVA → the boards see a LOWER fault than one big unit.
+    const dualFault = dual.panels['P']!.faultLevelKa ?? 0;
+    const bigFault = big.panels['P']!.faultLevelKa ?? 0;
+    expect(dualFault).toBeLessThan(bigFault);
+  });
+
+  it('draws T1 + T2 and the coupler interlock on the one-line', () => {
+    const ol = computePowerOneline(computeSystem(prj(true, 400000)));
+    const txs = ol.nodes.filter((n) => n.kind === 'transformer');
+    expect(txs).toHaveLength(2);
+    expect(txs.map((n) => n.label)).toEqual(['Transformer T1', 'Transformer T2']);
+    expect(ol.edges.some((e) => e.from === 'tx2' && e.to === 'bus')).toBe(true);
+    const coupler = ol.interlocks.find((il) => il.id === 'il-coupler');
+    expect(coupler).toBeDefined();
+    expect(coupler!.note).toContain('NORMALLY OPEN');
+  });
+});
+
 describe('secondary SPDs at distant sub-boards', () => {
   it('recommends a Type 2 on a sub-board beyond ~10 m of feeder, not nearby ones', () => {
     const prj: ProjectInput = {

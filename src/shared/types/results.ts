@@ -66,6 +66,11 @@ export interface SupplyResult {
   type: 'LV' | 'MV';
   voltageV: number;
   demandKva: number;
+  /**
+   * Number of transformers (2 = dual/redundant supply with a normally-open bus
+   * coupler; `transformerKva` is then the PER-UNIT rating). Absent or 1 = single.
+   */
+  transformerCount?: number;
   note: string;
   mvVoltageV?: number;
   transformerKva?: number;

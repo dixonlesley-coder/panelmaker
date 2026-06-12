@@ -35,7 +35,26 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
         : `${system.supply.voltageV} V LV`,
   });
   let utilityOut = 'utility';
-  if (system.supply.type === 'MV') {
+  if (system.supply.type === 'MV' && (system.supply.transformerCount ?? 1) >= 2) {
+    // Dual supply: T1 + T2 onto split bus sections behind a N.O. coupler. The
+    // single 'bus' node represents both sections; the coupler is an interlock.
+    nodes.push({ id: 'tx', kind: 'transformer', label: 'Transformer T1', sub: `${system.supply.transformerKva} kVA` });
+    nodes.push({ id: 'tx2', kind: 'transformer', label: 'Transformer T2', sub: `${system.supply.transformerKva} kVA` });
+    edge('utility', 'tx');
+    edge('utility', 'tx2');
+    edge('tx2', 'bus', 'section B');
+    const busNode = nodes.find((n) => n.id === 'bus');
+    if (busNode) busNode.sub = `${system.supply.voltageV} V · 2 sections + N.O. coupler`;
+    interlocks.push({
+      id: 'il-coupler',
+      kind: 'electrical',
+      aId: 'tx',
+      bId: 'tx2',
+      relation: 'mutual_exclusion',
+      note: 'Bus coupler NORMALLY OPEN: each transformer carries its own section. Close it only with one unit out (shed non-essential load) — never parallel the transformers, or the fault level doubles past the switchgear rating.',
+    });
+    utilityOut = 'tx'; // section A continues as the mains path (ATS etc.)
+  } else if (system.supply.type === 'MV') {
     nodes.push({ id: 'tx', kind: 'transformer', label: 'Transformer', sub: `${system.supply.transformerKva} kVA` });
     edge('utility', 'tx');
     utilityOut = 'tx';

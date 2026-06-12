@@ -1197,7 +1197,10 @@ function buildUnified(
   const supplyFor = (id: string): SupplyHead | undefined => {
     if (id !== rootId) return undefined;
     const head: SupplyHead = {};
-    if (system.supply.type === 'MV' && system.supply.transformerKva) head.transformer = `${system.supply.transformerKva} kVA`;
+    if (system.supply.type === 'MV' && system.supply.transformerKva) {
+      const units = system.supply.transformerCount ?? 1;
+      head.transformer = units >= 2 ? `2× ${system.supply.transformerKva} kVA` : `${system.supply.transformerKva} kVA`;
+    }
     if (system.sources?.generator) {
       head.generator = true;
       head.ats = true;
