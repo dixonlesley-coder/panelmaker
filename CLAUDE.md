@@ -54,10 +54,19 @@ python scripts/extract_catalogue.py --pdf catalogue.pdf --inspect 1-20  # debug 
 batches, minor (`0.x.0`) when a batch meaningfully expands the design domain (new engineering
 capabilities, model/DB additions). electron-updater only needs the number to increase.
 
-**Verification reality:** the Electron GUI and a headless browser cannot run in this
-environment (no display; the sandbox blocks the Playwright/Chromium CDN). Verify changes
-with the typechecks above + Vitest + `npx electron-vite build`. The pure engine is the
-acceptance gate and is fully headless-testable.
+**Verification reality:** the pure engine is the acceptance gate — verify with the typechecks
+above + Vitest + `npx electron-vite build`. The full *Electron* window still can't open (no
+display), BUT the **renderer (a plain Vite web app) CAN be screenshotted headless**: this
+environment ships Chromium under `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` and a global
+`playwright`. Run `npm run dev` (background), then drive/snapshot the real UI:
+
+```bash
+NODE_PATH=$(npm root -g) node scripts/ui-shot.cjs /tmp/ui.png \
+  --click "Service & Earthing"        # repeatable; clicks buttons by accessible name
+```
+
+Read the PNG to SEE the change. PDFs/SVGs likewise rasterise via `pypdfium2`. Use this to
+catch layout/overlap/clipping that typechecks can't — don't ship UI changes blind.
 
 ## Architecture
 
