@@ -1,6 +1,7 @@
 export * from './version';
 export * from './references';
 export * from './conductors';
+export * from './busway';
 export * from './protection';
 export * from './fault';
 export * from './enclosure';

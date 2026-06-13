@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   cable_override_mm2 REAL,
   cable_type TEXT,
   life_safety INTEGER,
+  busway INTEGER,
   breaker_override_a REAL,
   busbar_break_before INTEGER,
   phase_override TEXT,
@@ -239,6 +240,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'phases', ddl: 'ALTER TABLE circuits ADD COLUMN phases INTEGER' },
   // Life-safety circuit flag (fire pump / emergency lighting).
   { table: 'circuits', column: 'life_safety', ddl: 'ALTER TABLE circuits ADD COLUMN life_safety INTEGER' },
+  // Busway (busbar trunking) feeder flag.
+  { table: 'circuits', column: 'busway', ddl: 'ALTER TABLE circuits ADD COLUMN busway INTEGER' },
   // UPS-backed (critical) panel flag.
   { table: 'panels', column: 'ups_backed', ddl: 'ALTER TABLE panels ADD COLUMN ups_backed INTEGER' },
   // Tenant kWh sub-meter flag.

@@ -169,6 +169,8 @@ export interface CircuitResult {
   peAdiabaticOk?: boolean;
   /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
   containment?: ContainmentResult;
+  /** When the feeder runs as busbar trunking (busway): its standard rating (A). */
+  busway?: { ratingA: number };
   /** Point-level summary (fixtures / sockets / switch groups), when modelled. */
   finalCircuit?: FinalCircuitResult;
 }

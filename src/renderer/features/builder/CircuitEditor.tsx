@@ -388,6 +388,19 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
           />
         )}
 
+        {isFeederCircuit && (
+          <Switch
+            label={t('circuitEditor.busway')}
+            description={
+              result?.busway
+                ? t('circuitEditor.buswayRated', { rating: result.busway.ratingA })
+                : t('circuitEditor.buswayHint')
+            }
+            checked={circuit.busway === true}
+            onChange={(e) => patch({ busway: e.currentTarget.checked ? true : undefined })}
+          />
+        )}
+
         <Divider label={t('circuitEditor.busbarSection')} />
         <Switch
           label={t('circuitEditor.busbarBreak')}

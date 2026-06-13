@@ -142,6 +142,8 @@ export const circuits = sqliteTable('circuits', {
   cableType: text('cable_type'),
   /** Life-safety circuit (fire pump etc.): no RCD, FRC cable. */
   lifeSafety: integer('life_safety', { mode: 'boolean' }),
+  /** Feeder runs as busbar trunking (busway) instead of cable. */
+  busway: integer('busway', { mode: 'boolean' }),
   /** Manual breaker rating override (A). */
   breakerOverrideA: real('breaker_override_a'),
   /** Force a new busbar section to start at this circuit (manual bus break). */

@@ -116,6 +116,13 @@ export interface CircuitInput {
 
   /** If set, this branch feeds another panel (its load = that panel's demand). */
   feedsPanelId?: string;
+
+  /**
+   * Run this feeder as busbar trunking (busway/busduct) instead of cable — the
+   * standard riser for tall commercial buildings. Sized to a standard busway
+   * ampere rating; only meaningful on a feeder.
+   */
+  busway?: boolean;
 }
 
 export interface PanelInput {

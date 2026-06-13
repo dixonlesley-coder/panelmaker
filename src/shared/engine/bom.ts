@@ -181,7 +181,15 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
     // Cable run (priced per metre — qty is the CONDUCTOR count for single-core
     // wiring, 1 for a multicore cable; run length is not modelled as a separate
     // quantity). Spare ways are breaker provision only: no cable for them.
-    if (circuit.loadKind !== 'spare') {
+    if (circuit.busway) {
+      // Busbar trunking replaces the cable run with a busway length (by rating).
+      lines.push({
+        description: `Busway ${circuit.busway.ratingA} A rising main — ${circuit.name}`,
+        category: 'cable',
+        qty: 1,
+        matched: false,
+      });
+    } else if (circuit.loadKind !== 'spare') {
       const type = circuit.grounding.cableType;
       const runs = circuit.cable.runsPerPhase ?? 1;
       if (SINGLE_CORE_TYPES.has(type)) {

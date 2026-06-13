@@ -1825,7 +1825,11 @@ function buildUnified(
         type: 'feeder',
         // panelId + circuitId let a double-click open this feeder's editor.
         data: { label: feederLabel, offset, panelId: parentId, circuitId, util },
-        style: { stroke: 'var(--mantine-color-indigo-4)', strokeWidth: 2 },
+        // Busway (rising main) draws as a thick bar; cable feeders as a thin line.
+        style: {
+          stroke: 'var(--mantine-color-indigo-4)',
+          strokeWidth: feederWay?.busway ? 5 : 2,
+        },
       });
     });
   }

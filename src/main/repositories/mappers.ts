@@ -100,6 +100,7 @@ export function circuitToRow(
     cableOverrideMm2: undefToNull(c.cableOverrideMm2),
     cableType: undefToNull(c.cableType),
     lifeSafety: c.lifeSafety === true ? true : null,
+    busway: c.busway === true ? true : null,
     breakerOverrideA: undefToNull(c.breakerOverrideA),
     busbarBreakBefore: c.busbarBreakBefore === true ? true : null,
     phaseOverride: undefToNull(c.phaseOverride),
@@ -158,6 +159,7 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   const cableType = nullToUndef(r.cableType);
   if (cableType !== undefined) c.cableType = cableType as CircuitInput['cableType'];
   if (r.lifeSafety) c.lifeSafety = true;
+  if (r.busway) c.busway = true;
   const breakerOverrideA = nullToUndef(r.breakerOverrideA);
   if (breakerOverrideA !== undefined) c.breakerOverrideA = breakerOverrideA;
   if (r.busbarBreakBefore) c.busbarBreakBefore = true;

@@ -2,6 +2,7 @@ import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM, sheetThicknessMm } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
 import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
+import { selectBuswayRating } from '../standards/busway';
 import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
 import type { CircuitInput, PanelInput } from '../types/project';
 import type { CableType, SystemType, EarthingSystem } from '../types/electrical';
@@ -272,6 +273,14 @@ function computeCircuit(
     control,
     containment,
   };
+
+  // Busbar trunking (busway) feeder: report a standard busway rating and label
+  // the run as busway rather than a cable make-up (the riser for tall buildings).
+  if (c.busway && isFeeder) {
+    const ratingA = selectBuswayRating(designCurrentA);
+    result.busway = { ratingA };
+    result.grounding = { ...result.grounding, cableSpec: `Busway ${ratingA} A` };
+  }
 
   // Protection / fault analysis (only when the panel's prospective fault is known).
   if (opts.faultLevelA !== undefined) {
