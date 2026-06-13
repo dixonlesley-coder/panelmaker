@@ -106,4 +106,18 @@ describe('per-panel compliance checklist', () => {
     expect(by('protectiveConductor').status).toBe('na'); // no peAdiabaticOk set
     expect(complianceStatus(items)).toBe('fail');
   });
+
+  it('ampacity also fails when the breaker exceeds the cable (In > Iz, under-protected)', () => {
+    const circuit: CircuitResult = {
+      circuitId: 'c', name: 'c', loadKind: 'general', designCurrentA: 10, phase: 'L1',
+      breaker: { ratingA: 40, deviceClass: 'MCB', curve: 'C' }, // In 40 A
+      cable: { csaMm2: 2.5, baseKhaA: 24, deratedIzA: 24, deratingFactor: 1, appliedRule: '' }, // Iz 24 A
+      voltageDrop: { dropV: 1, dropPercent: 1, limitPercent: 3, withinLimit: true },
+      grounding: { cores: 3, peCsaMm2: 2.5, cableSpec: 'NYM 3×2.5', cableType: 'NYM' },
+      rcd: { required: false },
+    } as unknown as CircuitResult;
+    // Ib (10) ≤ Iz (24) so not overloaded, but In (40) > Iz (24): under-protected.
+    const result = { circuits: [circuit], incomer: {}, busbar: {} } as unknown as PanelResult;
+    expect(panelCompliance(result).find((i) => i.key === 'ampacity')!.status).toBe('fail');
+  });
 });

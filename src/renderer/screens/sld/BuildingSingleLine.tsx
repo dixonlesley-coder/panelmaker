@@ -13,7 +13,8 @@ import {
   SelectionMode,
   getSmoothStepPath,
   useNodesState,
-  useViewport,
+  useStore,
+  useStoreApi,
   type Edge,
   type EdgeProps,
   type Node,
@@ -45,6 +46,8 @@ import {
   IconServer,
   IconSitemap,
   IconSolarPanel,
+  IconTool,
+  IconWaveSine,
 } from '@tabler/icons-react';
 import type { CircuitInput, LoadKind, PanelInput, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
 import { circuitOrderCodes } from '@shared/engine/bom';
@@ -97,6 +100,10 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   // Resistive water heater — hotels/apartments/restaurants; no-neutral when 3φ.
   { key: 'heating', labelKey: 'vbuilder.heating', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.heating', { loadW: 2000 }) },
   { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.motor', { loadW: 0, motorKw: 5.5, starterType: 'DOL' }) },
+  // Star-delta: large 3φ motors started at reduced (58%) current.
+  { key: 'motorSD', labelKey: 'vbuilder.starDelta', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.starDelta', { loadW: 0, motorKw: 15, starterType: 'STAR_DELTA' }) },
+  // VFD: variable-speed drive — the non-linear (harmonic) load the PQ pass keys on.
+  { key: 'motorVfd', labelKey: 'vbuilder.vfd', icon: <IconWaveSine size={14} />, action: loadCard('motor', 'vbuilder.vfd', { loadW: 0, motorKw: 11, starterType: 'VFD' }) },
   // Pumps split by supply phase: a small 1-ph booster vs a 3-ph transfer pump.
   { key: 'pump1', labelKey: 'vbuilder.pump1ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump1ph', { loadW: 0, motorKw: 0.75, starterType: 'DOL', phases: 1 }) },
   { key: 'pump3', labelKey: 'vbuilder.pump3ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump3ph', { loadW: 0, motorKw: 4, starterType: 'DOL', phases: 3 }) },
@@ -107,6 +114,8 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   { key: 'socket3', labelKey: 'vbuilder.socket3ph', icon: <IconPlugConnected size={14} />, action: loadCard('socket', 'vbuilder.socket3ph', { loadW: 7500, phases: 3 }) },
   // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
   { key: 'ups', labelKey: 'vbuilder.ups', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
+  // Welding set — low cos φ (0.7), 50% demand, D-curve; harmonic source.
+  { key: 'welding', labelKey: 'vbuilder.welding', icon: <IconTool size={14} />, action: loadCard('welding', 'vbuilder.welding', { loadW: 8000, phases: 3 }) },
   // Custom/general loads with the phase stated outright — for the odd equipment
   // (kilns, lab gear, kitchen ranges…) the kind presets don't cover. Double-click
   // after dropping to set the real W / cos φ / demand factor.
@@ -530,12 +539,14 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
   // Drag a way (component column) left/right to reorder it within the panel.
   // Pointer-based (HTML5 DnD is unreliable on SVG); the column follows the cursor
   // in SVG units (screen px ÷ zoom) and snaps to a new slot on release.
-  const { zoom } = useViewport();
+  // Read zoom on demand from the store (during a drag) instead of subscribing to
+  // the viewport — subscribing re-rendered every panel on every pan/zoom frame.
+  const store = useStoreApi();
   const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
   const [hoverWay, setHoverWay] = useState<string | null>(null); // highlight the hovered, selectable way
   const dragRef = useRef({ from: 0, startX: 0, dx: 0 });
-  const liveRef = useRef({ ways: d.ways, onReorder: d.onReorder, zoom });
-  liveRef.current = { ways: d.ways, onReorder: d.onReorder, zoom };
+  const liveRef = useRef({ ways: d.ways, onReorder: d.onReorder });
+  liveRef.current = { ways: d.ways, onReorder: d.onReorder };
 
   const startWayDrag = (e: React.PointerEvent, index: number, id: string) => {
     if (e.button !== 0) return; // left-button only
@@ -547,7 +558,8 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
   useEffect(() => {
     if (!drag) return;
     const move = (e: PointerEvent) => {
-      const dx = (e.clientX - dragRef.current.startX) / (liveRef.current.zoom || 1);
+      const zoom = store.getState().transform[2] || 1;
+      const dx = (e.clientX - dragRef.current.startX) / zoom;
       dragRef.current.dx = dx;
       setDrag((cur) => (cur ? { ...cur, dx } : cur));
     };
@@ -946,8 +958,9 @@ function PanelSummary({ d, width, height }: { d: UnifiedPanelData; width: number
 function UnifiedPanelNode({ data, selected }: NodeProps) {
   const d = data as UnifiedPanelData;
   const { t } = useTranslation();
-  const { zoom } = useViewport();
-  const expanded = zoom >= 0.72;
+  // LOD: subscribe only to the threshold crossing, not the continuous zoom, so
+  // panning/zooming doesn't re-render every panel on every animation frame.
+  const expanded = useStore((s) => s.transform[2] >= 0.72);
   const width = panelWidth(d.ways.length, d.bus.length);
   // Reserve the expanded schematic height even in the summary, so the card is a
   // STABLE size at every zoom. Otherwise the card grows on zoom-in and its loads

@@ -46,6 +46,13 @@ export function computePowerFactor(
   const existingPf = kva > 0 ? kw / kva : 1;
   const needed = existingPf < PF_PENALTY_THRESHOLD;
 
+  // Capacitor output falls with ambient (IEC 60831, ~0.6%/°C above a 30°C
+  // reference). At an Indonesian rooftop/PFC-room 45-50°C the delivered kvar is
+  // ~10-15% low, so the NAMEPLATE bank is oversized to still deliver the
+  // required compensation hot — otherwise the installed PF lands below target.
+  const ambientC = Math.max(...project.panels.map((p) => p.ambientTempC ?? 30), 30);
+  const tempDerate = ambientC > 30 ? Math.max(0.85, 1 - 0.006 * (ambientC - 30)) : 1;
+
   let requiredKvar = 0;
   let bankKvar = 0;
   let steps = 0;
@@ -54,7 +61,8 @@ export function computePowerFactor(
     const phi1 = Math.acos(clampPf(existingPf));
     const phi2 = Math.acos(clampPf(targetPf));
     requiredKvar = kw * (Math.tan(phi1) - Math.tan(phi2));
-    bankKvar = selectCapacitorBankKvar(requiredKvar);
+    // Oversize the nameplate so the hot bank still delivers `requiredKvar`.
+    bankKvar = selectCapacitorBankKvar(requiredKvar / tempDerate);
     stepKvar = capacitorStepKvar(bankKvar);
     steps = Math.max(1, Math.round(bankKvar / stepKvar));
   }
@@ -72,6 +80,9 @@ export function computePowerFactor(
   if (detunedRecommended) {
     note +=
       ' The installation carries significant harmonic distortion — specify a DETUNED bank (≈7% reactors) so the capacitors do not resonate with the supply.';
+  }
+  if (tempDerate < 1 && bankKvar > 0) {
+    note += ` Bank oversized for a ${ambientC}°C ambient (×${round(1 / tempDerate, 2)}) so it still delivers ${round(requiredKvar, 1)} kVAR hot.`;
   }
 
   return {

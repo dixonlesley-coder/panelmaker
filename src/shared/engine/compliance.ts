@@ -119,14 +119,19 @@ export function panelCompliance(panel: PanelResult): ComplianceItem[] {
     items.push(item('protectiveConductor', total, fail, 'PE withstands the fault', '{n} PE under-sized'));
   }
 
-  // Ampacity — no cable carries more than its derated rating.
+  // Ampacity & cable protection (IEC 60364-4-43): the cable is not overloaded
+  // (Ib ≤ Iz) AND the breaker protects it (In ≤ Iz, so the conventional trip
+  // I₂ = 1.45·In ≤ 1.45·Iz). The second part bites when a manual cable override
+  // pins a section too small for the breaker.
   {
     const { total, fail } = tally(
       panel,
       (c) => c.loadKind !== 'spare' && c.cable.deratedIzA > 0,
-      (c) => c.designCurrentA > c.cable.deratedIzA + 1e-6,
+      (c) =>
+        c.designCurrentA > c.cable.deratedIzA + 1e-6 ||
+        c.breaker.ratingA > c.cable.deratedIzA + 1e-6,
     );
-    items.push(item('ampacity', total, fail, 'no cable overloaded', '{n} over ampacity'));
+    items.push(item('ampacity', total, fail, 'cable protected & not overloaded', '{n} under-protected / overloaded'));
   }
 
   return items;

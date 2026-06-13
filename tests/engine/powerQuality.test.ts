@@ -44,6 +44,26 @@ describe('computePowerFactor / capacitor bank', () => {
     expect(r.steps).toBeGreaterThan(0);
   });
 
+  it('oversizes the bank for a hot ambient (IEC 60831 derating)', () => {
+    // Same load at a rooftop 50°C must specify a bank at least as large as 30°C
+    // (and bigger once it crosses a step), so the hot bank still delivers the
+    // required compensation; the note records the derating.
+    const bankAt = (ambientTempC: number) =>
+      computePowerFactor({
+        id: 'P', name: 'B',
+        panels: [{
+          id: 'M', name: 'M', system: '3ph', voltageV: 400, ambientTempC,
+          installMethod: 'conduit', groupingCount: 1, diversityFactor: 1, sourceType: 'utility',
+          circuits: [{ id: 'l', name: 'L', role: 'branch', loadW: 225000, cosPhi: 0.8, lengthM: 20, loadKind: 'general', isLighting: false, demandFactor: 1 }],
+        }],
+      });
+    const cold = bankAt(30); // ~95 kvar → 100 kvar bank
+    const hot = bankAt(50); // ~95/0.88 ≈ 108 kvar → 150 kvar bank
+    expect(cold.note).not.toMatch(/ambient/);
+    expect(hot.note).toMatch(/50°C/);
+    expect(hot.bankKvar).toBeGreaterThan(cold.bankKvar);
+  });
+
   it('no correction when PF is already good', () => {
     const r = computePowerFactor(projectWith({ id: 'l', name: 'L', loadW: 50000, cosPhi: 0.98 }));
     expect(r.needed).toBe(false);
