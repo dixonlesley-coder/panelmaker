@@ -8,6 +8,7 @@ export * from './fault';
 export * from './busbar';
 export * from './busbarFault';
 export * from './spd';
+export * from './lightning';
 export * from './electrode';
 export * from './catalogMatch';
 export * from './gensetTransient';

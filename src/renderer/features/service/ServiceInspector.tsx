@@ -21,6 +21,7 @@ import {
   NumberInput,
   SegmentedControl,
   Select,
+  SimpleGrid,
   Stack,
   Switch,
   Text,
@@ -152,6 +153,42 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
             checked={project.site?.externalLps === true}
             onChange={(e) => setSiteConditions({ externalLps: e.currentTarget.checked })}
           />
+          {/* IEC 62305 lightning-risk screening from the building footprint. */}
+          <Text size="xs" c="dimmed" mt={4}>
+            {t('service.lightning')}
+          </Text>
+          <SimpleGrid cols={3} spacing="xs">
+            <NumberInput
+              label={t('service.bL')}
+              min={0}
+              value={project.site?.buildingLengthM ?? ''}
+              onChange={(v) => setSiteConditions({ buildingLengthM: typeof v === 'number' ? v : undefined })}
+            />
+            <NumberInput
+              label={t('service.bW')}
+              min={0}
+              value={project.site?.buildingWidthM ?? ''}
+              onChange={(v) => setSiteConditions({ buildingWidthM: typeof v === 'number' ? v : undefined })}
+            />
+            <NumberInput
+              label={t('service.bH')}
+              min={0}
+              value={project.site?.buildingHeightM ?? ''}
+              onChange={(v) => setSiteConditions({ buildingHeightM: typeof v === 'number' ? v : undefined })}
+            />
+          </SimpleGrid>
+          {system.lightningRisk && (
+            <Group gap="xs">
+              <Badge size="sm" variant="light" color={system.lightningRisk.lpsRequired ? 'orange' : 'teal'}>
+                {system.lightningRisk.lpsRequired
+                  ? t('service.lpsLevel', { level: system.lightningRisk.level })
+                  : t('service.lpsNone')}
+              </Badge>
+              <Text size="xs" c="dimmed">
+                {t('service.lpsEvents', { n: system.lightningRisk.eventsPerYear })}
+              </Text>
+            </Group>
+          )}
         </Stack>
 
         <Divider />

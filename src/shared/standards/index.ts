@@ -8,6 +8,7 @@ export * from './loads';
 export * from './schedule';
 export * from './transformer';
 export * from './pln';
+export * from './lightning';
 export * from './grounding';
 export * from './sources';
 export * from './capacitor';

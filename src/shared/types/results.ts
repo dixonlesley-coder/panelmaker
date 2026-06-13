@@ -8,6 +8,7 @@ import type { SourcesResult } from './sources';
 // Type-only imports of result shapes defined alongside their engine modules
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
 import type { SpdResult } from '../engine/spd';
+import type { LightningRiskResult } from '../engine/lightning';
 import type { ElectrodeResult } from '../engine/electrode';
 import type { MeteringResult, SubmeterResult } from '../engine/metering';
 import type { BusbarWithstandResult } from '../engine/busbarFault';
@@ -513,6 +514,8 @@ export interface SystemResult {
   powerFactor: CapacitorBankResult;
   /** Surge-protection (SPD) recommendation at the service origin. */
   spd?: SpdResult;
+  /** IEC 62305 lightning-risk screening, when building dimensions are provided. */
+  lightningRisk?: LightningRiskResult;
   /** PLN service step + revenue metering (direct / CT) at the origin. */
   metering?: MeteringResult;
   /** Distributed energy sources sizing, when configured. */

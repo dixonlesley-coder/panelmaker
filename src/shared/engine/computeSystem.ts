@@ -11,6 +11,7 @@ import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
 import { computeMetering } from './metering';
 import { recommendSpd, SECONDARY_SPD_DISTANCE_M } from './spd';
+import { assessLightningRisk } from './lightning';
 import {
   type Impedance,
   SELECTIVITY_RATIO,
@@ -525,11 +526,15 @@ export function computeSystem(project: ProjectInput): SystemResult {
     });
   }
 
+  // IEC 62305 lightning-risk screening from the building footprint; a computed
+  // LPS requirement also drives a Type 1 SPD at the origin.
+  const lightningRisk = assessLightningRisk(project.site);
+
   // Surge-protection recommendation at the service origin (Type 1 under a
   // lightning/overhead exposure, else Type 2), keyed to the earthing system.
   const spd = recommendSpd({
     earthingSystem,
-    hasExternalLps: project.site?.externalLps ?? false,
+    hasExternalLps: (project.site?.externalLps ?? false) || (lightningRisk?.lpsRequired ?? false),
     overheadSupply: project.site?.overheadSupply ?? false,
     atOrigin: true,
   });
@@ -542,6 +547,7 @@ export function computeSystem(project: ProjectInput): SystemResult {
     earthing,
     powerFactor,
     spd,
+    ...(lightningRisk ? { lightningRisk } : {}),
     metering,
     ...(sources ? { sources } : {}),
     ...(generatorFaultKa !== undefined ? { generatorFaultKa } : {}),

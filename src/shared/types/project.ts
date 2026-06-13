@@ -272,6 +272,21 @@ export interface SiteConditions {
    * 2.5). Distinct from the electrical resistivity above.
    */
   soilThermalResistivityKmW?: number;
+  /** Building footprint length × width and ridge height (m) — IEC 62305 collection area. */
+  buildingLengthM?: number;
+  buildingWidthM?: number;
+  buildingHeightM?: number;
+  /**
+   * Lightning ground flash density Ng (flashes/km²/year). Indonesia is among the
+   * highest on earth; absent → a conservative national default is assumed.
+   */
+  groundFlashDensity?: number;
+  /**
+   * Surroundings location factor Cd (IEC 62305 Table A.1): 1 = isolated, 0.5 =
+   * surrounded by lower structures, 0.25 = surrounded by same/taller, 2 = on a
+   * hilltop. Absent → 1 (isolated, conservative).
+   */
+  lightningLocationFactor?: number;
 }
 
 export interface ProjectInput {
