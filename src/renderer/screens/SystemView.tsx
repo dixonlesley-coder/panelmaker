@@ -14,7 +14,6 @@ import {
   Tabs,
   Text,
   ThemeIcon,
-  Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -108,15 +107,19 @@ export function SystemView() {
     });
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between" align="flex-end">
-        <div>
-          <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-            {t('system.eyebrow')}
+    <Stack gap="sm">
+      {/* Compact toolbar — the project name already lives in the app header, so
+          the canvas keeps the chrome to one row and gives the diagram the height. */}
+      <Group justify="space-between" align="center" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+          <ThemeIcon variant="light" color="indigo" size="sm" radius="sm">
+            <IconSitemap size={14} />
+          </ThemeIcon>
+          <Text fw={600} size="md" truncate style={{ letterSpacing: '-0.01em' }}>
+            {project.name}
           </Text>
-          <Title order={3}>{project.name}</Title>
-        </div>
-        <Group gap="xs">
+        </Group>
+        <Group gap="xs" wrap="nowrap">
           <ProjectIssues system={system} />
           <Button
             size="xs"
