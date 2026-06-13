@@ -20,7 +20,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from '@xyflow/react';
-import { Badge, Box, Button, Card, Drawer, Group, List, Menu, Modal, Paper, Stack, Text, TextInput, ThemeIcon } from '@mantine/core';
+import { ActionIcon, Badge, Box, Button, Card, Drawer, Group, List, Menu, Modal, Paper, Stack, Text, TextInput, ThemeIcon, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { LOAD_DEFAULTS, STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
@@ -37,6 +37,8 @@ import {
   IconFireHydrant,
   IconFlame,
   IconHandMove,
+  IconLayoutDistributeHorizontal,
+  IconLayoutDistributeVertical,
   IconSearch,
   IconPlug,
   IconPlugConnected,
@@ -1425,6 +1427,8 @@ function buildUnified(
   onReorder: (panelId: string, orderedCircuitIds: string[]) => void,
   floatingLoads: FloatingLoad[],
   parts: Part[],
+  /** Tree orientation: 'vertical' (source on top) or 'horizontal' (source at left). */
+  dir: 'vertical' | 'horizontal' = 'vertical',
 ): { nodes: Node[]; edges: Edge[] } {
   const byId = new Map(project.panels.map((p) => [p.id, p]));
 
@@ -1511,21 +1515,43 @@ function buildUnified(
     LOAD_NODE_H +
     80;
 
+  // Horizontal mode steps depth along X; the column pitch clears the widest panel.
+  const GAP = 80;
+  const maxPanelW = Math.max(
+    ...project.panels
+      .filter((p) => system.panels[p.id])
+      .map((p) => panelWidth(system.panels[p.id]!.circuits.length, busDevicesFor(p.id).length)),
+    200,
+  );
+  const colPitch = maxPanelW + 160;
+
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   for (const [d, ids] of [...rows.entries()].sort((a, b) => a[0] - b[0])) {
     const widths = ids.map((id) => panelWidth(system.panels[id]?.circuits.length ?? 0, busDevicesFor(id).length));
-    const GAP = 80;
-    const rowWidth = widths.reduce((s, w) => s + w, 0) + GAP * (ids.length - 1);
-    let x = -rowWidth / 2;
+    // Slot positions for this depth: vertical spreads panels along X at y=depth;
+    // horizontal stacks them along Y at x=depth (source on top vs at the left).
+    const slots: { x: number; y: number }[] = [];
+    if (dir === 'horizontal') {
+      let y = -(ids.length * rowPitch) / 2;
+      for (let i = 0; i < ids.length; i += 1) {
+        slots.push({ x: d * colPitch, y });
+        y += rowPitch;
+      }
+    } else {
+      const rowWidth = widths.reduce((s, w) => s + w, 0) + GAP * (ids.length - 1);
+      let x = -rowWidth / 2;
+      for (let i = 0; i < ids.length; i += 1) {
+        slots.push({ x, y: d * rowPitch });
+        x += widths[i]! + GAP;
+      }
+    }
     ids.forEach((id, i) => {
       const panel = byId.get(id);
       const res = system.panels[id];
       const w = widths[i]!;
-      if (!panel || !res) {
-        x += w + GAP;
-        return;
-      }
+      const slot = slots[i]!;
+      if (!panel || !res) return;
       const inputById = new Map(panel.circuits.map((ci) => [ci.id, ci]));
       const ways: UnifiedWay[] = res.circuits.map((c) => {
         const childId = feederWayToChild.get(c.circuitId);
@@ -1596,8 +1622,7 @@ function buildUnified(
       };
       // draggable comes from the flow-level nodesDraggable; per-node draggable:false
       // would override it and break rearranging. Panels are deletable (Delete key).
-      const panelY = d * rowPitch;
-      nodes.push({ id, type: 'uPanel', position: { x: snap(x), y: snap(panelY) }, data });
+      nodes.push({ id, type: 'uPanel', position: { x: snap(slot.x), y: snap(slot.y) }, data });
 
       // ONLY the service-entrance panel (the MDP) shows the incoming PLN grid
       // supply as a CHILD node above its incomer — a building has one intake.
@@ -1750,7 +1775,6 @@ function buildUnified(
           },
         });
       });
-      x += w + GAP;
     });
   }
 
@@ -1858,6 +1882,24 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   });
   // Palette search: filter the load/source cards by name as the list grows.
   const [paletteQuery, setPaletteQuery] = useState('');
+
+  // SLD tree orientation: vertical (source on top — the convention) or horizontal
+  // (source at the left). Persisted; flipping it re-arranges the whole tree.
+  const [layoutDir, setLayoutDir] = useState<'vertical' | 'horizontal'>(() => {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pm:layoutDir') : null;
+    return saved === 'horizontal' ? 'horizontal' : 'vertical';
+  });
+  const toggleLayoutDir = useCallback(() => {
+    setLayoutDir((d) => {
+      const next = d === 'vertical' ? 'horizontal' : 'vertical';
+      try {
+        localStorage.setItem('pm:layoutDir', next);
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
   const persistPaletteW = (w: number) => {
     try {
       localStorage.setItem('pm:paletteW', String(Math.round(w)));
@@ -2075,15 +2117,20 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   );
 
   const built = useMemo(
-    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads, parts),
-    [project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads, parts],
+    () => buildUnified(project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads, parts, layoutDir),
+    [project, system, openCircuit, addItem, openContext, reorderCircuits, floatingLoads, parts, layoutDir],
   );
   const edges = built.edges;
   // Panels are auto-arranged from the feeder tree, but draggable to rearrange.
   // Keep React Flow's node state so a drag sticks; re-sync node *data* when the
   // model changes while preserving any positions the user has dragged.
   const [nodes, setNodes, onNodesChange] = useNodesState(built.nodes);
+  // When the orientation flips, snap every panel to the fresh layout (a re-arrange)
+  // instead of preserving dragged positions.
+  const prevDirRef = useRef(layoutDir);
   useEffect(() => {
+    const dirChanged = prevDirRef.current !== layoutDir;
+    prevDirRef.current = layoutDir;
     setNodes((cur) => {
       const posById = new Map(cur.map((n) => [n.id, n.position]));
       // Keep the user's selection across model rebuilds — every edit regenerates
@@ -2100,12 +2147,14 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         // Only USER-PLACED nodes keep their dragged position. Layout-managed
         // children (a panel's grid-supply head and its load nodes) must take
         // the fresh layout position — preserving theirs left them stranded at
-        // stale offsets whenever the panel's width/way count changed.
+        // stale offsets whenever the panel's width/way count changed. On a
+        // direction flip, even user-placed panels re-arrange to the new layout.
         const userPlaced = n.type === 'uPanel' || n.type === 'floatLoad';
-        return { ...n, ...sel, position: userPlaced ? (posById.get(n.id) ?? n.position) : n.position };
+        const keepPos = userPlaced && !dirChanged;
+        return { ...n, ...sel, position: keepPos ? (posById.get(n.id) ?? n.position) : n.position };
       });
     });
-  }, [built.nodes, setNodes]);
+  }, [built.nodes, setNodes, layoutDir]);
 
   // A panel's EXPANDED footprint (width × detail height), so a drag can be nudged
   // clear of other panels even while zoomed out (where the card looks short).
@@ -2605,7 +2654,28 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               style={{ width: 150, height: 100 }}
             />
             <Panel position="top-right">
-              <CanvasHelp />
+              <Group gap={6} wrap="nowrap">
+                <Tooltip
+                  label={layoutDir === 'vertical' ? t('system.layoutHorizontal') : t('system.layoutVertical')}
+                >
+                  <ActionIcon
+                    variant="default"
+                    size="lg"
+                    aria-label={t('system.layoutToggle')}
+                    onClick={() => {
+                      toggleLayoutDir();
+                      setTimeout(() => rfRef.current?.fitView({ padding: 0.2, duration: 350 }), 160);
+                    }}
+                  >
+                    {layoutDir === 'vertical' ? (
+                      <IconLayoutDistributeHorizontal size={18} />
+                    ) : (
+                      <IconLayoutDistributeVertical size={18} />
+                    )}
+                  </ActionIcon>
+                </Tooltip>
+                <CanvasHelp />
+              </Group>
             </Panel>
             {preferredBrand && (
               <Panel position="top-left">
