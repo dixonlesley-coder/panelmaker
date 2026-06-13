@@ -637,6 +637,8 @@ export const id: TranslationKeys = {
     disconnected: 'Feeder diputus — panel kini menjadi root mandiri.',
     openPanel: 'Buka panel',
     panelSettings: 'Pengaturan panel…',
+    groupBackup: 'Cadangan & meter',
+    groupCircuits: 'Sirkit',
     markEssential: 'Tandai esensial (didukung genset)',
     unmarkEssential: 'Hapus tanda esensial',
     essentialOn: 'Ditandai esensial — ukuran cadangan genset kini mengikuti panel esensial.',

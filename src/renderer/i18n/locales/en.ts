@@ -633,6 +633,8 @@ export const en = {
     disconnected: 'Feeder disconnected — the panel is now a standalone root.',
     openPanel: 'Open panel',
     panelSettings: 'Panel settings…',
+    groupBackup: 'Backup & metering',
+    groupCircuits: 'Circuits',
     markEssential: 'Mark as essential (genset-backed)',
     unmarkEssential: 'Unmark essential',
     essentialOn: 'Marked essential — generator backup sizing now follows the essential panels.',

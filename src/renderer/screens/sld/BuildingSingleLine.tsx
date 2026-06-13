@@ -2829,6 +2829,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           >
             {t('sldMenu.panelSettings')}
           </Menu.Item>
+          <Menu.Divider />
+          <Menu.Label>{t('sldMenu.groupBackup')}</Menu.Label>
           <Menu.Item
             onClick={() => {
               const panelId = nodeCtx?.panelId;
@@ -2874,6 +2876,12 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           >
             {t(ctxPanel?.submeter ? 'sldMenu.removeSubmeter' : 'sldMenu.addSubmeter')}
           </Menu.Item>
+          {(ctxPanel?.system === '3ph' || ctxSpares > 0) && (
+            <>
+              <Menu.Divider />
+              <Menu.Label>{t('sldMenu.groupCircuits')}</Menu.Label>
+            </>
+          )}
           {ctxPanel?.system === '3ph' && (
             <Menu.Item
               onClick={() => {
@@ -2901,6 +2909,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               {t('sldMenu.addSpares', { count: ctxSpares })}
             </Menu.Item>
           )}
+          <Menu.Divider />
           <Menu.Item
             onClick={() => {
               const panelId = nodeCtx?.panelId;

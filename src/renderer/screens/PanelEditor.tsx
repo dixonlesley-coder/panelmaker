@@ -13,7 +13,6 @@ import {
 } from '@tabler/icons-react';
 import { OCCUPANCY_PRESETS, OCCUPANCY_TYPES } from '@shared/standards';
 import type { OccupancyType } from '@shared/types';
-import { panelLabel } from '@shared/labels';
 import { CircuitTable } from '@renderer/features/builder/CircuitTable';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
@@ -35,7 +34,6 @@ export function PanelEditor() {
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const activePanelId = useProjectStore((s) => s.activePanelId);
-  const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
   const updatePanel = useProjectStore((s) => s.updatePanel);
 
@@ -45,7 +43,6 @@ export function PanelEditor() {
   const panel = project.panels.find((p) => p.id === activePanelId);
   const result = panel ? system.panels[panel.id] : undefined;
 
-  const panelOptions = project.panels.map((p) => ({ value: p.id, label: panelLabel(p) }));
   const occupancyOptions = OCCUPANCY_TYPES.map((o) => ({
     value: o,
     label: OCCUPANCY_PRESETS[o].label,
@@ -104,26 +101,18 @@ export function PanelEditor() {
             />
           </Group>
         </div>
-        <Group gap="sm" align="flex-end">
-          <Select
-            label={t('panel.occupancy')}
-            placeholder={t('panel.occupancyPlaceholder')}
-            description={t('panel.occupancyHint')}
-            data={occupancyOptions}
-            value={panel.occupancy ?? null}
-            clearable
-            onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
-            w={210}
-          />
-          <Select
-            label={t('panel.activePanel')}
-            data={panelOptions}
-            value={activePanelId}
-            allowDeselect={false}
-            onChange={(v) => v && setActivePanel(v)}
-            w={240}
-          />
-        </Group>
+        {/* You opened THIS panel deliberately — switch panels on the canvas, not
+            from a redundant in-drawer picker. Occupancy stays (it's panel-level). */}
+        <Select
+          label={t('panel.occupancy')}
+          placeholder={t('panel.occupancyPlaceholder')}
+          description={t('panel.occupancyHint')}
+          data={occupancyOptions}
+          value={panel.occupancy ?? null}
+          clearable
+          onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
+          w={210}
+        />
       </Group>
 
       <Card withBorder radius="md" padding="md">
