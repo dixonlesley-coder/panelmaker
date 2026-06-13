@@ -168,6 +168,12 @@ export function Sources() {
                   [t('sources.gensetRating'), `${res.generator.ratingKva} kVA`],
                   [t('sources.backupLoad'), `${res.generator.backupKva} kVA`],
                   [t('sources.duty'), res.generator.mode],
+                  ...(res.generator.fuelLph
+                    ? ([
+                        [t('sources.fuelRate'), `${res.generator.fuelLph} l/h`],
+                        [t('sources.dayTank'), `${res.generator.dayTankL} L · ${res.generator.runtimeHours} h`],
+                      ] as [string, string][])
+                    : []),
                 ]}
               />
             )}

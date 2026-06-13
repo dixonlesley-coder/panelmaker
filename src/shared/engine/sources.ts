@@ -1,5 +1,8 @@
 import {
   selectGeneratorKva,
+  GENERATOR_PF,
+  GENSET_SFC_L_PER_KWH,
+  GENSET_DAY_TANK_HOURS,
   PV_PANEL_DEFAULT,
   MPPT_VMAX,
   MPPT_VMIN,
@@ -55,15 +58,29 @@ export function sizeGenerator(
     transfer === 'manual'
       ? 'Manual changeover (COS) — an operator must transfer; expect an outage until switched.'
       : 'Transfers automatically on mains failure via ATS.';
+
+  // Fuel & runtime: diesel burns ~0.25 l/kWh; size a day-tank for a standard
+  // runtime so the standby deliverable carries autonomy like the battery does.
+  const loadKw = backupKva * GENERATOR_PF;
+  const fuelLph = round(loadKw * GENSET_SFC_L_PER_KWH, 1);
+  const runtimeHours = GENSET_DAY_TANK_HOURS;
+  const dayTankL = Math.max(10, Math.ceil((fuelLph * runtimeHours) / 10) * 10); // round up to 10 L
+  const fuelText = fuelLph > 0 ? ` Fuel ≈ ${fuelLph} l/h at the backup load; a ${dayTankL} L day-tank gives ~${runtimeHours} h runtime.` : '';
+
   return {
     ratingKva,
     backupKva: round(backupKva, 1),
     mode: cfg.mode,
     ...(useEssential ? { essentialPanelCount: essential.panelCount } : {}),
     transfer,
-    note: useEssential
-      ? `${duty} genset backing the ${essential.panelCount} essential panel(s) (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. ${transferText}`
-      : `${duty} genset backing up ${Math.round(cfg.backupFraction * 100)}% of demand (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. ${transferText}`,
+    fuelLph,
+    dayTankL,
+    runtimeHours,
+    note:
+      (useEssential
+        ? `${duty} genset backing the ${essential.panelCount} essential panel(s) (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. ${transferText}`
+        : `${duty} genset backing up ${Math.round(cfg.backupFraction * 100)}% of demand (${round(backupKva, 1)} kVA) → ${ratingKva} kVA. ${transferText}`) +
+      fuelText,
   };
 }
 

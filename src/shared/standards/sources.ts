@@ -15,6 +15,12 @@ export const GENERATOR_KVA = [
 /** Typical genset power factor. */
 export const GENERATOR_PF = 0.8;
 
+/** Diesel specific fuel consumption (litres per kWh) — typical ~75% loading. */
+export const GENSET_SFC_L_PER_KWH = 0.25;
+
+/** Standard day-tank runtime target (hours) used to recommend a tank size. */
+export const GENSET_DAY_TANK_HOURS = 8;
+
 /** Smallest standard genset covering a required kVA. */
 export function selectGeneratorKva(requiredKva: number): number {
   return GENERATOR_KVA.find((k) => k >= requiredKva) ?? GENERATOR_KVA[GENERATOR_KVA.length - 1]!;

@@ -57,6 +57,12 @@ export interface GeneratorResult {
   essentialPanelCount?: number;
   /** Transfer arrangement the design assumes (ATS vs manual changeover). */
   transfer: 'ats' | 'manual';
+  /** Estimated diesel consumption at the backup load (litres/hour). */
+  fuelLph?: number;
+  /** Recommended day-tank capacity (litres) for the standard runtime target. */
+  dayTankL?: number;
+  /** Runtime (hours) the recommended day-tank provides at the backup load. */
+  runtimeHours?: number;
   note: string;
 }
 

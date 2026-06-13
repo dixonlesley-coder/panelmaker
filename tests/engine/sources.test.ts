@@ -8,6 +8,15 @@ describe('generator sizing', () => {
     expect(g.ratingKva).toBe(200); // next standard >= 160
   });
 
+  it('sizes genset fuel rate + day-tank for runtime', () => {
+    // 160 kVA backup × 0.8 pf = 128 kW; ×0.25 l/kWh = 32 l/h; 8 h → 256 → 260 L.
+    const g = sizeGenerator(160, { enabled: true, backupFraction: 1, mode: 'standby' });
+    expect(g.fuelLph).toBeCloseTo(32, 0);
+    expect(g.runtimeHours).toBe(8);
+    expect(g.dayTankL).toBe(260);
+    expect(g.note).toMatch(/day-tank/);
+  });
+
   it('prime genset adds continuous-duty headroom', () => {
     const g = sizeGenerator(160, { enabled: true, backupFraction: 1, mode: 'prime' });
     expect(g.ratingKva).toBe(200); // 160 x 1.25 = 200

@@ -911,6 +911,8 @@ export const en = {
     dutyPrime: 'Prime',
     gensetRating: 'Genset rating',
     backupLoad: 'Backup load',
+    fuelRate: 'Fuel rate',
+    dayTank: 'Day-tank',
     solarPv: 'Solar PV + inverter',
     targetArray: 'Target array (kWp)',
     panelPower: 'Panel power (Wp)',

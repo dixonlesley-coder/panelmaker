@@ -916,6 +916,8 @@ export const id: TranslationKeys = {
     dutyPrime: 'Prime',
     gensetRating: 'Rating genset',
     backupLoad: 'Beban cadangan',
+    fuelRate: 'Konsumsi BBM',
+    dayTank: 'Tangki harian',
     solarPv: 'PV Surya + inverter',
     targetArray: 'Target array (kWp)',
     panelPower: 'Daya panel (Wp)',
