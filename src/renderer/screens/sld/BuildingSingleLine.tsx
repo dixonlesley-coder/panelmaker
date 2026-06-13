@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BaseEdge,
@@ -1368,7 +1368,35 @@ function SourceNode({ data, selected }: NodeProps) {
   );
 }
 
-const UNIFIED_NODE_TYPES = { uPanel: UnifiedPanelNode, load: LoadNode, floatLoad: FloatLoadNode, grid: GridSourceNode, source: SourceNode };
+/**
+ * Stable content key for a node's data — serialised, dropping the callback props
+ * (which are fresh closures every rebuild but wrap STABLE handlers). Lets the
+ * memo below skip re-rendering a panel/load whose visible content is unchanged.
+ */
+function nodeDataKey(data: unknown): string {
+  return JSON.stringify(data, (_k, v) => (typeof v === 'function' ? undefined : v));
+}
+
+/**
+ * Memoise a custom node so editing ONE panel (or panning/zooming) doesn't
+ * re-render every other panel: a node only re-renders when its data content or
+ * selection changes (the LOD zoom threshold still triggers its own re-render via
+ * the internal store selector). The node callbacks wrap stable handlers, so a
+ * memoised node never holds a stale handler.
+ */
+function memoNode(C: (p: NodeProps) => React.ReactNode): (p: NodeProps) => React.ReactNode {
+  return memo(C, (a, b) => a.selected === b.selected && nodeDataKey(a.data) === nodeDataKey(b.data)) as unknown as (
+    p: NodeProps,
+  ) => React.ReactNode;
+}
+
+const UNIFIED_NODE_TYPES = {
+  uPanel: memoNode(UnifiedPanelNode),
+  load: memoNode(LoadNode),
+  floatLoad: memoNode(FloatLoadNode),
+  grid: GridSourceNode, // display-only + cheap; no callbacks to worry about
+  source: memoNode(SourceNode),
+};
 
 /**
  * Feeder edge between panels. Sibling feeders from the same parent share a
@@ -2066,7 +2094,9 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
         return;
       }
-      const panel = project.panels.find((p) => p.id === panelId);
+      // Read the project live from the store so this callback stays STABLE
+      // (no `project` dep) — required for the per-panel node memoization below.
+      const panel = useProjectStore.getState().project.panels.find((p) => p.id === panelId);
       const count = (panel?.circuits.length ?? 0) + 1;
       addCircuitConfigured(panelId, {
         name: `${t(action.nameKey)} ${count}`,
@@ -2081,7 +2111,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       });
       notifications.show({ message: t('vbuilder.added', { name: t(action.nameKey) }), color: 'teal' });
     },
-    [project, addCircuitConfigured, addSubPanel, enableSource, t],
+    [addCircuitConfigured, addSubPanel, enableSource, t],
   );
 
   // Drop on the empty canvas (not on a panel): a sub-panel becomes a new
