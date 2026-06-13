@@ -722,6 +722,7 @@ export const id: TranslationKeys = {
     exportAllCancelled: 'Ekspor dibatalkan.',
     panelAddedUnfed: 'Panel ditambahkan — belum disuplai. Seret outlet bundar panel lain ke panel ini untuk menyuplainya.',
     paletteResize: 'Seret untuk mengubah lebar palet',
+    paletteSearch: 'Cari beban…',
     dualTransformer: 'Trafo ganda (bus terpisah + kopler N.O.)',
     myTemplates: 'Templat saya',
     templateMeta_one: '{{count}} sirkuit · dari {{panel}}',

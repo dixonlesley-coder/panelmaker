@@ -37,6 +37,7 @@ import {
   IconFireHydrant,
   IconFlame,
   IconHandMove,
+  IconSearch,
   IconPlug,
   IconPlugConnected,
   IconServer,
@@ -1855,6 +1856,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     const saved = typeof localStorage !== 'undefined' ? Number(localStorage.getItem('pm:paletteW')) : NaN;
     return Number.isFinite(saved) && saved >= 130 ? clampPaletteW(saved) : PALETTE_FIT_W;
   });
+  // Palette search: filter the load/source cards by name as the list grows.
+  const [paletteQuery, setPaletteQuery] = useState('');
   const persistPaletteW = (w: number) => {
     try {
       localStorage.setItem('pm:paletteW', String(Math.round(w)));
@@ -2389,8 +2392,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             {t('system.dragToPanel')}
           </Text>
         </Group>
+        <TextInput
+          size="xs"
+          mb={6}
+          placeholder={t('system.paletteSearch')}
+          leftSection={<IconSearch size={13} />}
+          value={paletteQuery}
+          onChange={(e) => setPaletteQuery(e.currentTarget.value)}
+        />
         <Stack gap={5}>
-          {SLD_PALETTE.map((item) => (
+          {SLD_PALETTE.filter((item) => t(item.labelKey).toLowerCase().includes(paletteQuery.trim().toLowerCase())).map((item) => (
             <Paper
               key={item.key}
               withBorder
@@ -2415,10 +2426,12 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           ))}
 
           {/* Energy sources: dropping a card enables the source project-wide. */}
-          <Text size="xs" c="dimmed" fw={600} tt="uppercase" mt={6} style={{ letterSpacing: '0.04em' }}>
-            {t('vbuilder.groupSources')}
-          </Text>
-          {SOURCE_PALETTE.map((item) => (
+          {SOURCE_PALETTE.some((item) => t(item.labelKey).toLowerCase().includes(paletteQuery.trim().toLowerCase())) && (
+            <Text size="xs" c="dimmed" fw={600} tt="uppercase" mt={6} style={{ letterSpacing: '0.04em' }}>
+              {t('vbuilder.groupSources')}
+            </Text>
+          )}
+          {SOURCE_PALETTE.filter((item) => t(item.labelKey).toLowerCase().includes(paletteQuery.trim().toLowerCase())).map((item) => (
             <Paper
               key={item.key}
               withBorder

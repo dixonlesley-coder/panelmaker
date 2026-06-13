@@ -718,6 +718,7 @@ export const en = {
     exportAllCancelled: 'Export cancelled.',
     panelAddedUnfed: "Panel added — not fed yet. Drag another panel's round outlet onto it to feed it.",
     paletteResize: 'Drag to resize the palette',
+    paletteSearch: 'Search loads…',
     dualTransformer: 'Dual transformer (split bus + N.O. coupler)',
     myTemplates: 'My templates',
     templateMeta_one: '{{count}} circuit · from {{panel}}',
