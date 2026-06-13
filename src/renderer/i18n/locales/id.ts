@@ -157,7 +157,7 @@ export const id: TranslationKeys = {
   },
 
   settings: {
-    eyebrow: 'Pengaturan',
+    eyebrow: 'Preferensi',
     panelDefaults: 'Default panel — {{name}}',
     noPanelTitle: 'Tidak ada panel terpilih',
     noPanelBody: 'Pilih panel terlebih dahulu untuk mengubah defaultnya.',
@@ -762,6 +762,8 @@ export const id: TranslationKeys = {
     supplyMv: 'Tegangan menengah + trafo',
     supplyLv: 'Tegangan rendah (langsung PLN)',
     demandKva: 'kebutuhan {{kva}} kVA',
+    dayaLine: 'Daya PLN — disarankan {{recommended}} · kontrak {{contracted}}',
+    dayaUncontracted: 'belum diatur',
     plnService: 'Layanan PLN',
     plnServiceMv: 'Layanan TM (MV)',
     serviceCurrent: 'Arus layanan',

@@ -6,7 +6,6 @@ import {
   Group,
   SimpleGrid,
   Stack,
-  Switch,
   Table,
   Text,
   ThemeIcon,
@@ -15,6 +14,7 @@ import {
 import { IconBolt, IconCash, IconSitemap, IconSolarPanel, IconStack2 } from '@tabler/icons-react';
 import type { SystemResult } from '@shared/types';
 import { partsForBrand } from '@shared/data/catalog';
+import { formatDaya } from '@shared/standards';
 import { costSystem } from '@renderer/lib/bom';
 import { panelLabel } from '@shared/labels';
 import { formatAmps, formatIdr, formatKw } from '@renderer/lib/format';
@@ -35,7 +35,6 @@ export function SystemInfo() {
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const preferredBrand = useProjectStore((s) => s.preferredBrand);
-  const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
   const system = useSystemResult();
 
   const cost = useMemo(() => {
@@ -94,14 +93,11 @@ export function SystemInfo() {
             </Badge>
           </Group>
           <Group gap="md">
-            <Switch
-              size="xs"
-              label={t('system.dualTransformer')}
-              checked={project.meta?.dualTransformer === true}
-              onChange={(e) =>
-                setProjectMeta({ dualTransformer: e.currentTarget.checked ? true : undefined })
-              }
-            />
+            {project.meta?.dualTransformer === true && (
+              <Badge size="sm" variant="light" color="grape">
+                {t('system.dualTransformer')}
+              </Badge>
+            )}
             <Text size="sm" fw={600}>
               {t('system.demandKva', { kva: sup.demandKva })}
             </Text>
@@ -124,6 +120,16 @@ export function SystemInfo() {
         <Text size="xs" c="dimmed">
           {sup.note}
         </Text>
+        {sup.recommendedDayaVa !== undefined && (
+          <Text size="xs" c="dimmed" mt={4}>
+            {t('system.dayaLine', {
+              recommended: formatDaya(sup.recommendedDayaVa),
+              contracted: sup.contractedDayaVa !== undefined
+                ? formatDaya(sup.contractedDayaVa)
+                : t('system.dayaUncontracted'),
+            })}
+          </Text>
+        )}
         {system.metering && (
           <>
             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="sm" mb="xs">

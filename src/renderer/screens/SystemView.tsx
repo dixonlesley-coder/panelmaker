@@ -39,7 +39,6 @@ import {
 import type { CostResult } from '@shared/types';
 import { ProjectIssues } from '@renderer/features/issues/ProjectIssues';
 import { ServiceInspector } from '@renderer/features/service/ServiceInspector';
-import { ComplianceStatus } from '@renderer/features/compliance/ComplianceStatus';
 import { LoadImportModal } from '@renderer/features/loadimport/LoadImportModal';
 import { BuildingSingleLine } from '@renderer/screens/sld/BuildingSingleLine';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
@@ -118,7 +117,6 @@ export function SystemView() {
           <Title order={3}>{project.name}</Title>
         </div>
         <Group gap="xs">
-          <ComplianceStatus system={system} />
           <ProjectIssues system={system} />
           <Button
             size="xs"

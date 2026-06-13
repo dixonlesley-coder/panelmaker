@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Badge, Button, Card, Divider, Drawer, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconAlertTriangle, IconCircleCheck, IconTool } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCircleCheck, IconPointFilled, IconTool } from '@tabler/icons-react';
 import type { SuggestedFix, SystemResult, Warning } from '@shared/types';
+import { panelCompliance, type ComplianceItem } from '@shared/engine';
 import { panelLabel } from '@shared/labels';
 import { WarningBadge, severityColor } from '@renderer/features/components/WarningBadge';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -70,11 +71,71 @@ function IssueRowCard({ row }: { row: IssueRow }) {
   );
 }
 
+/** A single compliance topic's icon, coloured by pass / fail / not-applicable. */
+function ComplianceIcon({ status }: { status: ComplianceItem['status'] }) {
+  if (status === 'pass') {
+    return (
+      <ThemeIcon size={16} radius="xl" variant="light" color="teal">
+        <IconCircleCheck size={11} />
+      </ThemeIcon>
+    );
+  }
+  if (status === 'fail') {
+    return (
+      <ThemeIcon size={16} radius="xl" variant="light" color="orange">
+        <IconAlertTriangle size={11} />
+      </ThemeIcon>
+    );
+  }
+  return (
+    <ThemeIcon size={16} radius="xl" variant="subtle" color="gray">
+      <IconPointFilled size={11} />
+    </ThemeIcon>
+  );
+}
+
 /**
- * Project-wide validation: every panel's warnings plus the system-level ones, in
- * one drawer grouped by panel, with severity counts and a "fix all safe issues"
- * pass that applies every auto-applicable one-click fix at once. Turns validation
- * from a per-panel footnote into a single cleanup workflow.
+ * The per-panel sign-off checklist (voltage drop, ADS, breaking capacity, busbar
+ * withstand, protective conductor, ampacity) shown at the top of the drawer — the
+ * engineering checks you sign off, separate from advisory warnings below.
+ */
+function ComplianceSection({ system }: { system: SystemResult }) {
+  const { t } = useTranslation();
+  const panels = system.order
+    .map((id) => system.panels[id])
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+  if (panels.length === 0) return null;
+  return (
+    <Stack gap="xs">
+      <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+        {t('compliance.title')}
+      </Text>
+      {panels.map((p) => (
+        <Card key={p.panelId} withBorder radius="md" padding="xs">
+          <Text size="sm" fw={500} mb={6}>
+            {panelLabel(p)}
+          </Text>
+          <Group gap="md">
+            {panelCompliance(p).map((item) => (
+              <Group key={item.key} gap={6} wrap="nowrap">
+                <ComplianceIcon status={item.status} />
+                <Text size="xs" c={item.status === 'fail' ? undefined : 'dimmed'}>
+                  {t(`compliance.${item.key}`)}
+                </Text>
+              </Group>
+            ))}
+          </Group>
+        </Card>
+      ))}
+    </Stack>
+  );
+}
+
+/**
+ * Project-wide validation: a per-panel sign-off checklist plus every panel's
+ * warnings and the system-level ones, in one drawer grouped by panel, with a
+ * "fix all safe issues" pass that applies every auto-applicable one-click fix at
+ * once. The single status control in the header — its label reflects readiness.
  */
 export function ProjectIssues({ system }: { system: SystemResult }) {
   const { t } = useTranslation();
@@ -145,7 +206,7 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
         }
         onClick={() => setOpen(true)}
       >
-        {t('issues.projectIssues')}
+        {total > 0 ? t('issues.projectIssues') : t('compliance.ready')}
       </Button>
 
       <Drawer
@@ -163,12 +224,14 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
           </Group>
         }
       >
-        {total === 0 ? (
-          <Alert variant="light" color="teal" radius="md" icon={<IconCircleCheck size={18} />} title={t('issues.allClearTitle')}>
-            {t('issues.allClearBody')}
-          </Alert>
-        ) : (
-          <Stack gap="md">
+        <Stack gap="md">
+          <ComplianceSection system={system} />
+          {total === 0 ? (
+            <Alert variant="light" color="teal" radius="md" icon={<IconCircleCheck size={18} />} title={t('issues.allClearTitle')}>
+              {t('issues.allClearBody')}
+            </Alert>
+          ) : (
+            <>
             <Group justify="space-between" wrap="nowrap">
               <Text size="sm" c="dimmed">
                 {t('issues.errors', { count: errors })} · {t('issues.warnings', { count: warns })}
@@ -190,8 +253,9 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
                 </Stack>
               </div>
             ))}
-          </Stack>
-        )}
+            </>
+          )}
+        </Stack>
       </Drawer>
     </>
   );

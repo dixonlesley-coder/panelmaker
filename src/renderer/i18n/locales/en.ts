@@ -154,7 +154,7 @@ export const en = {
   },
 
   settings: {
-    eyebrow: 'Settings',
+    eyebrow: 'Preferences',
     panelDefaults: 'Panel defaults — {{name}}',
     noPanelTitle: 'No panel selected',
     noPanelBody: 'Select a panel first to edit its defaults.',
@@ -758,6 +758,8 @@ export const en = {
     supplyMv: 'Medium voltage + transformer',
     supplyLv: 'Low voltage (direct PLN)',
     demandKva: '{{kva}} kVA demand',
+    dayaLine: 'PLN daya — recommended {{recommended}} · contracted {{contracted}}',
+    dayaUncontracted: 'not set',
     plnService: 'PLN service',
     plnServiceMv: 'MV (TM) service',
     serviceCurrent: 'Service current',
