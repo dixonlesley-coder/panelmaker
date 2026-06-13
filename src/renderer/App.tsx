@@ -7,13 +7,8 @@ import {
   IconSearch,
   IconFolder,
   IconSitemap,
-  IconGauge,
-  IconInfoSquareRounded,
   IconChartLine,
-  IconBox,
-  IconReceipt,
   IconReceipt2,
-  IconSolarPanel,
   IconSettings,
   IconBolt,
   IconArrowBackUp,
@@ -32,13 +27,8 @@ import {
 } from '@renderer/state/projectStore';
 import { Projects } from '@renderer/screens/Projects';
 import { SystemView } from '@renderer/screens/SystemView';
-import { SystemInfo } from '@renderer/screens/SystemInfo';
-import { Dashboard } from '@renderer/screens/Dashboard';
-import { Coordination } from '@renderer/screens/Coordination';
-import { PartsCatalog } from '@renderer/screens/PartsCatalog';
-import { Pricelist } from '@renderer/screens/Pricelist';
-import { Quotation } from '@renderer/screens/Quotation';
-import { Sources } from '@renderer/screens/Sources';
+import { ReviewHub, REVIEW_SCREENS } from '@renderer/screens/ReviewHub';
+import { CommercialHub, COMMERCIAL_SCREENS } from '@renderer/screens/CommercialHub';
 import { Settings } from '@renderer/screens/Settings';
 import { UpdateNotifier } from '@renderer/features/update/UpdateNotifier';
 import { CommandPalette, openCommandPalette } from '@renderer/features/CommandPalette';
@@ -52,35 +42,11 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-/** Navigation grouped by workflow, so the sidebar reads as a process, not a list. */
-interface NavSection {
-  /** Translation key under the `nav.section*` namespace. */
-  labelKey: string;
-  items: NavItem[];
-}
-
-const NAV_SECTIONS: NavSection[] = [
-  {
-    labelKey: 'nav.sectionDesign',
-    items: [{ screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> }],
-  },
-  {
-    labelKey: 'nav.sectionReview',
-    items: [
-      { screen: 'overview', labelKey: 'nav.overview', icon: <IconInfoSquareRounded size={18} /> },
-      { screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> },
-      { screen: 'coordination', labelKey: 'nav.coordination', icon: <IconChartLine size={18} /> },
-      { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
-    ],
-  },
-  {
-    labelKey: 'nav.sectionCommercial',
-    items: [
-      { screen: 'parts', labelKey: 'nav.parts', icon: <IconBox size={18} /> },
-      { screen: 'pricelist', labelKey: 'nav.pricelist', icon: <IconReceipt size={18} /> },
-      { screen: 'quotation', labelKey: 'nav.quotation', icon: <IconReceipt2 size={18} /> },
-    ],
-  },
+/** The four primary destinations — Canvas, plus the two tabbed hubs. */
+const NAV_PRIMARY: NavItem[] = [
+  { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
+  { screen: 'overview', labelKey: 'nav.sectionReview', icon: <IconChartLine size={18} /> },
+  { screen: 'parts', labelKey: 'nav.sectionCommercial', icon: <IconReceipt2 size={18} /> },
 ];
 
 /** Utility destinations pinned at the bottom of the sidebar (entry + preferences). */
@@ -88,6 +54,13 @@ const NAV_BOTTOM: NavItem[] = [
   { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
   { screen: 'settings', labelKey: 'nav.settings', icon: <IconSettings size={18} /> },
 ];
+
+/** The active primary nav item, accounting for sub-screens owned by a hub. */
+function navGroupActive(item: Screen, active: Screen): boolean {
+  if (item === 'overview') return REVIEW_SCREENS.includes(active);
+  if (item === 'parts') return COMMERCIAL_SCREENS.includes(active);
+  return item === active;
+}
 
 /** Toggle between light and dark color schemes. */
 function ColorSchemeToggle() {
@@ -189,29 +162,25 @@ function ActiveScreen({ screen }: { screen: Screen }) {
   switch (screen) {
     case 'projects':
       return <Projects />;
-    case 'system':
-      return <SystemView />;
-    case 'overview':
-      return <SystemInfo />;
-    case 'dashboard':
-      return <Dashboard />;
     case 'panel':
       // The standalone Panel Editor was retired — editing now happens on the
       // single-line (double-click a component / drag the palette / the panel
       // inspector). Any leftover navigation to 'panel' lands there.
       return <SystemView />;
-    case 'coordination':
-      return <Coordination />;
-    case 'parts':
-      return <PartsCatalog />;
-    case 'pricelist':
-      return <Pricelist />;
-    case 'quotation':
-      return <Quotation />;
-    case 'sources':
-      return <Sources />;
+    case 'system':
+      return <SystemView />;
     case 'settings':
       return <Settings />;
+    // The read/analyse and commercial screens live inside their tabbed hubs.
+    case 'overview':
+    case 'dashboard':
+    case 'coordination':
+    case 'sources':
+      return <ReviewHub />;
+    case 'parts':
+    case 'pricelist':
+    case 'quotation':
+      return <CommercialHub />;
   }
 }
 
@@ -324,30 +293,14 @@ export function App() {
         className="app-chrome"
         style={{ gap: 2, display: 'flex', flexDirection: 'column' }}
       >
-        {NAV_SECTIONS.map((section, si) => (
-          <div key={section.labelKey}>
-            <Text
-              size="xs"
-              c="dimmed"
-              fw={600}
-              tt="uppercase"
-              px="sm"
-              pb={4}
-              pt={si === 0 ? 4 : 'md'}
-              style={{ letterSpacing: '0.04em' }}
-            >
-              {t(section.labelKey)}
-            </Text>
-            {section.items.map((item) => (
-              <NavLink
-                key={item.screen}
-                label={t(item.labelKey)}
-                leftSection={item.icon}
-                active={activeScreen === item.screen}
-                onClick={() => setScreen(item.screen)}
-              />
-            ))}
-          </div>
+        {NAV_PRIMARY.map((item) => (
+          <NavLink
+            key={item.screen}
+            label={t(item.labelKey)}
+            leftSection={item.icon}
+            active={navGroupActive(item.screen, activeScreen)}
+            onClick={() => setScreen(item.screen)}
+          />
         ))}
         {/* Entry + preferences pinned to the bottom, separated from the workflow. */}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
