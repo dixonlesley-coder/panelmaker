@@ -181,6 +181,15 @@ export function buildPanelBom(panel: PanelResult, parts: Part[]): BomLine[] {
     // Cable run (priced per metre — qty is the CONDUCTOR count for single-core
     // wiring, 1 for a multicore cable; run length is not modelled as a separate
     // quantity). Spare ways are breaker provision only: no cable for them.
+    if (circuit.transformer) {
+      // A dedicated transformer feeder lists the transformer as its own line item.
+      lines.push({
+        description: `Distribution transformer ${circuit.transformer.kva} kVA — ${circuit.name}`,
+        category: 'breaker',
+        qty: 1,
+        matched: false,
+      });
+    }
     if (circuit.busway) {
       // Busbar trunking replaces the cable run with a busway length (by rating).
       lines.push({

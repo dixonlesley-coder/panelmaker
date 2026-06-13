@@ -144,6 +144,8 @@ export const circuits = sqliteTable('circuits', {
   lifeSafety: integer('life_safety', { mode: 'boolean' }),
   /** Feeder runs as busbar trunking (busway) instead of cable. */
   busway: integer('busway', { mode: 'boolean' }),
+  /** Feeder includes a dedicated step-down/isolation transformer. */
+  transformer: integer('transformer', { mode: 'boolean' }),
   /** Manual breaker rating override (A). */
   breakerOverrideA: real('breaker_override_a'),
   /** Force a new busbar section to start at this circuit (manual bus break). */

@@ -171,6 +171,12 @@ export interface CircuitResult {
   containment?: ContainmentResult;
   /** When the feeder runs as busbar trunking (busway): its standard rating (A). */
   busway?: { ratingA: number };
+  /**
+   * When the feeder includes a dedicated transformer: its standard kVA rating and
+   * the transformer-limited prospective fault at its secondary (kA), which
+   * replaces the upstream fault for the whole downstream subtree.
+   */
+  transformer?: { kva: number; secondaryFaultKa: number };
   /** Point-level summary (fixtures / sockets / switch groups), when modelled. */
   finalCircuit?: FinalCircuitResult;
 }

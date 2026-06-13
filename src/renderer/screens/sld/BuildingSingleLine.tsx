@@ -1409,6 +1409,7 @@ function FeederEdge({
   const offset = (data?.offset as number | undefined) ?? 0;
   const label = data?.label as string | undefined;
   const util = data?.util as number | undefined;
+  const transformer = data?.transformer as number | undefined;
   // Colour the label by cable loading: ≥100% overloaded (red), ≥85% tight (orange).
   const color =
     util === undefined ? undefined : util >= 100 ? 'var(--mantine-color-red-7)' : util >= 85 ? 'var(--mantine-color-orange-7)' : undefined;
@@ -1420,6 +1421,32 @@ function FeederEdge({
   return (
     <>
       <BaseEdge path={path} markerEnd={markerEnd} style={style} interactionWidth={24} />
+      {transformer !== undefined && (
+        <EdgeLabelRenderer>
+          {/* IEC distribution-transformer symbol (two interlinked windings). */}
+          <div
+            className="nodrag nopan"
+            title="Dedicated transformer on this feeder"
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 17}px)`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              background: 'var(--mantine-color-body)',
+              borderRadius: 4,
+              padding: '0 3px',
+              color: 'var(--mantine-color-indigo-7)',
+            }}
+          >
+            <svg width={24} height={15} aria-hidden>
+              <circle cx={9} cy={7.5} r={6} fill="none" stroke="currentColor" strokeWidth={1.4} />
+              <circle cx={15} cy={7.5} r={6} fill="none" stroke="currentColor" strokeWidth={1.4} />
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>{transformer} kVA</span>
+          </div>
+        </EdgeLabelRenderer>
+      )}
       {label && (
         <EdgeLabelRenderer>
           <div
@@ -1852,7 +1879,14 @@ function buildUnified(
         targetHandle: 'in',
         type: 'feeder',
         // panelId + circuitId let a double-click open this feeder's editor.
-        data: { label: feederLabel, offset, panelId: parentId, circuitId, util },
+        data: {
+          label: feederLabel,
+          offset,
+          panelId: parentId,
+          circuitId,
+          util,
+          ...(feederWay?.transformer ? { transformer: feederWay.transformer.kva } : {}),
+        },
         // Busway (rising main) draws as a thick bar; cable feeders as a thin line.
         style: {
           stroke: 'var(--mantine-color-indigo-4)',

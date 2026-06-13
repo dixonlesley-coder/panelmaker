@@ -3,6 +3,12 @@ import { DIN_MODULE_WIDTH_MM, sheetThicknessMm } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
 import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
 import { selectBuswayRating } from '../standards/busway';
+import {
+  selectTransformerKva,
+  transformerFlc,
+  TRANSFORMER_IMPEDANCE_PCT,
+  TRANSFORMER_LOADING_FACTOR,
+} from '../standards/transformer';
 import { MAX_BUSBAR_SECTION_CURRENT_A, MAX_WAYS_PER_BUSBAR } from '../standards/protection';
 import type { CircuitInput, PanelInput } from '../types/project';
 import type { CableType, SystemType, EarthingSystem } from '../types/electrical';
@@ -280,6 +286,17 @@ function computeCircuit(
     const ratingA = selectBuswayRating(designCurrentA);
     result.busway = { ratingA };
     result.grounding = { ...result.grounding, cableSpec: `Busway ${ratingA} A` };
+  }
+
+  // Dedicated transformer feeder: size the transformer to the feeder load and
+  // report the transformer-limited secondary fault (Isc = FLC ÷ Z%). computeSystem
+  // uses this to isolate the downstream subtree's fault level from the upstream.
+  if (c.transformer && isFeeder) {
+    const apparentKva = (threePhase ? Math.sqrt(3) : 1) * panel.voltageV * designCurrentA / 1000;
+    const kva = selectTransformerKva(apparentKva / TRANSFORMER_LOADING_FACTOR);
+    const secFaultA = transformerFlc(kva, panel.voltageV) / (TRANSFORMER_IMPEDANCE_PCT / 100);
+    result.transformer = { kva, secondaryFaultKa: round(secFaultA / 1000, 1) };
+    result.grounding = { ...result.grounding, cableSpec: `${result.grounding.cableSpec} · via ${kva} kVA Tx` };
   }
 
   // Protection / fault analysis (only when the panel's prospective fault is known).

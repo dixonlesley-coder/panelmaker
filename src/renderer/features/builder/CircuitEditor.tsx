@@ -401,6 +401,22 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
           />
         )}
 
+        {isFeederCircuit && (
+          <Switch
+            label={t('circuitEditor.transformer')}
+            description={
+              result?.transformer
+                ? t('circuitEditor.transformerRated', {
+                    kva: result.transformer.kva,
+                    ka: result.transformer.secondaryFaultKa,
+                  })
+                : t('circuitEditor.transformerHint')
+            }
+            checked={circuit.transformer === true}
+            onChange={(e) => patch({ transformer: e.currentTarget.checked ? true : undefined })}
+          />
+        )}
+
         <Divider label={t('circuitEditor.busbarSection')} />
         <Switch
           label={t('circuitEditor.busbarBreak')}

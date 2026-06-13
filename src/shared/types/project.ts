@@ -123,6 +123,14 @@ export interface CircuitInput {
    * ampere rating; only meaningful on a feeder.
    */
   busway?: boolean;
+
+  /**
+   * Feed the sub-panel through a DEDICATED step-down/isolation transformer
+   * (campus / multi-substation). Auto-sized to the feeder load; its impedance
+   * isolates and LIMITS the prospective fault for the whole downstream subtree.
+   * Only meaningful on a feeder.
+   */
+  transformer?: boolean;
 }
 
 export interface PanelInput {

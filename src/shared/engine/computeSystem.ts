@@ -305,6 +305,13 @@ export function computeSystem(project: ProjectInput): SystemResult {
         );
         sourceZ = addImpedance(parentZ, { rOhm: fz.rOhm / feederRuns, xOhm: fz.xOhm / feederRuns });
         faultA = downstreamFaultA(panel.voltageV, sourceZ, parentFaultA);
+        // A dedicated transformer on the feeder ISOLATES the downstream fault: the
+        // subtree's prospective Isc is set by the transformer secondary, not the
+        // upstream bus (the whole point of a distribution transformer).
+        if (feederResult.transformer) {
+          faultA = feederResult.transformer.secondaryFaultKa * 1000;
+          sourceZ = sourceImpedanceFromIsc(faultA, panel.voltageV);
+        }
       } else {
         sourceZ = parentZ;
         faultA = parentFaultA;
