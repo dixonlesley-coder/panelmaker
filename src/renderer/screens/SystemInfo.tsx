@@ -68,7 +68,9 @@ export function SystemInfo() {
         />
         <Stat
           label={t('system.estimatedCost')}
-          value={formatIdr(cost.grandTotal)}
+          // A confident "Rp 0" reads as broken when nothing is priced yet — show
+          // a dash and let the hint prompt importing a pricelist.
+          value={cost.grandTotal > 0 ? formatIdr(cost.grandTotal) : '—'}
           hint={
             cost.unmatchedCount > 0
               ? t('system.unpricedLines', { count: cost.unmatchedCount })

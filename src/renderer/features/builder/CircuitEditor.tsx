@@ -12,7 +12,6 @@ import {
   Stack,
   Switch,
   Text,
-  TextInput,
 } from '@mantine/core';
 import { IconBulb, IconTrash } from '@tabler/icons-react';
 import type { CableType, CircuitInput, CircuitResult, LoadKind, StarterType } from '@shared/types';
@@ -26,6 +25,7 @@ import {
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { circuitOrderCodes } from '@shared/engine/bom';
 import { partsForBrand } from '@shared/data/catalog';
+import { DebouncedNumberInput, DebouncedTextInput } from '@renderer/features/builder/DebouncedField';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps, formatPercent } from '@renderer/lib/format';
 
@@ -127,12 +127,12 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
       size="lg"
       title={
         <Group gap="xs">
-          <TextInput
+          <DebouncedTextInput
             variant="unstyled"
             size="md"
             value={circuit.name}
             aria-label={t('builder.colName')}
-            onChange={(e) => patch({ name: e.currentTarget.value })}
+            onCommit={(name) => patch({ name })}
             styles={{ input: { fontWeight: 700, fontSize: 'var(--mantine-font-size-lg)' } }}
           />
         </Group>
@@ -207,34 +207,34 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             }}
           />
           {motor ? (
-            <NumberInput
+            <DebouncedNumberInput
               label={t('circuitEditor.motorKw')}
               value={circuit.motorKw ?? 0}
               min={0}
               step={0.5}
               decimalScale={1}
               suffix=" kW"
-              onChange={(v) => patch({ motorKw: typeof v === 'number' ? v : 0 })}
+              onCommit={(v) => patch({ motorKw: v })}
             />
           ) : (
-            <NumberInput
+            <DebouncedNumberInput
               label={t('builder.colLoad')}
               value={circuit.loadW / 1000}
               min={0}
               step={0.5}
               decimalScale={2}
               suffix=" kW"
-              onChange={(v) => patch({ loadW: (typeof v === 'number' ? v : 0) * 1000 })}
+              onCommit={(v) => patch({ loadW: v * 1000 })}
             />
           )}
-          <NumberInput
+          <DebouncedNumberInput
             label={t('builder.colPf')}
             value={circuit.cosPhi}
             min={0.1}
             max={1}
             step={0.05}
             decimalScale={2}
-            onChange={(v) => patch({ cosPhi: typeof v === 'number' ? v : circuit.cosPhi })}
+            onCommit={(v) => patch({ cosPhi: v })}
           />
           {motor && (
             <Select
@@ -280,13 +280,13 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
 
         {/* Cable run */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <NumberInput
+          <DebouncedNumberInput
             label={t('builder.colLength')}
             value={circuit.lengthM}
             min={0}
             step={5}
             suffix=" m"
-            onChange={(v) => patch({ lengthM: typeof v === 'number' ? v : 0 })}
+            onCommit={(v) => patch({ lengthM: v })}
           />
           <Select
             label={t('circuitEditor.cableType')}
