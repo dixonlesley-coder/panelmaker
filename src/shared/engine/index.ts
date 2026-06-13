@@ -33,3 +33,4 @@ export * from './powerOneline';
 export * from './computePanel';
 export * from './computeSystem';
 export * from './control';
+export * from './compliance';

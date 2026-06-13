@@ -34,9 +34,13 @@ import {
   IconTableExport,
   IconTableImport,
   IconTags,
+  IconPlugConnected,
 } from '@tabler/icons-react';
 import type { CostResult } from '@shared/types';
 import { ProjectIssues } from '@renderer/features/issues/ProjectIssues';
+import { ServiceInspector } from '@renderer/features/service/ServiceInspector';
+import { ComplianceStatus } from '@renderer/features/compliance/ComplianceStatus';
+import { LoadImportModal } from '@renderer/features/loadimport/LoadImportModal';
 import { BuildingSingleLine } from '@renderer/screens/sld/BuildingSingleLine';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { partsForBrand, CATALOG_BRANDS } from '@shared/data/catalog';
@@ -44,7 +48,6 @@ import { costSystemConsolidated } from '@renderer/lib/bom';
 import { downloadBomCsv, downloadBomXlsx } from '@renderer/lib/bomExport';
 import { downloadCsv } from '@renderer/lib/download';
 import { cableScheduleCsv } from '@shared/io/scheduleExport';
-import { parseLoadList } from '@shared/io/loadListImport';
 import { formatIdr } from '@renderer/lib/format';
 import { PANEL_TEMPLATES } from '@renderer/data/panelTemplates';
 import { useProjectStore } from '@renderer/state/projectStore';
@@ -72,6 +75,15 @@ export function SystemView() {
   // The consolidated project BOM lives in a right-side drawer (toggled from the
   // header) rather than below the diagram, so the single-line gets the full height.
   const [bomOpen, setBomOpen] = useState(false);
+  const [serviceOpen, setServiceOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // A brand-new project (one panel, no circuits, no feeders) shows a warm
+  // empty-state prompting the engineer to set up the service first.
+  const isEmpty = useMemo(
+    () => project.panels.length <= 1 && project.panels.every((p) => p.circuits.length === 0),
+    [project.panels],
+  );
 
   // Consolidated project-wide BOM (per-panel lines merged by part/description).
   const projectBom = useMemo(() => {
@@ -80,40 +92,14 @@ export function SystemView() {
   }, [system, bomParts, prices]);
 
   /** Pick a CSV load list, parse it leniently, and append its panels (undoable). */
-  function onImportLoadList() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.csv,text/csv';
-    input.style.display = 'none';
-    input.addEventListener('change', () => {
-      const file = input.files?.[0];
-      input.remove();
-      if (!file) return;
-      void file.text().then((text) => {
-        const { panels, warnings } = parseLoadList(text);
-        if (panels.length === 0) {
-          notifications.show({ message: t('system.loadListEmpty'), color: 'red' });
-          return;
-        }
-        importPanels(panels);
-        const circuitCount = panels.reduce((n, p) => n + p.circuits.length, 0);
-        notifications.show({
-          message: t('system.loadListImported', { panels: panels.length, circuits: circuitCount }),
-          color: 'teal',
-        });
-        for (const w of warnings.slice(0, 5)) {
-          notifications.show({ message: w, color: 'yellow' });
-        }
-        if (warnings.length > 5) {
-          notifications.show({
-            message: t('system.loadListMoreWarnings', { count: warnings.length - 5 }),
-            color: 'yellow',
-          });
-        }
-      });
+  /** Commit a parsed load list (panels) into the project, with a summary toast. */
+  function onLoadListImport(panels: typeof project.panels) {
+    importPanels(panels);
+    const circuitCount = panels.reduce((n, p) => n + p.circuits.length, 0);
+    notifications.show({
+      message: t('system.loadListImported', { panels: panels.length, circuits: circuitCount }),
+      color: 'teal',
     });
-    document.body.appendChild(input);
-    input.click();
   }
 
   const notify = (res: { ok: boolean; reason?: string; message: string }) =>
@@ -132,7 +118,16 @@ export function SystemView() {
           <Title order={3}>{project.name}</Title>
         </div>
         <Group gap="xs">
+          <ComplianceStatus system={system} />
           <ProjectIssues system={system} />
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconPlugConnected size={14} />}
+            onClick={() => setServiceOpen(true)}
+          >
+            {t('service.title')}
+          </Button>
           <Menu position="bottom-end" withinPortal shadow="md" width={300}>
             <Menu.Target>
               <Button
@@ -205,72 +200,108 @@ export function SystemView() {
           <Button
             size="xs"
             variant="default"
-            leftSection={<IconDeviceFloppy size={14} />}
-            onClick={async () => notify(await saveProjectToDisk(project))}
-          >
-            {t('system.save')}
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
-            leftSection={<IconDownload size={14} />}
-            onClick={async () => notify(await exportSystemPdf(project))}
-          >
-            {t('system.exportSystemPdf')}
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
-            color="teal"
-            leftSection={<IconPackageExport size={14} />}
-            onClick={async () => {
-              const res = await exportAllDeliverables();
-              notifications.show({
-                message: exportAllMessage(t, res),
-                color: res.ok ? 'teal' : res.reason === 'cancelled' ? 'gray' : 'red',
-              });
-            }}
-          >
-            {t('system.exportAll')}
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
-            leftSection={<IconTags size={14} />}
-            onClick={async () => notify(await exportLabelsPdf(project))}
-          >
-            {t('system.exportLabels')}
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
-            leftSection={<IconTableExport size={14} />}
-            onClick={() => {
-              downloadCsv(`${project.name} - cable schedule.csv`, cableScheduleCsv(system));
-              notifications.show({ message: t('system.cableScheduleExported'), color: 'teal' });
-            }}
-          >
-            {t('system.exportCableSchedule')}
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
             leftSection={<IconTableImport size={14} />}
-            onClick={onImportLoadList}
+            onClick={() => setImportOpen(true)}
           >
             {t('system.importLoadList')}
           </Button>
-          <Button
-            size="xs"
-            variant="light"
-            color="indigo"
-            leftSection={<IconListDetails size={14} />}
-            onClick={() => setBomOpen(true)}
-          >
-            {t('system.projectBom')}
-          </Button>
+          <Menu position="bottom-end" withinPortal shadow="md" width={240}>
+            <Menu.Target>
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<IconPackageExport size={14} />}
+                rightSection={<IconChevronDown size={14} />}
+              >
+                {t('system.export')}
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<IconDeviceFloppy size={14} />}
+                onClick={async () => notify(await saveProjectToDisk(project))}
+              >
+                {t('system.save')}
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconDownload size={14} />}
+                onClick={async () => notify(await exportSystemPdf(project))}
+              >
+                {t('system.exportSystemPdf')}
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconTags size={14} />}
+                onClick={async () => notify(await exportLabelsPdf(project))}
+              >
+                {t('system.exportLabels')}
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconTableExport size={14} />}
+                onClick={() => {
+                  downloadCsv(`${project.name} - cable schedule.csv`, cableScheduleCsv(system));
+                  notifications.show({ message: t('system.cableScheduleExported'), color: 'teal' });
+                }}
+              >
+                {t('system.exportCableSchedule')}
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Item
+                leftSection={<IconListDetails size={14} />}
+                onClick={() => setBomOpen(true)}
+              >
+                {t('system.projectBom')}
+              </Menu.Item>
+              <Menu.Item
+                color="teal"
+                leftSection={<IconPackageExport size={14} />}
+                onClick={async () => {
+                  const res = await exportAllDeliverables();
+                  notifications.show({
+                    message: exportAllMessage(t, res),
+                    color: res.ok ? 'teal' : res.reason === 'cancelled' ? 'gray' : 'red',
+                  });
+                }}
+              >
+                {t('system.exportAll')}
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </Group>
+
+      {isEmpty && (
+        <Card withBorder radius="md" padding="lg" bg="var(--mantine-color-indigo-light)">
+          <Group justify="space-between" wrap="nowrap">
+            <Group gap="md" wrap="nowrap">
+              <ThemeIcon size={42} radius="md" variant="light" color="indigo">
+                <IconPlugConnected size={24} />
+              </ThemeIcon>
+              <div>
+                <Text fw={600}>{t('system.setupTitle')}</Text>
+                <Text size="sm" c="dimmed">
+                  {t('system.setupBody')}
+                </Text>
+              </div>
+            </Group>
+            <Group gap="xs" wrap="nowrap">
+              <Button
+                variant="filled"
+                leftSection={<IconPlugConnected size={16} />}
+                onClick={() => setServiceOpen(true)}
+              >
+                {t('system.setupCta')}
+              </Button>
+              <Button
+                variant="default"
+                leftSection={<IconTableImport size={16} />}
+                onClick={() => setImportOpen(true)}
+              >
+                {t('system.importLoadList')}
+              </Button>
+            </Group>
+          </Group>
+        </Card>
+      )}
 
       <Card withBorder radius="md" padding="xs">
         <Tabs defaultValue="single-line">
@@ -315,6 +346,13 @@ export function SystemView() {
       >
         <ProjectBomCard cost={projectBom} projectName={project.name} />
       </Drawer>
+
+      <ServiceInspector opened={serviceOpen} onClose={() => setServiceOpen(false)} />
+      <LoadImportModal
+        opened={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={onLoadListImport}
+      />
     </Stack>
   );
 }

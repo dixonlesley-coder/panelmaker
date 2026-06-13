@@ -366,6 +366,35 @@ Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.1.
   verified on the GitHub Release; CI gate caught that the full `tsconfig.json` typecheck also
   covers `tests/` — run it before tagging.
 
+### Workspace restructure + engineer-workflow features — stage 1 (same branch)
+
+A UX pass (EE + Apple-HIG audits) toward an Inspector-first workspace. Stage 1:
+
+- **PLN connected power ("daya tersambung", `standards/pln.ts`):** standard 1φ/3φ daya steps +
+  `nextDaya`/`formatDaya`. `computeSystem` sets `supply.recommendedDayaVa` (next step ≥ demand) and,
+  when `ProjectMeta.contractedDayaVa` is set, warns `demand-exceeds-daya`.
+- **Per-panel compliance (`engine/compliance.ts`):** pure `panelCompliance(panel)` rolls up the
+  sign-off checklist (voltage drop, ADS/Zs, breaking capacity, busbar withstand, protective
+  conductor, ampacity) to pass/fail/na from existing result fields. Surfaced as an **ambient status
+  pill** in the canvas toolbar (`features/compliance/ComplianceStatus.tsx`): green "Ready to issue"
+  / amber "N to resolve", popover lists the offending panel + topic.
+- **Service & Earthing inspector (`features/service/ServiceInspector.tsx`):** ONE right-side drawer
+  for supply phase/voltage, PLN daya (recommended marked), earthing system, dual-transformer, site
+  exposure, target PF, building type, and source enable toggles — consolidating what was scattered
+  across Settings/SystemInfo/Sources. Edits the service-root panel + project directly (no new model).
+  Doubles as the **guided first-run setup**: a blank project shows a warm "Set up your service"
+  empty-state card on the canvas that opens it.
+- **Bulk load import (`features/loadimport/LoadImportModal.tsx`):** CSV **or** XLSX (SheetJS) **or**
+  paste-from-Excel, with a downloadable template and a live preview (panels/circuits + lenient
+  importer assumptions) before committing. Replaces the old CSV-only file picker.
+- **Sidebar consolidation (`App.tsx`):** 4 groups → Design (Canvas) · Review · Commercial, with
+  Projects + **Preferences** pinned at the bottom; "System" renamed **Canvas** (already the home
+  screen). SystemView's button row collapsed into one **Export menu** + Import + Service. All
+  localised EN + ID. Suite at 496 tests.
+
+  TODO (later stages): fold Sources/SystemInfo fully into inspectors; hub-tab the Review/Commercial
+  groups; the visual language pass (grouped inset lists, monospaced figures); inline node fixes.
+
 ### CAD-quality PDF drawing sheets (same branch)
 
 The system/panel PDF embedded the SLD/GA as small fit-to-width SVGs: overlapping GA device

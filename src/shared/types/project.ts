@@ -247,6 +247,12 @@ export interface ProjectMeta {
    * behind a normally-open bus coupler. Fault level is one unit's (N.O. coupler).
    */
   dualTransformer?: boolean;
+  /**
+   * Contracted PLN connected power ("daya tersambung", VA). When set, the engine
+   * warns if the diversified demand exceeds it. Absent = uncontracted (the engine
+   * just recommends the next standard step).
+   */
+  contractedDayaVa?: number;
 }
 
 /**

@@ -5,6 +5,7 @@ import { circuitConnectedW, computePanel } from './computePanel';
 import { circuitDemandFactor, effectiveDiversityFactor } from './occupancy';
 import { determineSupply } from './transformer';
 import { ASSUMED_BUILDING_PF } from '../standards/transformer';
+import { nextDaya } from '../standards/pln';
 import { computeSources } from './sources';
 import { computeEarthing } from './grounding';
 import { computePowerFactor } from './capacitor';
@@ -151,6 +152,22 @@ export function computeSystem(project: ProjectInput): SystemResult {
   const supply = determineSupply(totalDemandKva, lvVoltageV, {
     dual: project.meta?.dualTransformer === true,
   });
+  // PLN connected power ("daya tersambung"): recommend the next standard step at
+  // or above the diversified demand, and warn if the contracted daya is exceeded.
+  const supplyPhase: 1 | 3 = (roots[0]?.system ?? '3ph') === '1ph' ? 1 : 3;
+  const totalDemandVa = totalDemandKva * 1000;
+  supply.recommendedDayaVa = nextDaya(totalDemandVa, supplyPhase);
+  const contractedDaya = project.meta?.contractedDayaVa;
+  if (contractedDaya !== undefined) {
+    supply.contractedDayaVa = contractedDaya;
+    if (totalDemandVa > contractedDaya + 1e-6) {
+      warnings.push({
+        code: 'demand-exceeds-daya',
+        severity: 'warning',
+        message: `Diversified demand (${Math.round(totalDemandVa).toLocaleString('en-US')} VA) exceeds the contracted PLN daya (${contractedDaya.toLocaleString('en-US')} VA). Upgrade the connection to at least ${supply.recommendedDayaVa.toLocaleString('en-US')} VA.`,
+      });
+    }
+  }
   // Flagged-panel demand (essential → genset, UPS-backed → battery): a panel
   // under a flagged ancestor is already inside that ancestor's demand, so only
   // the TOPMOST flagged panels are summed (double-count free).

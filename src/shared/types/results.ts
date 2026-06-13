@@ -77,6 +77,13 @@ export interface SupplyResult {
   transformerImpedancePct?: number;
   transformerPrimaryA?: number;
   transformerSecondaryA?: number;
+  /**
+   * Recommended PLN connected-power step ("daya tersambung", VA) — the smallest
+   * standard step at or above the diversified demand for the supply phase.
+   */
+  recommendedDayaVa?: number;
+  /** The contracted PLN connected power (VA), when the user has set it. */
+  contractedDayaVa?: number;
 }
 
 export interface BreakerResult {

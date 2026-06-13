@@ -62,18 +62,15 @@ interface NavSection {
 const NAV_SECTIONS: NavSection[] = [
   {
     labelKey: 'nav.sectionDesign',
-    items: [
-      { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
-      { screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> },
-      { screen: 'coordination', labelKey: 'nav.coordination', icon: <IconChartLine size={18} /> },
-      { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
-    ],
+    items: [{ screen: 'system', labelKey: 'nav.system', icon: <IconSitemap size={18} /> }],
   },
   {
-    labelKey: 'nav.sectionInsight',
+    labelKey: 'nav.sectionReview',
     items: [
       { screen: 'overview', labelKey: 'nav.overview', icon: <IconInfoSquareRounded size={18} /> },
       { screen: 'dashboard', labelKey: 'nav.dashboard', icon: <IconGauge size={18} /> },
+      { screen: 'coordination', labelKey: 'nav.coordination', icon: <IconChartLine size={18} /> },
+      { screen: 'sources', labelKey: 'nav.sources', icon: <IconSolarPanel size={18} /> },
     ],
   },
   {
@@ -84,10 +81,12 @@ const NAV_SECTIONS: NavSection[] = [
       { screen: 'quotation', labelKey: 'nav.quotation', icon: <IconReceipt2 size={18} /> },
     ],
   },
-  {
-    labelKey: 'nav.sectionSetup',
-    items: [{ screen: 'settings', labelKey: 'nav.settings', icon: <IconSettings size={18} /> }],
-  },
+];
+
+/** Utility destinations pinned at the bottom of the sidebar (entry + preferences). */
+const NAV_BOTTOM: NavItem[] = [
+  { screen: 'projects', labelKey: 'nav.projects', icon: <IconFolder size={18} /> },
+  { screen: 'settings', labelKey: 'nav.settings', icon: <IconSettings size={18} /> },
 ];
 
 /** Toggle between light and dark color schemes. */
@@ -320,7 +319,11 @@ export function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="sm" className="app-chrome" style={{ gap: 2 }}>
+      <AppShell.Navbar
+        p="sm"
+        className="app-chrome"
+        style={{ gap: 2, display: 'flex', flexDirection: 'column' }}
+      >
         {NAV_SECTIONS.map((section, si) => (
           <div key={section.labelKey}>
             <Text
@@ -346,6 +349,18 @@ export function App() {
             ))}
           </div>
         ))}
+        {/* Entry + preferences pinned to the bottom, separated from the workflow. */}
+        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+          {NAV_BOTTOM.map((item) => (
+            <NavLink
+              key={item.screen}
+              label={t(item.labelKey)}
+              leftSection={item.icon}
+              active={activeScreen === item.screen}
+              onClick={() => setScreen(item.screen)}
+            />
+          ))}
+        </div>
       </AppShell.Navbar>
 
       <AppShell.Main>
