@@ -258,7 +258,10 @@ function SelectivityCard({ system }: { system: SystemResult }) {
                 <Table.Td>{formatAmps(e.downstreamRatingA)}</Table.Td>
                 <Table.Td>{e.ratio.toFixed(2)}×</Table.Td>
                 <Table.Td>
-                  <Badge variant="light" color={e.selective ? 'teal' : 'red'} size="sm">
+                  {/* A current-ratio SCREEN, not a type-tested verdict — amber
+                      "review" rather than a red "fail" so it doesn't assert more
+                      than it computes. */}
+                  <Badge variant="light" color={e.selective ? 'teal' : 'orange'} size="sm">
                     {e.selective ? t('system.selOk') : t('system.selRisk')}
                   </Badge>
                 </Table.Td>
@@ -267,6 +270,9 @@ function SelectivityCard({ system }: { system: SystemResult }) {
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>
+      <Text size="xs" c="dimmed" mt="xs">
+        {t('system.selectivityScreenNote')}
+      </Text>
     </Card>
   );
 }

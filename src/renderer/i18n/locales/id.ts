@@ -804,8 +804,10 @@ export const id: TranslationKeys = {
     selColDownstream: 'Hilir',
     selColRatio: 'Rasio',
     selColDiscrimination: 'Diskriminasi',
-    selOk: 'OK',
-    selRisk: 'risiko',
+    selOk: 'Mungkin',
+    selRisk: 'Tinjau',
+    selectivityScreenNote:
+      'Hanya skrining rasio arus (≥1,6× = kemungkinan selektif) — konfirmasi diskriminasi akhir dengan tabel let-through / diskriminasi pabrikan.',
     projectBom: 'Daftar material proyek',
     allBrands: 'Semua merek',
     exportBrand: 'Merek kode pesan',

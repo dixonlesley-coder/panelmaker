@@ -2285,6 +2285,10 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     circuits: { panelId: string; circuit: CircuitInput }[];
     floats: FloatingLoad[];
   } | null>(null);
+  // Mirror `nodes` in a ref so the global copy/paste listener can read the live
+  // selection without re-subscribing on every node change (drag frame / edit).
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -2296,7 +2300,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       const state = useProjectStore.getState();
 
       if (key === 'c') {
-        const selected = nodes.filter((n) => n.selected);
+        const selected = nodesRef.current.filter((n) => n.selected);
         if (selected.length === 0) return;
         const panels: { snapshot: PanelInput; position: { x: number; y: number } }[] = [];
         const circuits: { panelId: string; circuit: CircuitInput }[] = [];
@@ -2383,7 +2387,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [nodes, pastePanels, pasteCircuits, addFloatingLoad, nearestPanelId, t]);
+    // `nodes` is read via nodesRef, so the listener mounts once (not per edit).
+  }, [pastePanels, pasteCircuits, addFloatingLoad, nearestPanelId, t]);
 
   const editingPanel = editing ? project.panels.find((p) => p.id === editing.panelId) : undefined;
   const editingCircuit = editingPanel?.circuits.find((c) => c.id === editing?.circuitId);

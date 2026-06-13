@@ -800,8 +800,10 @@ export const en = {
     selColDownstream: 'Downstream',
     selColRatio: 'Ratio',
     selColDiscrimination: 'Discrimination',
-    selOk: 'OK',
-    selRisk: 'risk',
+    selOk: 'Likely',
+    selRisk: 'Review',
+    selectivityScreenNote:
+      'Current-ratio screen only (≥1.6× = likely selective) — confirm final discrimination against the manufacturers’ let-through / discrimination tables.',
     projectBom: 'Project bill of materials',
     allBrands: 'All brands',
     exportBrand: 'Order-code brand',
