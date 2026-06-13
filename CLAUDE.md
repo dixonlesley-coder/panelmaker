@@ -366,6 +366,37 @@ Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.1.
   verified on the GitHub Release; CI gate caught that the full `tsconfig.json` typecheck also
   covers `tests/` — run it before tagging.
 
+### CAD-quality PDF drawing sheets (same branch)
+
+The system/panel PDF embedded the SLD/GA as small fit-to-width SVGs: overlapping GA device
+labels, clipped dimension + incomer labels, illegible shrunk text on wide boards, and a tofu
+box for the feeder arrow (Roboto has no `→`). Reworked into proper plotted drawing sheets:
+
+- **`drawing/sheet.ts` — landscape-A4 CAD sheet renderer.** Frames a {@link Drawing} with a
+  double trim/drawing border, A–D × 1–6 **zone reference markers**, a multi-cell **title block**
+  (company / project / client / dwg-no / rev / scale / drawn / date, inline label+value), and an
+  optional **graphic scale bar**. The diagram is scaled to fill the window but **text is held at a
+  fixed paper-size band** (`MIN_TXT`..`MAX_TXT`) with a min stroke — so a 10-way SLD plots small
+  geometry yet keeps readable annotation (exactly how a drawing is plotted to a scale). Builders:
+  `panelSldSheet` (NTS), `panelGaSheet` / `panelPointsSheet` (true scale → `sheetScaleLabel` "1:N"
+  + scale bar). Each goes on its **own landscape page** (`pageBreak`+`pageOrientation:'landscape'`)
+  in a drawings appendix at the end of the report.
+- **Layout fixes (shared by screen + `.svg`/`.dxf` + PDF).** SLD: real **breaker symbols** (switch
+  blade + hinge dot, not empty boxes), **filled bus-tap dots**, the incomer label no longer clips
+  (the sheet fits the true content `drawingBounds`, text extents included), feeder loads draw as a
+  **double-bordered sub-board**, long load names **wrap to two lines**. GA: device labels are now
+  short **vertical tags** inside the to-scale footprint (no more overlap) plus proper **dimension
+  lines** (witness ticks, rotated height dim). `TextPrim` gained `rotate`/`bold`; `CirclePrim`
+  gained `filled`; DXF honours rotation (group 50).
+- **Cross-reference tags `Q0/Q1/Q2…`** (`circuitTag`) shared by the SLD, the GA and a new **Tag
+  column** on the circuit schedule, so a device on one drawing is found on the others. Schedule
+  also now prints the **cable make-up** (`grounding.cableSpec`) and a phase column.
+- **`pdfGlyphs`** (in `drawing/geometry.ts`) maps font-unsupported arrows (`→`/`←`/`↔`) to ASCII,
+  applied to every PDF label (diagram text, schedule, BOM, nameplates). Roboto covers `· × § … —`
+  but **no arrow glyphs** — verified against the bundled `vfs_fonts` cmap.
+- Verified by rendering the generated PDF to images (pypdfium2) since the GUI can't run headless.
+  Suite at **489 tests** (new `drawing.test.ts` cases for the sheet builders + `pdfGlyphs`).
+
 ## README
 
 See `README.md` for the product overview and the PUIL sizing rules summary. Results are

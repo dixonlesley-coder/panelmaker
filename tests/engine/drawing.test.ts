@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { computePanel } from '@shared/engine';
-import { panelGaSvg, panelSldSvg, panelGaDxf, panelSldDxf } from '@shared/drawing';
+import {
+  circuitTag,
+  panelGaSheet,
+  panelGaSvg,
+  panelSldSheet,
+  panelSldSvg,
+  panelGaDxf,
+  panelSldDxf,
+  pdfGlyphs,
+} from '@shared/drawing';
 import type { PanelInput, CircuitInput } from '@shared/types';
 
 function branch(partial: Partial<CircuitInput> & { id: string; name: string }): CircuitInput {
@@ -131,6 +140,56 @@ describe('drawing title-strip (optional branding)', () => {
     const result = computePanel(SAMPLE);
     const svg = panelGaSvg(SAMPLE, result, { company: 'A & B <co>' });
     expect(svg).toContain('A &amp; B &lt;co&gt;');
+  });
+});
+
+describe('PDF glyph fallback', () => {
+  it('replaces arrow glyphs the bundled font cannot render', () => {
+    // Roboto (the PDF font) has no arrow glyphs; "->" is the safe stand-in.
+    expect(pdfGlyphs('Feeder → SDP-1')).toBe('Feeder -> SDP-1');
+    expect(pdfGlyphs('A ← B')).toBe('A <- B');
+    // Leaves ordinary text untouched.
+    expect(pdfGlyphs('Pump 3φ · 10A')).toBe('Pump 3φ · 10A');
+  });
+});
+
+describe('cross-reference device tags', () => {
+  it('tags branch circuits Q1, Q2, …', () => {
+    expect(circuitTag(0)).toBe('Q1');
+    expect(circuitTag(9)).toBe('Q10');
+  });
+});
+
+describe('CAD drawing sheets', () => {
+  const feeder = panel({
+    id: 'P4',
+    name: 'MDP',
+    circuits: [branch({ id: 'f1', name: 'Feeder → SDP-1', loadKind: 'feeder', feedsPanelId: 'x', loadW: 5000 })],
+  });
+
+  it('frames the SLD as a landscape A4 sheet with a title block', () => {
+    const svg = panelSldSheet(feeder, computePanel(feeder), {
+      company: 'Acme', project: 'Tower 5', drawingNumber: 'E-101',
+    });
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).toContain('viewBox="0 0 297 210"'); // landscape A4 in mm
+    expect(svg).toContain('Acme');
+    expect(svg).toContain('E-101');
+    expect(svg).toContain('NTS'); // schematic → not to scale
+    // The feeder arrow is sanitised, never a tofu box.
+    expect(svg).toContain('Feeder -&gt; SDP-1');
+    expect(svg).not.toContain('→');
+    // attribute styling only (svg-to-pdfkit constraint)
+    expect(svg).not.toContain('class=');
+    expect(svg).not.toContain('foreignObject');
+  });
+
+  it('frames the GA as a dimensioned sheet with a numeric scale', () => {
+    const svg = panelGaSheet(SAMPLE, computePanel(SAMPLE), { company: 'Acme' });
+    expect(svg).toContain('viewBox="0 0 297 210"');
+    // The GA is dimensionally true → carries a "1:N" scale, not "NTS".
+    expect(svg).toMatch(/1:\d+/);
+    expect(svg.trimEnd().endsWith('</svg>')).toBe(true);
   });
 });
 

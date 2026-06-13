@@ -28,7 +28,14 @@ import type {
   Warning,
 } from '@shared/types/results';
 import type { ExportResult } from '@shared/ipc-contract';
-import { panelGaSvg, panelPointsSvg, panelSldSvg, type TitleStrip } from '@shared/drawing';
+import {
+  circuitTag,
+  panelGaSheet,
+  panelPointsSheet,
+  panelSldSheet,
+  pdfGlyphs,
+  type SheetTitleBlock,
+} from '@shared/drawing';
 import { panelLabel } from '@shared/labels';
 import {
   buildSystemBom,
@@ -74,33 +81,39 @@ function heading(text: string): Content {
 /** Build the circuit-schedule table for one panel. */
 function circuitScheduleTable(panel: PanelResult): Content {
   const header: TableCell[] = [
+    'Tag',
     'Circuit',
+    'Ph',
     'Ib (A)',
     'Breaker',
-    'Cable (mm²)',
+    'Cable',
     'Vd %',
     'OK',
   ].map((t) => ({ text: t, bold: true }));
 
   const body: TableCell[][] = [header];
-  for (const c of panel.circuits) {
+  panel.circuits.forEach((c, i) => {
     body.push([
-      c.name,
+      { text: circuitTag(i), bold: true },
+      pdfGlyphs(c.name),
+      c.phase === '3ph' ? '3' : '1',
       fmtA(c.designCurrentA),
       `${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve}`,
-      `${c.cable.csaMm2}`,
+      // The full cable make-up (cores + section + PE) reads better than a bare CSA.
+      c.grounding.cableSpec || `${c.cable.csaMm2} mm²`,
       c.voltageDrop.dropPercent.toFixed(2),
       c.voltageDrop.withinLimit ? 'yes' : 'NO',
     ]);
-  }
+  });
 
   return {
     table: {
       headerRows: 1,
-      widths: ['*', 'auto', 'auto', 'auto', 'auto', 'auto'],
+      widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
       body,
     },
     layout: 'lightHorizontalLines',
+    fontSize: 8,
   };
 }
 
@@ -133,57 +146,58 @@ function panelSpecTable(panel: PanelResult): Content {
 }
 
 /**
- * Build the drawing title-strip from the project metadata for a given sheet, so
- * the embedded SLD/GA carry a small bottom-right title block. Returns `undefined`
- * when no branding is present, leaving the diagrams unchanged.
+ * The common title-block fields (company / project / client / drawing number /
+ * revision / engineer / date) for every drawing sheet in a report, derived from
+ * the project metadata. The per-sheet `sheet`/`scale` fields are set by the sheet
+ * builders.
  */
-function titleStripFor(
-  project: ProjectInput,
-  sheet: string,
-): TitleStrip | undefined {
-  const meta = project.meta;
-  if (!meta) return undefined;
-  const strip: TitleStrip = { project: project.name, sheet };
-  if (meta.companyName) strip.company = meta.companyName;
-  if (meta.drawingNumber) strip.drawingNumber = meta.drawingNumber;
-  if (meta.revision) strip.revision = meta.revision;
-  return strip;
+function sheetTitleBlock(project: ProjectInput): SheetTitleBlock {
+  const m: ProjectMeta = project.meta ?? {};
+  const tb: SheetTitleBlock = { project: project.name, date: today() };
+  if (m.companyName) tb.company = m.companyName;
+  if (m.client) tb.client = m.client;
+  if (m.location) tb.location = m.location;
+  if (m.drawingNumber) tb.drawingNumber = m.drawingNumber;
+  if (m.projectNumber) tb.projectNumber = m.projectNumber;
+  if (m.revision) tb.revision = m.revision;
+  if (m.engineer) tb.engineer = m.engineer;
+  return tb;
 }
 
+/** Printable area of a landscape A4 page (pt), inside the document margins. */
+const LANDSCAPE_FIT: [number, number] = [752, 500];
+
 /**
- * Vector single-line + general-arrangement diagrams for a panel, embedded as SVG
- * (pdfmake renders them via svg-to-pdfkit). The SLD is fitted to the text width;
- * the GA is fitted within a box so the to-scale elevation never overflows. The GA
- * goes on its own block (`pageBreak: 'before'`) so a tall cabinet is not split.
- *
- * When the project carries branding metadata, each diagram gets a small
- * bottom-right title-strip.
+ * The CAD drawing sheets for one panel — each a full landscape A4 plate with a
+ * border, title block and legible paper-fixed annotation — as their own pages.
+ * The SLD and GA are always emitted; a lighting & small-power plan is added only
+ * when the panel's circuits carry point detail.
  */
-function panelDiagramsBlock(
+function panelDrawingPages(
   panel: PanelInput,
   result: PanelResult,
   project: ProjectInput,
 ): Content[] {
-  const blocks: Content[] = [
-    heading('Single-line diagram'),
-    { svg: panelSldSvg(panel, result, titleStripFor(project, 'Single-line diagram')), width: 515 },
-    { text: 'General arrangement', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
-    { svg: panelGaSvg(panel, result, titleStripFor(project, 'General arrangement')), fit: [515, 360] },
+  const tb = sheetTitleBlock(project);
+  const name = panelLabel(result);
+  const sheet = (svg: string): Content => ({
+    svg,
+    fit: LANDSCAPE_FIT,
+    alignment: 'center',
+    pageBreak: 'before',
+    pageOrientation: 'landscape',
+  });
+  const pages: Content[] = [
+    sheet(panelSldSheet(panel, result, { ...tb, sheet: `Single-Line Diagram — ${name}` })),
+    sheet(panelGaSheet(panel, result, { ...tb, sheet: `General Arrangement — ${name}` })),
   ];
-  // Lighting & small-power points diagram — only when circuits carry point detail.
   const hasPoints = panel.circuits.some(
     (c) => (c.fixtures ?? []).length > 0 || (c.sockets ?? []).length > 0,
   );
   if (hasPoints) {
-    blocks.push(
-      { text: 'Lighting & switching', style: 'h2', margin: [0, 12, 0, 6], pageBreak: 'before' },
-      {
-        svg: panelPointsSvg(panel, result, titleStripFor(project, 'Lighting & switching')),
-        fit: [515, 640],
-      },
-    );
+    pages.push(sheet(panelPointsSheet(panel, result, { ...tb, sheet: `Lighting & Small Power — ${name}` })));
   }
-  return blocks;
+  return pages;
 }
 
 /**
@@ -243,13 +257,13 @@ function bomLinesForPanel(panel: PanelResult): BomLine[] {
   const lines: BomLine[] = [];
   for (const c of panel.circuits) {
     lines.push({
-      description: `Breaker ${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve} — ${c.name}`,
+      description: pdfGlyphs(`Breaker ${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve} — ${c.name}`),
       category: 'breaker',
       qty: 1,
       matched: false,
     });
     lines.push({
-      description: `Cable ${c.cable.csaMm2} mm² — ${c.name}`,
+      description: pdfGlyphs(`Cable ${c.cable.csaMm2} mm² — ${c.name}`),
       category: 'cable',
       qty: 1,
       matched: false,
@@ -394,7 +408,6 @@ function panelDocDefinition(
       panelSpecTable(panel),
       heading('Circuit Schedule'),
       circuitScheduleTable(panel),
-      ...(input ? panelDiagramsBlock(input, panel, project) : []),
       heading('Bill of Materials'),
       bomTable(bomLinesForPanel(panel)),
       ...revisionBlock(project),
@@ -405,6 +418,8 @@ function panelDocDefinition(
         style: 'subtitle',
         margin: [0, 12, 0, 0],
       },
+      // Drawing sheets last, as a landscape appendix.
+      ...(input ? panelDrawingPages(input, panel, project) : []),
     ],
   };
 }
@@ -430,8 +445,10 @@ function systemDocDefinition(
     layout: 'lightHorizontalLines',
   });
 
-  // Per-panel sections in root-first order.
+  // Per-panel schedule sections in root-first order; the drawing sheets are
+  // collected into a single landscape appendix at the end of the report.
   const allBom: BomLine[] = [];
+  const drawingPages: Content[] = [];
   for (const panelId of system.order) {
     const panel = system.panels[panelId];
     if (!panel) continue;
@@ -440,7 +457,7 @@ function systemDocDefinition(
     content.push({ text: 'Circuit Schedule', style: 'h2', margin: [0, 6, 0, 4] });
     content.push(circuitScheduleTable(panel));
     const input = panelInputFor(project, panel.panelId);
-    if (input) content.push(...panelDiagramsBlock(input, panel, project));
+    if (input) drawingPages.push(...panelDrawingPages(input, panel, project));
     allBom.push(...bomLinesForPanel(panel));
   }
 
@@ -450,6 +467,9 @@ function systemDocDefinition(
   content.push(...revisionBlock(project));
   content.push(...warningsBlock(system.warnings));
   content.push(...standardsReferencesBlock());
+
+  // Landscape drawing appendix (SLD + GA per panel).
+  content.push(...drawingPages);
 
   return {
     defaultStyle: DEFAULT_STYLE,
@@ -488,7 +508,7 @@ function labelsForSystem(system: SystemResult): LabelData[] {
     for (const c of panel.circuits) {
       labels.push({
         panelName: panel.name,
-        circuitName: c.name,
+        circuitName: pdfGlyphs(c.name),
         breaker: `${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve}`,
         // Prefer the engine's human-readable cable make-up; fall back to the CSA.
         cable: c.grounding.cableSpec || `${c.cable.csaMm2} mm²`,

@@ -15,6 +15,7 @@ import type { PanelResult } from '../types/results';
 import { panelLabel } from '../labels';
 import {
   GUTTER_MM,
+  drawingBounds,
   layoutGa,
   type Drawing,
   type Prim,
@@ -41,7 +42,7 @@ export function escapeXml(s: string): string {
 }
 
 /** Round to 2 dp and drop a trailing `.00` so the markup stays compact. */
-function n(v: number): string {
+export function n(v: number): string {
   return Number.isFinite(v) ? String(Math.round(v * 100) / 100) : '0';
 }
 
@@ -61,13 +62,16 @@ function primToSvg(p: Prim): string {
     }
     case 'circle': {
       const w = p.weight ?? 1;
-      return `<circle cx="${n(p.cx)}" cy="${n(p.cy)}" r="${n(p.r)}" fill="none" stroke="${INK}" stroke-width="${n(w)}"/>`;
+      const fill = p.filled ? INK : 'none';
+      return `<circle cx="${n(p.cx)}" cy="${n(p.cy)}" r="${n(p.r)}" fill="${fill}" stroke="${INK}" stroke-width="${n(w)}"/>`;
     }
     case 'text': {
       const size = Math.max(p.size, MIN_FONT);
       const anchor = p.anchor ?? 'start';
       const fill = p.dim ? DIM : INK;
-      return `<text x="${n(p.x)}" y="${n(p.y)}" font-size="${n(size)}" text-anchor="${anchor}" fill="${fill}">${escapeXml(p.text)}</text>`;
+      const weight = p.bold ? ' font-weight="600"' : '';
+      const rot = p.rotate ? ` transform="rotate(${n(p.rotate)} ${n(p.x)} ${n(p.y)})"` : '';
+      return `<text x="${n(p.x)}" y="${n(p.y)}" font-size="${n(size)}" text-anchor="${anchor}" fill="${fill}"${weight}${rot}>${escapeXml(p.text)}</text>`;
     }
   }
 }
@@ -147,14 +151,21 @@ function titleStripSvg(d: Drawing, t: TitleStrip): string {
  * unaffected.
  */
 export function drawingToSvg(d: Drawing, title: string, titleStrip?: TitleStrip): string {
-  const m = 24; // mm margin around the drawing for outer dimension labels
-  const vbW = d.width + 2 * m;
-  const vbH = d.height + 2 * m;
+  // Frame the TRUE content bounds (text + any negative-coordinate dimension
+  // geometry) so nothing clips, then add a small uniform margin.
+  const b = drawingBounds(d);
+  const m = 8;
+  const minX = Math.min(b.minX, 0) - m;
+  const minY = Math.min(b.minY, 0) - m;
+  const maxX = Math.max(b.maxX, d.width) + m;
+  const maxY = Math.max(b.maxY, d.height) + m;
+  const vbW = maxX - minX;
+  const vbH = maxY - minY;
   const body = d.prims.map(primToSvg).join('');
   const strip = titleStrip ? titleStripSvg(d, titleStrip) : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${n(vbW)}" height="${n(vbH)}" ` +
-    `viewBox="${n(-m)} ${n(-m)} ${n(vbW)} ${n(vbH)}" ` +
+    `viewBox="${n(minX)} ${n(minY)} ${n(vbW)} ${n(vbH)}" ` +
     `font-family="Helvetica, Arial, sans-serif" role="img" aria-label="${escapeXml(title)}">` +
     body +
     strip +
@@ -201,8 +212,10 @@ export function gaDrawing(panel: PanelInput, result: PanelResult): Drawing {
     prims.push({ type: 'line', x1: GUTTER_MM, y1: y, x2: GUTTER_MM + innerW, y2: y, weight: 2 });
   }
 
-  // Placed branch devices (to-scale footprints) with labels.
-  const labelSize = Math.max(widthMm / 60, MIN_FONT);
+  // Placed branch devices (to-scale footprints). The cross-reference tag is
+  // drawn VERTICALLY inside the device so even a 1-module breaker stays legible
+  // and adjacent devices never overlap; the full name lives in the schedule.
+  const tagSize = 9;
   for (const pl of lay.placements) {
     prims.push({
       type: 'rect',
@@ -216,10 +229,12 @@ export function gaDrawing(panel: PanelInput, result: PanelResult): Drawing {
     prims.push({
       type: 'text',
       x: pl.x + pl.w / 2,
-      y: pl.y + pl.h / 2 + labelSize / 3,
-      text: pl.device.label,
-      size: labelSize,
+      y: pl.y + pl.h / 2,
+      text: pl.device.tag,
+      size: tagSize,
       anchor: 'middle',
+      rotate: -90,
+      bold: true,
     });
   }
 
@@ -230,16 +245,25 @@ export function gaDrawing(panel: PanelInput, result: PanelResult): Drawing {
     type: 'text',
     x: ch.x + ch.w / 2,
     y: ch.y + ch.h / 2,
-    text: 'busbar chamber',
-    size: Math.max(widthMm / 36, MIN_FONT),
+    text: 'BUSBAR CHAMBER',
+    size: 9,
     anchor: 'middle',
     dim: true,
   });
 
-  // Overall dimension labels.
-  const dimSize = Math.max(widthMm / 32, MIN_FONT);
-  prims.push({ type: 'text', x: widthMm / 2, y: -8, text: `${enc.widthMm} mm`, size: dimSize, anchor: 'middle', dim: true });
-  prims.push({ type: 'text', x: -8, y: heightMm / 2, text: `${enc.heightMm} mm`, size: dimSize, anchor: 'middle', dim: true });
+  // Overall dimension lines (witness lines + ticks + text), offset clear of the
+  // cabinet. The height dimension text is rotated to read up the left edge.
+  const off = 26;
+  // Width (top).
+  prims.push({ type: 'line', x1: 0, y1: -off, x2: widthMm, y2: -off, weight: 0.6 });
+  prims.push({ type: 'line', x1: 0, y1: -off - 4, x2: 0, y2: -off + 4, weight: 0.6 });
+  prims.push({ type: 'line', x1: widthMm, y1: -off - 4, x2: widthMm, y2: -off + 4, weight: 0.6 });
+  prims.push({ type: 'text', x: widthMm / 2, y: -off - 3, text: `${enc.widthMm} mm`, size: 9, anchor: 'middle', dim: true });
+  // Height (left).
+  prims.push({ type: 'line', x1: -off, y1: 0, x2: -off, y2: heightMm, weight: 0.6 });
+  prims.push({ type: 'line', x1: -off - 4, y1: 0, x2: -off + 4, y2: 0, weight: 0.6 });
+  prims.push({ type: 'line', x1: -off - 4, y1: heightMm, x2: -off + 4, y2: heightMm, weight: 0.6 });
+  prims.push({ type: 'text', x: -off - 3, y: heightMm / 2, text: `${enc.heightMm} mm`, size: 9, anchor: 'middle', dim: true, rotate: -90 });
 
   return { width: widthMm, height: heightMm, prims };
 }

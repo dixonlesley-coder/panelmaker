@@ -51,12 +51,15 @@ function dxfText(
   height: number,
   text: string,
   anchor: 'start' | 'middle' | 'end',
+  rotateCw = 0,
 ): string {
   const justify = anchor === 'middle' ? 1 : anchor === 'end' ? 2 : 0;
   // DXF has no escaping; strip control/newline characters defensively.
   const clean = text.replace(/[\r\n]+/g, ' ');
   let out = group(0, 'TEXT') + group(8, LAYER) + group(10, x) + group(20, y) + group(40, height);
   out += group(1, clean);
+  // DXF rotation (group 50) is CCW degrees; the model's rotate is CW (SVG sense).
+  if (rotateCw) out += group(50, -rotateCw);
   if (justify !== 0) {
     out += group(72, justify) + group(11, x) + group(21, y);
   }
@@ -87,7 +90,7 @@ function primToDxf(p: Prim, h: number): string {
       // SVG text y is the glyph baseline; DXF TEXT y is the bottom of the glyph
       // box. Dropping the alignment point by ~20% of the cap height places the
       // baseline at a comparable position after the Y-flip.
-      return dxfText(p.x, fy(p.y) - p.size * 0.2, p.size, p.text, p.anchor ?? 'start');
+      return dxfText(p.x, fy(p.y) - p.size * 0.2, p.size, p.text, p.anchor ?? 'start', p.rotate ?? 0);
   }
 }
 

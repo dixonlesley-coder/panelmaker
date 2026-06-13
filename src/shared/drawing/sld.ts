@@ -12,7 +12,7 @@
 import type { PanelInput } from '../types/project';
 import type { PanelResult } from '../types/results';
 import { panelLabel } from '../labels';
-import type { Drawing, Prim } from './geometry';
+import { INCOMER_TAG, circuitTag, pdfGlyphs, type Drawing, type Prim } from './geometry';
 
 /** Horizontal pitch between branch drops (user units). */
 const BRANCH_PITCH = 130;
@@ -37,11 +37,50 @@ const LOAD_H = 34;
 /** Label font size (user units). */
 const FONT = 9;
 
+/**
+ * Wrap a label into at most two lines near a target line length, breaking on the
+ * space closest to the midpoint. Keeps long load names inside their box instead
+ * of overflowing into the neighbouring column.
+ */
+function wrapLabel(text: string, maxChars = 16): string[] {
+  if (text.length <= maxChars) return [text];
+  const mid = Math.floor(text.length / 2);
+  let split = -1;
+  for (let d = 0; d < text.length; d += 1) {
+    if (text[mid - d] === ' ') {
+      split = mid - d;
+      break;
+    }
+    if (text[mid + d] === ' ') {
+      split = mid + d;
+      break;
+    }
+  }
+  if (split === -1) return [text];
+  return [text.slice(0, split), text.slice(split + 1)];
+}
+
+/**
+ * Push a breaker / switch-disconnector symbol centred on `x` with its top at
+ * `topY`: the device box plus a diagonal switch blade and a hinge dot, so it
+ * reads as a protective device rather than an empty rectangle.
+ */
+function pushBreaker(prims: Prim[], x: number, topY: number): void {
+  prims.push({ type: 'rect', x: x - BREAKER_W / 2, y: topY, w: BREAKER_W, h: BREAKER_H, weight: 1.2, accent: true });
+  // Switch blade across the box (open-on-paper convention) + hinge dot.
+  const hx = x - BREAKER_W / 2 + 4;
+  const hy = topY + BREAKER_H - 4;
+  prims.push({ type: 'line', x1: hx, y1: hy, x2: x + BREAKER_W / 2 - 4, y2: topY + 4, weight: 1.2 });
+  prims.push({ type: 'circle', cx: hx, cy: hy, r: 1.4, weight: 0.8, filled: true });
+}
+
 /** Build the SLD {@link Drawing} for one panel. */
 export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
   const sections = result.busbarSections;
   const multi = sections.length > 1;
   const byId = new Map(result.circuits.map((c) => [c.circuitId, c] as const));
+  // Q1, Q2 … per circuit in panel order — the same tag the GA and schedule use.
+  const tagOf = new Map(result.circuits.map((c, i) => [c.circuitId, circuitTag(i)] as const));
   const maxWays = Math.max(...sections.map((s) => Math.max(s.ways, 1)), 1);
   const width = MARGIN_X * 2 + (maxWays - 1) * BRANCH_PITCH + LOAD_W;
   const lastSectionBusY = BUS_Y + (sections.length - 1) * SECTION_STEP;
@@ -56,23 +95,38 @@ export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
   // --- Incomer: a labelled breaker feeding section 0's bus from above. ---
   const sec0Count = Math.max(sections[0]!.ways, 1);
   const incomerMidX = (branchX(0) + branchX(sec0Count - 1)) / 2;
+  const inc = result.incomer;
+  pushBreaker(prims, incomerMidX, INCOMER_Y);
+  // Supply lead in (with an upstream terminal dot) and the drop to the bus.
+  prims.push({ type: 'line', x1: incomerMidX, y1: MARGIN_Y, x2: incomerMidX, y2: INCOMER_Y, weight: 1.6 });
+  prims.push({ type: 'circle', cx: incomerMidX, cy: MARGIN_Y, r: 2, weight: 1, filled: true });
+  prims.push({ type: 'line', x1: incomerMidX, y1: INCOMER_Y + BREAKER_H, x2: incomerMidX, y2: BUS_Y, weight: 1.6 });
+  // Main device tag (left of the box) + the panel + incomer spec (to the right;
+  // the sheet fits the full text extent so this no longer clips at the edge).
   prims.push({
-    type: 'rect',
-    x: incomerMidX - BREAKER_W / 2,
-    y: INCOMER_Y,
-    w: BREAKER_W,
-    h: BREAKER_H,
-    weight: 1.4,
-    accent: true,
+    type: 'text',
+    x: incomerMidX - BREAKER_W / 2 - 5,
+    y: INCOMER_Y + BREAKER_H / 2 + FONT / 3,
+    text: INCOMER_TAG,
+    size: FONT,
+    anchor: 'end',
+    bold: true,
   });
-  prims.push({ type: 'line', x1: incomerMidX, y1: MARGIN_Y, x2: incomerMidX, y2: INCOMER_Y, weight: 1.4 });
-  prims.push({ type: 'line', x1: incomerMidX, y1: INCOMER_Y + BREAKER_H, x2: incomerMidX, y2: BUS_Y, weight: 1.4 });
   prims.push({
     type: 'text',
     x: incomerMidX + BREAKER_W / 2 + 6,
-    y: INCOMER_Y + BREAKER_H / 2 + FONT / 3,
-    text: `${panelLabel(panel)} · ${result.incomer.breaker.deviceClass} ${result.incomer.breaker.ratingA}A ${result.incomer.poles}P (Ib ${result.totalDemandCurrentA.toFixed(0)} A)`,
+    y: INCOMER_Y + BREAKER_H / 2,
+    text: pdfGlyphs(panelLabel(panel)),
     size: FONT,
+    bold: true,
+  });
+  prims.push({
+    type: 'text',
+    x: incomerMidX + BREAKER_W / 2 + 6,
+    y: INCOMER_Y + BREAKER_H / 2 + FONT + 1,
+    text: `${inc.breaker.deviceClass} ${inc.breaker.ratingA}A ${inc.breaker.curve} ${inc.poles}P${inc.breakerKa ? ` ${inc.breakerKa}kA` : ''} · Ib ${result.totalDemandCurrentA.toFixed(0)}A`,
+    size: FONT - 1,
+    dim: true,
   });
 
   // --- One busbar section per row, each fed RADIALLY from the incomer. ---
@@ -124,59 +178,63 @@ export function layoutSld(panel: PanelInput, result: PanelResult): Drawing {
       const c = byId.get(cid);
       if (!c) return;
       const x = branchX(i);
+      const tag = tagOf.get(cid) ?? '';
+      const isFeeder = c.loadKind === 'feeder';
 
-      // Drop from the bus to the breaker.
+      // Drop from the bus to the breaker, with a filled tap dot at the bus.
       prims.push({ type: 'line', x1: x, y1: busY, x2: x, y2: breakerY, weight: 1.2 });
-      // Connection dot at the bus.
-      prims.push({ type: 'circle', cx: x, cy: busY, r: 2.4, weight: 1 });
+      prims.push({ type: 'circle', cx: x, cy: busY, r: 2.2, weight: 1, filled: true });
 
-      // Breaker symbol.
+      // Breaker symbol + its tag (left) and rating/poles (above).
+      pushBreaker(prims, x, breakerY);
       prims.push({
-        type: 'rect',
-        x: x - BREAKER_W / 2,
-        y: breakerY,
-        w: BREAKER_W,
-        h: BREAKER_H,
-        weight: 1.2,
-        accent: true,
+        type: 'text',
+        x: x - BREAKER_W / 2 - 4,
+        y: breakerY + BREAKER_H / 2 + FONT / 3,
+        text: tag,
+        size: FONT - 1,
+        anchor: 'end',
+        bold: true,
       });
       prims.push({
         type: 'text',
         x: x,
         y: breakerY - 6,
-        text: `${c.breaker.ratingA}A ${c.breaker.curve}`,
-        size: FONT,
+        text: `${c.breaker.ratingA}A ${c.breaker.curve}${c.phase === '3ph' ? ' 3P' : ''}`,
+        size: FONT - 1,
         anchor: 'middle',
       });
 
-      // Conductor from breaker to load.
+      // Conductor from breaker to load, annotated with the cable make-up.
       prims.push({ type: 'line', x1: x, y1: breakerY + BREAKER_H, x2: x, y2: loadY, weight: 1.2 });
       prims.push({
         type: 'text',
-        x: x + 6,
+        x: x + 5,
         y: (breakerY + BREAKER_H + loadY) / 2,
-        text: `${c.cable.runsPerPhase && c.cable.runsPerPhase > 1 ? `${c.cable.runsPerPhase}× ` : ''}${c.cable.csaMm2} mm²`,
-        size: FONT,
+        text: c.grounding.cableSpec || `${c.cable.runsPerPhase && c.cable.runsPerPhase > 1 ? `${c.cable.runsPerPhase}× ` : ''}${c.cable.csaMm2} mm²`,
+        size: FONT - 1.5,
         anchor: 'start',
         dim: true,
       });
 
-      // Load box + name.
-      prims.push({
-        type: 'rect',
-        x: x - LOAD_W / 2,
-        y: loadY,
-        w: LOAD_W,
-        h: LOAD_H,
-        weight: 1,
-      });
-      prims.push({
-        type: 'text',
-        x: x,
-        y: loadY + LOAD_H / 2 + FONT / 3,
-        text: c.name,
-        size: FONT,
-        anchor: 'middle',
+      // Load box + name. A feeder destination is drawn as a sub-board (double
+      // border); a plain load gets a single box.
+      prims.push({ type: 'rect', x: x - LOAD_W / 2, y: loadY, w: LOAD_W, h: LOAD_H, weight: 1 });
+      if (isFeeder) {
+        prims.push({ type: 'rect', x: x - LOAD_W / 2 + 2.5, y: loadY + 2.5, w: LOAD_W - 5, h: LOAD_H - 5, weight: 0.6 });
+      }
+      const lines = wrapLabel(pdfGlyphs(c.name));
+      const lineH = FONT - 0.5;
+      const startY = loadY + LOAD_H / 2 + FONT / 3 - ((lines.length - 1) * lineH) / 2;
+      lines.forEach((ln, li) => {
+        prims.push({
+          type: 'text',
+          x,
+          y: startY + li * lineH,
+          text: ln,
+          size: FONT - 1,
+          anchor: 'middle',
+        });
       });
     });
   });

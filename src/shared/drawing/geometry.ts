@@ -13,6 +13,19 @@ import { DIN_MODULE_WIDTH_MM } from '../standards/enclosure';
 import type { PanelInput } from '../types/project';
 import type { CircuitResult, PanelResult } from '../types/results';
 
+/**
+ * Replace glyphs the bundled PDF font (Roboto) cannot render with safe
+ * equivalents, so feeder labels like "Feeder → SDP-1" don't print as a tofu box.
+ * Roboto has no arrow glyphs; the ASCII "->" reads unambiguously as one. Applied
+ * to every label drawn into the PDF (diagram text and table cells).
+ */
+export function pdfGlyphs(s: string): string {
+  return s
+    .replace(/[→➤➔➙↦➜➞⟶]/g, '->')
+    .replace(/[←↤]/g, '<-')
+    .replace(/[↔⟷]/g, '<->');
+}
+
 /** Inner door gutter / mounting-plate margin around the chassis (mm). */
 export const GUTTER_MM = 40;
 /** Height reserved for the busbar chamber at the bottom of the GA view (mm). */
@@ -51,6 +64,8 @@ export interface CirclePrim {
   cy: number;
   r: number;
   weight?: number;
+  /** Solid fill — a busbar tap / junction dot rather than a hollow terminal. */
+  filled?: boolean;
 }
 
 /** A primitive text label. */
@@ -64,6 +79,10 @@ export interface TextPrim {
   anchor?: 'start' | 'middle' | 'end';
   /** Subdued (dimension / annotation) vs. primary label. */
   dim?: boolean;
+  /** Rotation about (x, y) in degrees (e.g. -90 for a vertical GA device tag). */
+  rotate?: number;
+  /** Bold (device tag / heading) vs. regular weight. */
+  bold?: boolean;
 }
 
 export type Prim = LinePrim | RectPrim | CirclePrim | TextPrim;
@@ -75,14 +94,111 @@ export interface Drawing {
   prims: Prim[];
 }
 
+/** An axis-aligned bounding box in drawing units. */
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Approximate plotted text extent, honouring anchor + rotation. */
+function textBounds(
+  x: number,
+  y: number,
+  text: string,
+  size: number,
+  anchor: 'start' | 'middle' | 'end',
+  rotate: number,
+): Bounds {
+  const w = text.length * size * 0.6;
+  const ascent = size * 0.8;
+  const descent = size * 0.25;
+  let dx0 = 0;
+  let dx1 = w;
+  if (anchor === 'middle') {
+    dx0 = -w / 2;
+    dx1 = w / 2;
+  } else if (anchor === 'end') {
+    dx0 = -w;
+    dx1 = 0;
+  }
+  const rad = (rotate * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const cx of [dx0, dx1]) {
+    for (const cy of [-ascent, descent]) {
+      xs.push(x + cx * cos - cy * sin);
+      ys.push(y + cx * sin + cy * cos);
+    }
+  }
+  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+}
+
+/**
+ * The true bounding box of every primitive in a drawing — including text extents
+ * and any geometry placed at negative coordinates (e.g. dimension lines beside
+ * the cabinet). Used to frame the drawing so nothing clips on screen, in the
+ * `.svg` export or on the plotted PDF sheet.
+ */
+export function drawingBounds(d: Drawing): Bounds {
+  const b: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const grow = (x: number, y: number) => {
+    if (x < b.minX) b.minX = x;
+    if (y < b.minY) b.minY = y;
+    if (x > b.maxX) b.maxX = x;
+    if (y > b.maxY) b.maxY = y;
+  };
+  for (const p of d.prims) {
+    switch (p.type) {
+      case 'line':
+        grow(p.x1, p.y1);
+        grow(p.x2, p.y2);
+        break;
+      case 'rect':
+        grow(p.x, p.y);
+        grow(p.x + p.w, p.y + p.h);
+        break;
+      case 'circle':
+        grow(p.cx - p.r, p.cy - p.r);
+        grow(p.cx + p.r, p.cy + p.r);
+        break;
+      case 'text': {
+        const tb = textBounds(p.x, p.y, p.text, p.size, p.anchor ?? 'start', p.rotate ?? 0);
+        grow(tb.minX, tb.minY);
+        grow(tb.maxX, tb.maxY);
+        break;
+      }
+    }
+  }
+  if (!Number.isFinite(b.minX)) return { minX: 0, minY: 0, maxX: d.width, maxY: d.height };
+  return b;
+}
+
 /** One branch device laid onto a DIN rail in the GA view. */
 export interface DeviceFootprint {
   circuitId: string;
+  /** Short cross-reference tag (Q1, Q2 …) shared by the SLD, GA and schedule. */
+  tag: string;
   /** Circuit name + breaker rating label. */
   label: string;
   /** DIN modules this device occupies (breaker poles + control gear). */
   modules: number;
   widthMm: number;
+}
+
+/** The incomer's device tag (the main switch / main breaker). */
+export const INCOMER_TAG = 'Q0';
+
+/**
+ * The cross-reference tag for the i-th branch circuit (0-based) — `Q1`, `Q2`, …
+ * Shared by the SLD, the GA front view and the circuit schedule so a device on
+ * one drawing is found on the others.
+ */
+export function circuitTag(index: number): string {
+  return `Q${index + 1}`;
 }
 
 /**
@@ -98,7 +214,7 @@ function breakerPoles(c: CircuitResult): number {
  * control-gear module widths declared on the assembly devices, rounded up to a
  * whole number of DIN modules.
  */
-export function deviceFootprint(c: CircuitResult): DeviceFootprint {
+export function deviceFootprint(c: CircuitResult, index: number): DeviceFootprint {
   let modules = breakerPoles(c);
   if (c.control) {
     for (const d of c.control.devices) {
@@ -109,6 +225,7 @@ export function deviceFootprint(c: CircuitResult): DeviceFootprint {
   const whole = Math.max(1, Math.ceil(modules));
   return {
     circuitId: c.circuitId,
+    tag: circuitTag(index),
     label: `${c.name} · ${c.breaker.ratingA}A`,
     modules: whole,
     widthMm: whole * DIN_MODULE_WIDTH_MM,
@@ -117,7 +234,7 @@ export function deviceFootprint(c: CircuitResult): DeviceFootprint {
 
 /** Branch circuits only (drop any incomer rows the engine may surface). */
 export function branchDevices(result: PanelResult): DeviceFootprint[] {
-  return result.circuits.map(deviceFootprint);
+  return result.circuits.map((c, i) => deviceFootprint(c, i));
 }
 
 /**

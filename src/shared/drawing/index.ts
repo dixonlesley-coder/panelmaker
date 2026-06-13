@@ -9,5 +9,6 @@
 export * from './geometry';
 export * from './sld';
 export * from './svg';
+export * from './sheet';
 export * from './dxf';
 export * from './points';
