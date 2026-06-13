@@ -258,12 +258,27 @@ function SelectivityCard({ system }: { system: SystemResult }) {
                 <Table.Td>{formatAmps(e.downstreamRatingA)}</Table.Td>
                 <Table.Td>{e.ratio.toFixed(2)}×</Table.Td>
                 <Table.Td>
-                  {/* A current-ratio SCREEN, not a type-tested verdict — amber
-                      "review" rather than a red "fail" so it doesn't assert more
-                      than it computes. */}
-                  <Badge variant="light" color={e.selective ? 'teal' : 'orange'} size="sm">
-                    {e.selective ? t('system.selOk') : t('system.selRisk')}
-                  </Badge>
+                  {/* Curve-driven verdict from BOTH regions of the time-current
+                      characteristic: the thermal/overload ratio AND short-circuit
+                      current discrimination (Isc below the upstream magnetic
+                      pickup). Fully selective (teal) needs both; overload-only
+                      with a short-circuit race is "Partial" (amber); a too-close
+                      upstream rating is "Review" (orange). */}
+                  {(() => {
+                    const full = e.selective && e.scSelective !== false;
+                    const partial = e.selective && e.scSelective === false;
+                    const color = full ? 'teal' : partial ? 'yellow' : 'orange';
+                    const label = full
+                      ? t('system.selOk')
+                      : partial
+                        ? t('system.selPartial')
+                        : t('system.selRisk');
+                    return (
+                      <Badge variant="light" color={color} size="sm">
+                        {label}
+                      </Badge>
+                    );
+                  })()}
                 </Table.Td>
               </Table.Tr>
             ))}
