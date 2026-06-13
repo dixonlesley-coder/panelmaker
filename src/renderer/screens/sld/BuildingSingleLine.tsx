@@ -1950,6 +1950,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     [setActivePanel],
   );
 
+  // Honour an external "go to panel" request (e.g. from the Issues drawer):
+  // open that panel's inspector, then clear the one-shot request.
+  const inspectorRequest = useProjectStore((s) => s.inspectorRequest);
+  const clearInspectorRequest = useProjectStore((s) => s.clearInspectorRequest);
+  useEffect(() => {
+    if (!inspectorRequest) return;
+    if (project.panels.some((p) => p.id === inspectorRequest)) openInspector(inspectorRequest);
+    clearInspectorRequest();
+  }, [inspectorRequest, project.panels, openInspector, clearInspectorRequest]);
+
   // Source cards enable a PROJECT-level energy source (shown on the service
   // head + the power one-line); the Sources screen is where it's tuned.
   const updateSources = useProjectStore((s) => s.updateSources);

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Badge, Button, Card, Divider, Drawer, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconAlertTriangle, IconCircleCheck, IconPointFilled, IconTool } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowRight, IconCircleCheck, IconPointFilled, IconTool } from '@tabler/icons-react';
 import type { SuggestedFix, SystemResult, Warning } from '@shared/types';
 import { panelCompliance, type ComplianceItem } from '@shared/engine';
 import { panelLabel } from '@shared/labels';
@@ -21,7 +21,7 @@ interface IssueRow {
 }
 
 /** One warning row with severity, code, message and its apply-able fixes. */
-function IssueRowCard({ row }: { row: IssueRow }) {
+function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string) => void }) {
   const { t } = useTranslation();
   const applyFix = useProjectStore((s) => s.applyFix);
   const w = row.warning;
@@ -51,22 +51,31 @@ function IssueRowCard({ row }: { row: IssueRow }) {
         </Text>
       </Group>
       <Text size="sm">{w.message}</Text>
-      {w.fixes && w.fixes.length > 0 && (
-        <Group gap="xs" mt="xs">
-          {w.fixes.map((fix, i) => (
-            <Button
-              key={i}
-              size="xs"
-              variant="light"
-              leftSection={<IconTool size={14} />}
-              disabled={!row.panelId || !w.circuitId}
-              onClick={() => onApply(fix)}
-            >
-              {t('issues.apply', { description: fix.description })}
-            </Button>
-          ))}
-        </Group>
-      )}
+      <Group gap="xs" mt="xs">
+        {(w.fixes ?? []).map((fix, i) => (
+          <Button
+            key={i}
+            size="xs"
+            variant="light"
+            leftSection={<IconTool size={14} />}
+            disabled={!row.panelId || !w.circuitId}
+            onClick={() => onApply(fix)}
+          >
+            {t('issues.apply', { description: fix.description })}
+          </Button>
+        ))}
+        {row.panelId && (
+          <Button
+            size="xs"
+            variant="subtle"
+            color="gray"
+            rightSection={<IconArrowRight size={14} />}
+            onClick={() => onGoto(row.panelId!)}
+          >
+            {t('issues.goToPanel')}
+          </Button>
+        )}
+      </Group>
     </Card>
   );
 }
@@ -99,7 +108,7 @@ function ComplianceIcon({ status }: { status: ComplianceItem['status'] }) {
  * withstand, protective conductor, ampacity) shown at the top of the drawer — the
  * engineering checks you sign off, separate from advisory warnings below.
  */
-function ComplianceSection({ system }: { system: SystemResult }) {
+function ComplianceSection({ system, onGoto }: { system: SystemResult; onGoto: (panelId: string) => void }) {
   const { t } = useTranslation();
   const panels = system.order
     .map((id) => system.panels[id])
@@ -112,9 +121,14 @@ function ComplianceSection({ system }: { system: SystemResult }) {
       </Text>
       {panels.map((p) => (
         <Card key={p.panelId} withBorder radius="md" padding="xs">
-          <Text size="sm" fw={500} mb={6}>
-            {panelLabel(p)}
-          </Text>
+          <Group justify="space-between" mb={6} wrap="nowrap">
+            <Text size="sm" fw={500}>
+              {panelLabel(p)}
+            </Text>
+            <Button size="compact-xs" variant="subtle" color="gray" rightSection={<IconArrowRight size={13} />} onClick={() => onGoto(p.panelId)}>
+              {t('issues.goToPanel')}
+            </Button>
+          </Group>
           <Group gap="md">
             {panelCompliance(p).map((item) => (
               <Group key={item.key} gap={6} wrap="nowrap">
@@ -140,7 +154,14 @@ function ComplianceSection({ system }: { system: SystemResult }) {
 export function ProjectIssues({ system }: { system: SystemResult }) {
   const { t } = useTranslation();
   const applyFix = useProjectStore((s) => s.applyFix);
+  const requestInspector = useProjectStore((s) => s.requestInspector);
   const [open, setOpen] = useState(false);
+
+  // Jump to a panel: open its canvas inspector and dismiss the drawer.
+  const goTo = (panelId: string) => {
+    requestInspector(panelId);
+    setOpen(false);
+  };
 
   const rows = useMemo<IssueRow[]>(() => {
     const out: IssueRow[] = [];
@@ -225,7 +246,7 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
         }
       >
         <Stack gap="md">
-          <ComplianceSection system={system} />
+          <ComplianceSection system={system} onGoto={goTo} />
           {total === 0 ? (
             <Alert variant="light" color="teal" radius="md" icon={<IconCircleCheck size={18} />} title={t('issues.allClearTitle')}>
               {t('issues.allClearBody')}
@@ -248,7 +269,7 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
                 <Divider label={g} labelPosition="left" mb="xs" />
                 <Stack gap="xs">
                   {list.map((r, i) => (
-                    <IssueRowCard key={`${g}-${r.warning.code}-${i}`} row={r} />
+                    <IssueRowCard key={`${g}-${r.warning.code}-${i}`} row={r} onGoto={goTo} />
                   ))}
                 </Stack>
               </div>

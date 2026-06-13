@@ -551,6 +551,7 @@ export const en = {
     applyManuallyBody: 'This suggestion must be applied by hand.',
     apply: 'Apply: {{description}}',
     projectIssues: 'Issues',
+    goToPanel: 'Go to panel',
     systemGroup: 'System',
     fixAllSafe: 'Fix all safe ({{count}})',
     fixAllDone_one: 'Applied {{count}} fix',

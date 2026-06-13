@@ -125,6 +125,11 @@ export interface ProjectState {
   /** Loads dropped on the canvas, not yet wired to a panel (session-scoped). */
   floatingLoads: FloatingLoad[];
   activePanelId: string;
+  /**
+   * Transient request to open a panel's inspector on the canvas (set by e.g. the
+   * Issues drawer "go to panel"); the canvas consumes and clears it. Not persisted.
+   */
+  inspectorRequest: string | null;
   activeScreen: Screen;
   /** Preferred manufacturer for order-code matching / exports (null = all brands). */
   preferredBrand: string | null;
@@ -152,6 +157,10 @@ export interface ProjectState {
   // navigation
   setScreen: (screen: Screen) => void;
   setActivePanel: (panelId: string) => void;
+  /** Ask the canvas to open a panel's inspector (jumps to the Canvas screen). */
+  requestInspector: (panelId: string) => void;
+  /** Clear a consumed inspector request (called by the canvas). */
+  clearInspectorRequest: () => void;
   setPreferredBrand: (brand: string | null) => void;
 
   // circuit editing
@@ -464,6 +473,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   prices: SAMPLE_PRICES,
   floatingLoads: [],
   activePanelId: initialProject.panels[0]?.id ?? '',
+  inspectorRequest: null,
   activeScreen: 'system',
   preferredBrand: null,
   userTemplates: loadUserTemplates(),
@@ -475,6 +485,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setScreen: (screen) => set({ activeScreen: screen }),
   setActivePanel: (panelId) => set({ activePanelId: panelId }),
+  requestInspector: (panelId) =>
+    set({ activePanelId: panelId, inspectorRequest: panelId, activeScreen: 'system' }),
+  clearInspectorRequest: () => set({ inspectorRequest: null }),
   setPreferredBrand: (brand) => set({ preferredBrand: brand }),
 
   updateCircuit: (panelId, circuitId, patch) =>

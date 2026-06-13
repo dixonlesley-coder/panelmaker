@@ -554,6 +554,7 @@ export const id: TranslationKeys = {
     applyManuallyBody: 'Saran ini harus diterapkan secara manual.',
     apply: 'Terapkan: {{description}}',
     projectIssues: 'Masalah',
+    goToPanel: 'Buka panel',
     systemGroup: 'Sistem',
     fixAllSafe: 'Perbaiki semua yang aman ({{count}})',
     fixAllDone_one: '{{count}} perbaikan diterapkan',
