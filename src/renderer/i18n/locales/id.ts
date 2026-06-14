@@ -1198,7 +1198,7 @@ export const id: TranslationKeys = {
   },
   coordination: {
     eyebrow: 'Tinjauan',
-    title: 'Koordinasi waktu–arus',
+    title: 'Koordinasi waktu-arus',
     exportSvg: 'Ekspor grafik (SVG)',
     noPairsTitle: 'Tidak ada pasangan pemutus berjenjang',
     noPairsBody: 'Tambahkan feeder antara dua panel untuk menganalisis diskriminasi antar pemutusnya.',
@@ -1283,6 +1283,11 @@ export const id: TranslationKeys = {
     notSaved: 'Belum tersimpan',
     failedTip: 'Penyimpanan otomatis gagal — perubahan terakhir Anda mungkin belum tersimpan',
     savedTip: 'Tersimpan otomatis ke {{where}}',
+    savedTipTime: 'Tersimpan otomatis {{ago}} ke {{where}}',
+    agoJustNow: 'baru saja',
+    agoSeconds: '{{n}} dtk lalu',
+    agoMinutes: '{{n}} mnt lalu',
+    agoHours: '{{n}} jam lalu',
   },
 
   update: {

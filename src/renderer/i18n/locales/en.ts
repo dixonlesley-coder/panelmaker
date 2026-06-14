@@ -1193,7 +1193,7 @@ export const en = {
   },
   coordination: {
     eyebrow: 'Review',
-    title: 'Time–current coordination',
+    title: 'Time-current coordination',
     exportSvg: 'Export plot (SVG)',
     noPairsTitle: 'No cascaded breaker pairs',
     noPairsBody: 'Add a feeder between two panels to analyse discrimination between their breakers.',
@@ -1278,6 +1278,11 @@ export const en = {
     notSaved: 'Not saved',
     failedTip: 'Autosave failed — your last change may not be saved',
     savedTip: 'Autosaved to {{where}}',
+    savedTipTime: 'Autosaved {{ago}} to {{where}}',
+    agoJustNow: 'just now',
+    agoSeconds: '{{n}}s ago',
+    agoMinutes: '{{n}}m ago',
+    agoHours: '{{n}}h ago',
   },
 
   update: {

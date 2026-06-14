@@ -119,17 +119,24 @@ export function Sources() {
               </Text>
             )}
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm">
-              <NumberInput
-                hideControls
-                label={t('sources.backupOfDemand')}
-                description={t('sources.backupOfDemandHint')}
-                value={Math.round(gen.backupFraction * 100)}
-                min={10}
-                max={100}
-                step={5}
-                disabled={essentialCount > 0}
-                onChange={(v) => setGen({ backupFraction: (typeof v === 'number' ? v : 100) / 100 })}
-              />
+              {/* Helper text sits BELOW the input so its box lines up on a
+                  baseline with the Duty control beside it (a description above
+                  the field would push this one down asymmetrically). */}
+              <div>
+                <NumberInput
+                  hideControls
+                  label={t('sources.backupOfDemand')}
+                  value={Math.round(gen.backupFraction * 100)}
+                  min={10}
+                  max={100}
+                  step={5}
+                  disabled={essentialCount > 0}
+                  onChange={(v) => setGen({ backupFraction: (typeof v === 'number' ? v : 100) / 100 })}
+                />
+                <Text size="xs" c="dimmed" mt={4}>
+                  {t('sources.backupOfDemandHint')}
+                </Text>
+              </div>
               <div>
                 <Text size="sm" fw={500} mb={4}>
                   {t('sources.duty')}
@@ -273,16 +280,22 @@ export function Sources() {
               </Text>
             )}
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="sm">
-              <NumberInput
-                hideControls
-                label={t('sources.backupLoadKw')}
-                description={t('sources.backupLoadKwHint')}
-                value={batt.backupKw}
-                min={1}
-                step={1}
-                disabled={criticalCount > 0}
-                onChange={(v) => setBatt({ backupKw: typeof v === 'number' ? v : batt.backupKw })}
-              />
+              {/* Helper below the input — aligns the field with the autonomy /
+                  chemistry controls beside it (see the generator note above). */}
+              <div>
+                <NumberInput
+                  hideControls
+                  label={t('sources.backupLoadKw')}
+                  value={batt.backupKw}
+                  min={1}
+                  step={1}
+                  disabled={criticalCount > 0}
+                  onChange={(v) => setBatt({ backupKw: typeof v === 'number' ? v : batt.backupKw })}
+                />
+                <Text size="xs" c="dimmed" mt={4}>
+                  {t('sources.backupLoadKwHint')}
+                </Text>
+              </div>
               <NumberInput
                 hideControls
                 label={t('sources.autonomyHours')}

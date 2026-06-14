@@ -18,12 +18,19 @@ const DEBOUNCE_MS = 1200;
  * change. Autosave only starts once hydration completes, so the freshly-loaded
  * project is never overwritten by the seeded sample during the load race.
  */
-export function useAutosave(): { hydrated: boolean; saveState: SaveState; target: AutosaveTarget } {
+export function useAutosave(): {
+  hydrated: boolean;
+  saveState: SaveState;
+  target: AutosaveTarget;
+  /** Epoch ms of the last successful save, or null if nothing has saved yet. */
+  savedAt: number | null;
+} {
   const project = useProjectStore((s) => s.project);
   const replaceProject = useProjectStore((s) => s.replaceProject);
   const [hydrated, setHydrated] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   // restore once on mount
   useEffect(() => {
@@ -62,7 +69,10 @@ export function useAutosave(): { hydrated: boolean; saveState: SaveState; target
     setSaveState('saving');
     const t = setTimeout(() => {
       persistProject(project)
-        .then(() => setSaveState('saved'))
+        .then(() => {
+          setSaveState('saved');
+          setSavedAt(Date.now());
+        })
         .catch(() => setSaveState('error'));
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
@@ -75,5 +85,5 @@ export function useAutosave(): { hydrated: boolean; saveState: SaveState; target
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  return { hydrated, saveState, target: autosaveTarget() };
+  return { hydrated, saveState, target: autosaveTarget(), savedAt };
 }

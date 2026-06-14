@@ -203,7 +203,7 @@ export function App() {
   const projectName = useProjectStore((s) => s.project.name);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
-  const { hydrated, saveState, target } = useAutosave();
+  const { hydrated, saveState, target, savedAt } = useAutosave();
 
   // Global undo/redo shortcuts: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y.
   useEffect(() => {
@@ -281,7 +281,7 @@ export function App() {
               </ActionIcon>
             </Tooltip>
             <HistoryControls />
-            <AutosaveIndicator saveState={saveState} target={target} />
+            <AutosaveIndicator saveState={saveState} target={target} savedAt={savedAt} />
             <LanguageMenu />
             <ColorSchemeToggle />
           </Group>
