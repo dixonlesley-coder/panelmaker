@@ -150,7 +150,7 @@ shared on-disk DB.
 
 ## Implemented feature set (current progress)
 
-Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.1.43**; full suite green.
+Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.2.0**; full suite green (509 tests).
 
 - **Sizing engine (PUIL/IEC):** load current (1ph/3ph), derating, cable sizing
   (`Iz ≥ max(In, 1.25·Ib)` + minimums + voltage drop), breaker (MCB/MCCB), busbar
@@ -434,6 +434,39 @@ box for the feeder arrow (Roboto has no `→`). Reworked into proper plotted dra
   but **no arrow glyphs** — verified against the bundled `vfs_fonts` cmap.
 - Verified by rendering the generated PDF to images (pypdfium2) since the GUI can't run headless.
   Suite at **489 tests** (new `drawing.test.ts` cases for the sheet builders + `pdfGlyphs`).
+
+### Roadmap engineering + placeable equipment + UI polish (released as v0.2.0)
+
+A batch of new engineering capabilities (the EE-review roadmap), placeable equipment nodes, and a
+full Apple-HIG UI polish pass — cut as the **minor** bump **v0.2.0** (first non-patch since 0.1.x):
+
+- **IEC 62305 lightning-risk screening (`standards/lightning.ts` + `engine/lightning.ts`):**
+  `collectionArea(L,W,H)`; `assessLightningRisk(site)` → Nd = Ng·Ad·Cd·1e-6 vs Nc=1e-3, LPS level
+  I–IV from the residual risk. `computeSystem` sets `SystemResult.lightningRisk` and feeds
+  `lpsRequired` into Type-1 SPD selection. `SiteConditions` gained building L/W/H, ground-flash
+  density, location factor. **Opt-in** in the Service inspector (no empty dimension fields by default).
+- **Busway (`standards/busway.ts`):** `BUSWAY_RATINGS_A` ladder + `selectBuswayRating`;
+  `CircuitInput.busway` → `CircuitResult.busway` (cableSpec "Busway N A"); thicker feeder stroke.
+- **Dedicated feeder transformer (`computePanel`/`computeSystem`):** a placeable equipment node that
+  **isolates fault level** — the secondary fault is re-derived from the transformer kVA/impedance and
+  used as the downstream `sourceZ`. Drawn on the feeder edge (two circles + kVA).
+- **Curve-driven selectivity:** the displayed verdict is now 3-state (Selective / Partial (SC) /
+  Review) from the already-computed `scSelective` (Isc vs upstream magnetic pickup), not rating-only.
+- **Per-panel canvas memoization:** `React.memo` on the unified-canvas node types with a
+  data-content comparator, so editing/panning one panel doesn't re-render all (callbacks kept stable).
+- **Vertical/horizontal SLD layout toggle** (`layoutDir`, persisted) — panels left-to-right or
+  top-down; flipping re-arranges the whole feeder tree.
+- **UI polish pass (Apple-HIG review, all 21 items):** unified eyebrow/title system; `hideControls`
+  on typed number fields; green→amber→red selectivity/compliance colour scale; restructured Service
+  inspector (lightning split out); TCC legend on an inset panel; dashboard peak-contributor bars
+  tinted to the chart legend; grouped canvas palette (Loads / Motors & pumps / Distribution /
+  Sources); unified issue count badges; clamped issue-drawer messages; parts-finder order codes in
+  full-ink monospace; autosave "saved Ns ago" hover hint (`AutosaveIndicator` + `useAutosave.savedAt`);
+  Sources field baseline alignment; title dash consistency. All localised EN + ID.
+- **Live-UI verification:** every change was screenshotted headless via `scripts/ui-shot.cjs` /
+  Playwright (Chromium at `/opt/pw-browsers`) — see the Verification-reality note above. Suite at
+  **509 tests**; `npx electron-vite build` green. Released via workflow_dispatch `publish=true`
+  (run concluded `success`; the v0.2.0 Release carries all three assets incl. `latest.yml`).
 
 ## README
 
