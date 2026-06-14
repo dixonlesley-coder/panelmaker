@@ -385,6 +385,7 @@ export const id: TranslationKeys = {
     circuitBuilder: 'Pembuat sirkit',
     tabSingleLine: 'Satu garis',
     tabSchematic: 'Skema kontrol',
+    tabPumpGroups: 'Grup pompa',
     tabLayout: 'Tata letak',
     tabSwitching: 'Sakelar',
     tabBuild: 'Bangun',
@@ -400,6 +401,27 @@ export const id: TranslationKeys = {
     exportPanelPdf: 'Ekspor PDF panel',
     noCircuits: 'Belum ada sirkit. Tambahkan satu untuk memulai.',
     circuits: 'Sirkit',
+  },
+
+  pumpGroups: {
+    eyebrow: 'Kontrol pompa',
+    intro:
+      'Kelompokkan sirkit pompa dan pilih skema kontrol. Komponen yang dibutuhkan (kontrol level/timer, relai alternator), interlock antar-pompa, dan pengawatan kontrol dibuat otomatis.',
+    addGroup: 'Tambah grup pompa',
+    noPumps: 'Panel ini belum memiliki sirkit pompa atau motor. Tambahkan pompa dulu, lalu kelompokkan di sini.',
+    noGroups: 'Belum ada grup pompa. Tambahkan satu untuk mengontrol beberapa pompa bersama.',
+    name: 'Nama grup',
+    mode: 'Skema kontrol',
+    trigger: 'Dipicu oleh',
+    members: 'Pompa anggota',
+    membersPlaceholder: 'Pilih pompa dalam grup ini',
+    sensing: 'Penginderaan level',
+    timerOn: 'Jalan',
+    timerOff: 'Jeda',
+    components: 'Komponen otomatis',
+    interlocks: 'Interlock',
+    schematic: 'Skema kontrol grup',
+    remove: 'Hapus grup',
   },
 
   builder: {

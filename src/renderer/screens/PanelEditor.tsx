@@ -7,6 +7,7 @@ import {
   IconBulb,
   IconColumns,
   IconCpu,
+  IconDroplet,
   IconLayoutGrid,
   IconListDetails,
   IconListNumbers,
@@ -19,6 +20,7 @@ import { CircuitTable } from '@renderer/features/builder/CircuitTable';
 import { ResultsPanel } from '@renderer/features/results/ResultsPanel';
 import { IssuesPanel } from '@renderer/features/issues/IssuesPanel';
 import { SchematicView } from '@renderer/features/schematic/SchematicView';
+import { PumpGroupsPanel } from '@renderer/features/builder/PumpGroupsPanel';
 import { PanelLayout } from '@renderer/features/layout/PanelLayout';
 import { SwitchingDiagram } from '@renderer/features/layout/SwitchingDiagram';
 import { CableSchedule } from '@renderer/features/schedule/CableSchedule';
@@ -66,6 +68,7 @@ export function PanelEditor() {
 
   const issueCount = result.warnings.length;
   const errorCount = result.warnings.filter((w) => w.severity === 'error').length;
+  const hasPumps = panel.circuits.some((c) => c.loadKind === 'pump' || c.loadKind === 'motor');
 
   return (
     <Stack gap="md">
@@ -163,6 +166,11 @@ export function PanelEditor() {
             <Tabs.Tab value="schematic" leftSection={<IconCpu size={16} />}>
               {t('panel.tabSchematic')}
             </Tabs.Tab>
+            {hasPumps && (
+              <Tabs.Tab value="pumpgroups" leftSection={<IconDroplet size={16} />}>
+                {t('panel.tabPumpGroups')}
+              </Tabs.Tab>
+            )}
             <Tabs.Tab value="layout" leftSection={<IconLayoutGrid size={16} />}>
               {t('panel.tabLayout')}
             </Tabs.Tab>
@@ -212,6 +220,11 @@ export function PanelEditor() {
           <Tabs.Panel value="schematic">
             <SchematicView panel={panel} result={result} />
           </Tabs.Panel>
+          {hasPumps && (
+            <Tabs.Panel value="pumpgroups">
+              <PumpGroupsPanel panel={panel} result={result} />
+            </Tabs.Panel>
+          )}
           <Tabs.Panel value="layout">
             <PanelLayout panel={panel} result={result} />
           </Tabs.Panel>

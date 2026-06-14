@@ -2,7 +2,7 @@
 
 import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
-import type { ControlAssembly } from './control';
+import type { ControlAssembly, PumpGroupResult } from './control';
 import type { PhaseAssignment, EarthingSystem, CableType, LoadKind } from './electrical';
 import type { SourcesResult } from './sources';
 // Type-only imports of result shapes defined alongside their engine modules
@@ -443,6 +443,8 @@ export interface PanelResult {
   arcFlash?: ArcFlashResult;
   /** Cable-tray sizing for the panel's outgoing cables. */
   cableTray?: CableTrayResult;
+  /** Derived control packages for the panel's pump groups (alternation/assist/cascade). */
+  pumpGroups?: PumpGroupResult[];
 }
 
 /** A 24-hour building demand profile and peak analysis. */

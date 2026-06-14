@@ -103,6 +103,8 @@ export const panels = sqliteTable('panels', {
   upsBacked: integer('ups_backed', { mode: 'boolean' }),
   /** Tenant/check kWh sub-meter at this board. */
   submeter: integer('submeter', { mode: 'boolean' }),
+  /** Functional pump groups (control scheme + members) as JSON. */
+  pumpGroupsJson: text('pump_groups_json'),
 });
 
 export const circuits = sqliteTable('circuits', {

@@ -68,6 +68,22 @@ describe('SQLite persistence', () => {
     // Explicit motor supply phase must survive the round-trip.
     const mccPump = project.panels.find((p) => p.name.includes('MCC'))!.circuits.find((c) => c.motorKw)!;
     mccPump.phases = 1;
+    // Pump group on the MCC must round-trip via the pump_groups_json column.
+    const mccInput = project.panels.find((p) => p.name.includes('MCC'))!;
+    const mccPumpIds = mccInput.circuits
+      .filter((c) => c.loadKind === 'pump' || c.loadKind === 'motor')
+      .slice(0, 2)
+      .map((c) => c.id);
+    mccInput.pumpGroups = [
+      {
+        id: 'pg-test',
+        name: 'Transfer pumps',
+        mode: 'single-alternate',
+        trigger: 'level',
+        sensing: 'float',
+        memberCircuitIds: mccPumpIds,
+      },
+    ];
     project.meta = {
       client: 'PT Contoh',
       location: 'Jakarta',
@@ -142,6 +158,10 @@ describe('SQLite persistence', () => {
     const plain = lpdb.circuits.find((c) => c.loadKind === 'hvac')!;
     expect(plain.fixtures).toBeUndefined();
     expect(plain.sockets).toBeUndefined();
+
+    // pump groups round-trip via the pump_groups_json column
+    const loadedMcc = loaded!.panels.find((p) => p.name.includes('MCC'))!;
+    expect(loadedMcc.pumpGroups).toEqual(mccInput.pumpGroups);
 
     // appears in the project list, then deletes cleanly
     expect(listProjects().some((p) => p.id === project.id)).toBe(true);

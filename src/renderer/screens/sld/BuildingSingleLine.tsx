@@ -1198,6 +1198,8 @@ function LoadNode({ data, selected }: NodeProps) {
       }}
     >
       <Handle type="target" position={Position.Top} id="in" isConnectable={false} />
+      {/* Control-wiring tap (bottom): a pump-group controller wires up to here. */}
+      <Handle type="target" position={Position.Bottom} id="ctl" isConnectable={false} style={{ opacity: 0 }} />
       <svg width={LOAD_W - 12} height={30} style={{ display: 'block', margin: '0 auto' }}>
         <line x1={(LOAD_W - 12) / 2} y1={0} x2={(LOAD_W - 12) / 2} y2={6} stroke={PHASE_COLOR[d.phase] ?? FG} strokeWidth={1.6} />
         {loadSymbol((LOAD_W - 12) / 2, 8, symW, d.threePhase)}
@@ -1399,12 +1401,74 @@ function memoNode(C: (p: NodeProps) => React.ReactNode): (p: NodeProps) => React
   ) => React.ReactNode;
 }
 
+interface PumpControlNodeData {
+  name: string;
+  trigger: 'level' | 'timer' | 'pressure' | 'manual';
+  scheme: string;
+  members: number;
+  [key: string]: unknown;
+}
+
+const TRIGGER_LABEL: Record<PumpControlNodeData['trigger'], string> = {
+  level: 'Water-level controller',
+  timer: 'Cyclic timer',
+  pressure: 'Pressure controller',
+  manual: 'Manual / BMS',
+};
+
+/** A pump-group controller (level / timer / pressure) wired to its member pumps. */
+function PumpControlNode({ data }: NodeProps) {
+  const d = data as PumpControlNodeData;
+  const icon =
+    d.trigger === 'timer' ? (
+      <IconClock size={14} />
+    ) : d.trigger === 'pressure' ? (
+      <IconGauge size={14} />
+    ) : d.trigger === 'manual' ? (
+      <IconHandMove size={14} />
+    ) : (
+      <IconDroplet size={14} />
+    );
+  return (
+    <Box
+      style={{
+        width: 150,
+        background: 'var(--mantine-color-body)',
+        border: '1.5px dashed var(--mantine-color-cyan-5)',
+        borderRadius: 'var(--mantine-radius-md)',
+        boxShadow: 'var(--mantine-shadow-xs)',
+        padding: '6px 8px',
+      }}
+    >
+      {/* Control wires leave the top, up to each member pump's control tap. */}
+      <Handle type="source" position={Position.Top} id="out" isConnectable={false} style={{ opacity: 0 }} />
+      <Group gap={6} wrap="nowrap">
+        <ThemeIcon size="sm" variant="light" color="cyan">
+          {icon}
+        </ThemeIcon>
+        <Box style={{ minWidth: 0 }}>
+          <Text size="10px" fw={700} lineClamp={1} title={d.name}>
+            {d.name}
+          </Text>
+          <Text size="9px" c="dimmed" lineClamp={1}>
+            {TRIGGER_LABEL[d.trigger]}
+          </Text>
+        </Box>
+      </Group>
+      <Text size="9px" c="cyan.7" ta="center" mt={2} lineClamp={1} title={d.scheme}>
+        {d.scheme} · {d.members}×
+      </Text>
+    </Box>
+  );
+}
+
 const UNIFIED_NODE_TYPES = {
   uPanel: memoNode(UnifiedPanelNode),
   load: memoNode(LoadNode),
   floatLoad: memoNode(FloatLoadNode),
   grid: GridSourceNode, // display-only + cheap; no callbacks to worry about
   source: memoNode(SourceNode),
+  control: PumpControlNode, // display-only pump-group controller
 };
 
 /**
@@ -1850,6 +1914,50 @@ function buildUnified(
             // heights so neighbouring drops never share a line.
             offset: i % 2 === 0 ? 6 : 22,
           },
+        });
+      });
+
+      // Pump groups: a shared controller node (water-level / timer / pressure)
+      // sits under the member pumps and wires up to each one — drawn as a CHILD
+      // of the panel (so it moves with it) with dashed control links, making the
+      // grouping and its connections visible on the canvas.
+      const panelHForCtl = heightFor(id);
+      (res.pumpGroups ?? []).forEach((g, gi) => {
+        const memberIdx = g.memberCircuitIds
+          .map((mid) => ways.findIndex((wy) => wy.id === mid && !wy.feeds && wy.kind !== 'spare'))
+          .filter((idx) => idx >= 0);
+        if (memberIdx.length === 0) return;
+        const centers = memberIdx.map((idx) => LEFT + idx * WAY_W + WAY_W / 2);
+        const avgX = centers.reduce((s, c) => s + c, 0) / centers.length;
+        const ctlId = `pgctl-${g.id}`;
+        nodes.push({
+          id: ctlId,
+          type: 'control',
+          parentId: id,
+          position: {
+            x: avgX - 75,
+            y: panelHForCtl + PANEL_CHROME + LOAD_DROP_GAP + LOAD_NODE_H + 28 + gi * 78,
+          },
+          draggable: true,
+          deletable: false,
+          data: {
+            name: g.name,
+            trigger: g.trigger,
+            scheme: g.mode.replace('-', ' '),
+            members: memberIdx.length,
+          },
+        });
+        g.memberCircuitIds.forEach((mid) => {
+          if (!ways.some((wy) => wy.id === mid && !wy.feeds && wy.kind !== 'spare')) return;
+          edges.push({
+            id: `${ctlId}-${mid}`,
+            source: ctlId,
+            sourceHandle: 'out',
+            target: `load-${mid}`,
+            targetHandle: 'ctl',
+            type: 'smoothstep',
+            style: { stroke: 'var(--mantine-color-cyan-5)', strokeWidth: 1.4, strokeDasharray: '5 4' },
+          });
         });
       });
     });

@@ -11,6 +11,7 @@
  */
 
 import type { CircuitInput, PanelInput, ProjectInput } from '@shared/types/project';
+import type { PumpGroupConfig } from '@shared/types/control';
 import type { Part } from '@shared/types/parts';
 import type { CircuitResult } from '@shared/types/results';
 import type {
@@ -225,6 +226,8 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     essential: p.essential === true ? true : null,
     upsBacked: p.upsBacked === true ? true : null,
     submeter: p.submeter === true ? true : null,
+    pumpGroupsJson:
+      p.pumpGroups && p.pumpGroups.length > 0 ? JSON.stringify(p.pumpGroups) : null,
   };
 }
 
@@ -254,6 +257,14 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (r.essential) p.essential = true;
   if (r.upsBacked) p.upsBacked = true;
   if (r.submeter) p.submeter = true;
+  if (r.pumpGroupsJson) {
+    try {
+      const groups = JSON.parse(r.pumpGroupsJson) as PumpGroupConfig[];
+      if (Array.isArray(groups) && groups.length > 0) p.pumpGroups = groups;
+    } catch {
+      /* corrupt pump-groups blob — drop it, keep the panel */
+    }
+  }
   return p;
 }
 
