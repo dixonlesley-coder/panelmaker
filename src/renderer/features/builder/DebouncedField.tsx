@@ -40,6 +40,9 @@ export function DebouncedNumberInput({ value, onCommit, ...rest }: NumProps) {
 
   return (
     <NumberInput
+      // Typed engineering values — hide the stepper chevrons for a calmer field
+      // (a caller can re-enable via {...rest}).
+      hideControls
       {...rest}
       value={local}
       onFocus={() => { focused.current = true; }}

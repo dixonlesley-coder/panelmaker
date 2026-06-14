@@ -713,7 +713,7 @@ export const en = {
     confirm: 'Delete panel',
   },
   system: {
-    eyebrow: 'Building overview',
+    eyebrow: 'Review',
     title: 'Whole-building system',
     addPanel: 'Add panel',
     blankPanel: 'Blank panel',
@@ -756,6 +756,7 @@ export const en = {
     unpricedLines_one: '{{count}} unpriced line',
     unpricedLines_other: '{{count}} unpriced lines',
     allPriced: 'all priced',
+    notPriced: 'Not priced',
     supply: 'Supply',
     gridSupply: 'PLN grid supply',
     helpTitle: 'Canvas guide',
@@ -834,7 +835,7 @@ export const en = {
   },
 
   dashboard: {
-    eyebrow: 'Energy & peak load',
+    eyebrow: 'Review',
     title: 'Dashboard',
     peakDemand: 'Peak demand',
     peakTime: 'Peak time',
@@ -903,7 +904,7 @@ export const en = {
     startKva: 'Starting kVA',
     limitingMotor: 'Limiting motor',
     minGensetForStart: 'Min. genset for start',
-    eyebrow: 'Power sources',
+    eyebrow: 'Review',
     title: 'Energy sources',
     demandIntro: 'Building demand: {{kva}} kVA. Enable backup and renewable sources to size them against it.',
     generator: 'Generator (genset)',
@@ -1108,6 +1109,7 @@ export const en = {
     whyCableManual: 'Cable {{csa}} mm² — manual minimum pinned.',
     device: 'Device',
     cableSection: 'Cable run',
+    advanced: 'Advanced',
     cableType: 'Cable type',
     cableTypeAuto: 'Auto (panel default)',
     cableTypeNYY: 'NYY · 0.6/1 kV power',
@@ -1186,7 +1188,7 @@ export const en = {
     remove: 'Remove from supply',
   },
   coordination: {
-    eyebrow: 'Protection',
+    eyebrow: 'Review',
     title: 'Time–current coordination',
     exportSvg: 'Export plot (SVG)',
     noPairsTitle: 'No cascaded breaker pairs',
@@ -1225,7 +1227,7 @@ export const en = {
     finderBreaking: 'Breaking (Icu)',
     finderNoMatch: 'No family covers that rating — check the kind/rating or relax the breaking-capacity filter.',
     finderDisclaimer: 'Representative product families and standard IEC rating ladders only. No order codes or prices are fabricated; import your supplier pricelist for authoritative prices.',
-    eyebrow: 'Catalog',
+    eyebrow: 'Commercial',
     title: 'Parts',
     searchPlaceholder: 'Search manufacturer, model, attribute…',
     noMatch: 'No parts match “{{query}}”.',
@@ -1240,7 +1242,7 @@ export const en = {
   },
 
   pricelist: {
-    eyebrow: 'Costing',
+    eyebrow: 'Commercial',
     title: 'Pricelist import',
     subtitle:
       'Import a CSV or Excel pricelist — a column of part models and a column of unit prices. Matched parts update the build cost across every panel and the whole-system total.',

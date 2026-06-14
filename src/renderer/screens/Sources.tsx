@@ -120,6 +120,7 @@ export function Sources() {
             )}
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm">
               <NumberInput
+                hideControls
                 label={t('sources.backupOfDemand')}
                 description={t('sources.backupOfDemandHint')}
                 value={Math.round(gen.backupFraction * 100)}
@@ -214,6 +215,7 @@ export function Sources() {
           <>
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="sm">
               <NumberInput
+                hideControls
                 label={t('sources.targetArray')}
                 value={solar.targetKwp}
                 min={1}
@@ -221,6 +223,7 @@ export function Sources() {
                 onChange={(v) => setSolar({ targetKwp: typeof v === 'number' ? v : solar.targetKwp })}
               />
               <NumberInput
+                hideControls
                 label={t('sources.panelPower')}
                 value={solar.panelWp}
                 min={100}
@@ -228,6 +231,7 @@ export function Sources() {
                 onChange={(v) => setSolar({ panelWp: typeof v === 'number' ? v : solar.panelWp })}
               />
               <NumberInput
+                hideControls
                 label={t('sources.dcAcRatio')}
                 value={solar.dcAcRatio}
                 min={1}
@@ -270,6 +274,7 @@ export function Sources() {
             )}
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mt="sm">
               <NumberInput
+                hideControls
                 label={t('sources.backupLoadKw')}
                 description={t('sources.backupLoadKwHint')}
                 value={batt.backupKw}
@@ -279,6 +284,7 @@ export function Sources() {
                 onChange={(v) => setBatt({ backupKw: typeof v === 'number' ? v : batt.backupKw })}
               />
               <NumberInput
+                hideControls
                 label={t('sources.autonomyHours')}
                 value={batt.autonomyHours}
                 min={0.5}

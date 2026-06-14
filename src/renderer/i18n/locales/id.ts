@@ -717,7 +717,7 @@ export const id: TranslationKeys = {
     confirm: 'Hapus panel',
   },
   system: {
-    eyebrow: 'Ikhtisar bangunan',
+    eyebrow: 'Tinjauan',
     title: 'Sistem seluruh bangunan',
     addPanel: 'Tambah panel',
     blankPanel: 'Panel kosong',
@@ -760,6 +760,7 @@ export const id: TranslationKeys = {
     unpricedLines_one: '{{count}} baris tanpa harga',
     unpricedLines_other: '{{count}} baris tanpa harga',
     allPriced: 'semua berharga',
+    notPriced: 'Belum berharga',
     supply: 'Suplai',
     gridSupply: 'Suplai jaringan PLN',
     helpTitle: 'Panduan kanvas',
@@ -838,7 +839,7 @@ export const id: TranslationKeys = {
   },
 
   dashboard: {
-    eyebrow: 'Energi & beban puncak',
+    eyebrow: 'Tinjauan',
     title: 'Dasbor',
     peakDemand: 'Kebutuhan puncak',
     peakTime: 'Waktu puncak',
@@ -907,7 +908,7 @@ export const id: TranslationKeys = {
     startKva: 'kVA start',
     limitingMotor: 'Motor pembatas',
     minGensetForStart: 'Genset min. untuk start',
-    eyebrow: 'Sumber daya',
+    eyebrow: 'Tinjauan',
     title: 'Sumber energi',
     demandIntro:
       'Kebutuhan bangunan: {{kva}} kVA. Aktifkan sumber cadangan dan terbarukan untuk mengukurnya terhadap kebutuhan ini.',
@@ -1113,6 +1114,7 @@ export const id: TranslationKeys = {
     whyCableManual: 'Kabel {{csa}} mm² — minimum manual disematkan.',
     device: 'Perangkat',
     cableSection: 'Jalur kabel',
+    advanced: 'Lanjutan',
     cableType: 'Jenis kabel',
     cableTypeAuto: 'Otomatis (bawaan panel)',
     cableTypeNYY: 'NYY · daya 0,6/1 kV',
@@ -1191,7 +1193,7 @@ export const id: TranslationKeys = {
     remove: 'Hapus dari suplai',
   },
   coordination: {
-    eyebrow: 'Proteksi',
+    eyebrow: 'Tinjauan',
     title: 'Koordinasi waktu–arus',
     exportSvg: 'Ekspor grafik (SVG)',
     noPairsTitle: 'Tidak ada pasangan pemutus berjenjang',
@@ -1230,7 +1232,7 @@ export const id: TranslationKeys = {
     finderBreaking: 'Pemutusan (Icu)',
     finderNoMatch: 'Tidak ada seri yang mencakup rating tersebut — periksa jenis/rating atau longgarkan filter kapasitas pemutusan.',
     finderDisclaimer: 'Hanya keluarga produk representatif dan tangga rating IEC standar. Tidak ada kode pesanan atau harga yang dikarang; impor daftar harga pemasok Anda untuk harga resmi.',
-    eyebrow: 'Katalog',
+    eyebrow: 'Komersial',
     title: 'Komponen',
     searchPlaceholder: 'Cari pabrikan, model, atribut…',
     noMatch: 'Tidak ada komponen cocok dengan “{{query}}”.',
@@ -1245,7 +1247,7 @@ export const id: TranslationKeys = {
   },
 
   pricelist: {
-    eyebrow: 'Penentuan biaya',
+    eyebrow: 'Komersial',
     title: 'Impor daftar harga',
     subtitle:
       'Impor daftar harga CSV atau Excel — satu kolom model komponen dan satu kolom harga satuan. Komponen yang cocok memperbarui biaya pembuatan di setiap panel dan total seluruh sistem.',

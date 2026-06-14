@@ -68,9 +68,9 @@ export function SystemInfo() {
         />
         <Stat
           label={t('system.estimatedCost')}
-          // A confident "Rp 0" reads as broken when nothing is priced yet — show
-          // a dash and let the hint prompt importing a pricelist.
-          value={cost.grandTotal > 0 ? formatIdr(cost.grandTotal) : '—'}
+          // A confident "Rp 0" (or a lone "—") reads as broken when nothing is
+          // priced yet — say so plainly; the hint prompts importing a pricelist.
+          value={cost.grandTotal > 0 ? formatIdr(cost.grandTotal) : t('system.notPriced')}
           hint={
             cost.unmatchedCount > 0
               ? t('system.unpricedLines', { count: cost.unmatchedCount })
@@ -267,7 +267,9 @@ function SelectivityCard({ system }: { system: SystemResult }) {
                   {(() => {
                     const full = e.selective && e.scSelective !== false;
                     const partial = e.selective && e.scSelective === false;
-                    const color = full ? 'teal' : partial ? 'yellow' : 'orange';
+                    // Legible severity scale: green → amber → red, so "Review"
+                    // (unverified) reads hotter than "Partial" at a glance.
+                    const color = full ? 'teal' : partial ? 'yellow' : 'red';
                     const label = full
                       ? t('system.selOk')
                       : partial

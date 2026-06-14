@@ -79,7 +79,7 @@ interface Props {
  * summary — breaker, cable, Iz and the **cable utilisation %** of its ampacity.
  * Edits dispatch immediately, so the canvas and this panel recompute live.
  */
-export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose }: Props) {
+export function CircuitEditor({ panelId, circuit, result, opened, onClose }: Props) {
   const { t } = useTranslation();
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
@@ -184,7 +184,10 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
           </Alert>
         )}
 
-        <Divider label={focus === 'cable' ? t('circuitEditor.cableSection') : t('circuitEditor.device')} />
+        {/* The top divider always labels the DEVICE section it precedes; `focus`
+            only decides where to scroll, not the label (a "Cable run" divider
+            also appears below, so labelling this one "Cable run" duplicated it). */}
+        <Divider label={t('circuitEditor.device')} />
 
         {/* Device */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
@@ -377,6 +380,8 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             })}
           </Text>
         )}
+
+        {circuit.loadKind !== 'spare' && <Divider label={t('circuitEditor.advanced')} />}
 
         {!isFeederCircuit && circuit.loadKind !== 'spare' && (
           <Switch

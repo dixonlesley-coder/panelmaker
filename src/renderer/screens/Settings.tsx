@@ -328,6 +328,7 @@ export function Settings() {
         </Text>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <NumberInput
+            hideControls
             label={t('settings.ambientTemp')}
             description={t('settings.ambientTempHint')}
             suffix=" °C"
@@ -359,6 +360,7 @@ export function Settings() {
             onChange={(v) => v && updatePanel(panel.id, { installMethod: v as InstallMethod })}
           />
           <NumberInput
+            hideControls
             label={t('settings.diversityFactor')}
             description={t('settings.diversityFactorHint')}
             min={0.1}
@@ -371,6 +373,7 @@ export function Settings() {
             }
           />
           <NumberInput
+            hideControls
             label={t('settings.targetPf')}
             description={t('settings.targetPfHint')}
             min={0.85}
@@ -442,6 +445,7 @@ export function Settings() {
             maw={320}
           />
           <NumberInput
+            hideControls
             label={t('settings.soilThermal')}
             description={t('settings.soilThermalHint')}
             value={project.site?.soilThermalResistivityKmW ?? 2.5}
