@@ -108,17 +108,10 @@ export function SystemView() {
 
   return (
     <Stack gap="sm">
-      {/* Compact toolbar — the project name already lives in the app header, so
-          the canvas keeps the chrome to one row and gives the diagram the height. */}
-      <Group justify="space-between" align="center" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-          <ThemeIcon variant="light" color="indigo" size="sm" radius="sm">
-            <IconSitemap size={14} />
-          </ThemeIcon>
-          <Text fw={600} size="md" truncate style={{ letterSpacing: '-0.01em' }}>
-            {project.name}
-          </Text>
-        </Group>
+      {/* Canvas is the workspace — no page title (the project name already lives
+          in the app header). A single right-aligned action toolbar, giving the
+          single-line diagram the full height. */}
+      <Group justify="flex-end" align="center" wrap="nowrap">
         <Group gap="xs" wrap="nowrap">
           <ProjectIssues system={system} />
           <Button

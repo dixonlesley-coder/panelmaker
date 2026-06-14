@@ -286,12 +286,8 @@ export function Projects() {
           description={t('projects.heroSampleHint')}
           onClick={() => void onNew('sample')}
         />
-        <HeroAction
-          icon={<IconFileImport size={22} />}
-          title={t('projects.heroImport')}
-          description={t('projects.heroImportHint')}
-          onClick={() => void onImport()}
-        />
+        {/* Import is project MANAGEMENT (on the active-project bar below), not a
+            "start here" — the hero stays the three genuine starting points. */}
         <HeroAction
           icon={<IconBolt size={22} />}
           title={t('projects.heroContinue')}
