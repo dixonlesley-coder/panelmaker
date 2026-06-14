@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BaseEdge,
@@ -93,37 +93,46 @@ function loadCard(kind: LoadKind, nameKey: string, extra: Partial<CircuitInput> 
   };
 }
 
-const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd }[] = [
-  { key: 'lighting', labelKey: 'vbuilder.lighting', icon: <IconBulb size={14} />, action: loadCard('lighting', 'vbuilder.lighting', { loadW: 1200 }) },
-  { key: 'socket', labelKey: 'vbuilder.sockets', icon: <IconPlug size={14} />, action: loadCard('socket', 'vbuilder.sockets', { loadW: 2000 }) },
-  { key: 'hvac', labelKey: 'vbuilder.hvac', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac', { loadW: 5500 }) },
+/** Palette sub-groups, in render order — a faint label heads each so the
+ *  flat 18-card list stays scannable (n21). Sources keep their own group below. */
+type PaletteGroup = 'loads' | 'motors' | 'dist';
+const PALETTE_GROUPS: { key: PaletteGroup; labelKey: string }[] = [
+  { key: 'loads', labelKey: 'vbuilder.groupLoads' },
+  { key: 'motors', labelKey: 'vbuilder.groupMotors' },
+  { key: 'dist', labelKey: 'vbuilder.groupDistribution' },
+];
+
+const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd; group: PaletteGroup }[] = [
+  { key: 'lighting', labelKey: 'vbuilder.lighting', group: 'loads', icon: <IconBulb size={14} />, action: loadCard('lighting', 'vbuilder.lighting', { loadW: 1200 }) },
+  { key: 'socket', labelKey: 'vbuilder.sockets', group: 'loads', icon: <IconPlug size={14} />, action: loadCard('socket', 'vbuilder.sockets', { loadW: 2000 }) },
+  { key: 'hvac', labelKey: 'vbuilder.hvac', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac', { loadW: 5500 }) },
   // Resistive water heater — hotels/apartments/restaurants; no-neutral when 3φ.
-  { key: 'heating', labelKey: 'vbuilder.heating', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.heating', { loadW: 2000 }) },
-  { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.motor', { loadW: 0, motorKw: 5.5, starterType: 'DOL' }) },
-  // Star-delta: large 3φ motors started at reduced (58%) current.
-  { key: 'motorSD', labelKey: 'vbuilder.starDelta', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.starDelta', { loadW: 0, motorKw: 15, starterType: 'STAR_DELTA' }) },
-  // VFD: variable-speed drive — the non-linear (harmonic) load the PQ pass keys on.
-  { key: 'motorVfd', labelKey: 'vbuilder.vfd', icon: <IconWaveSine size={14} />, action: loadCard('motor', 'vbuilder.vfd', { loadW: 0, motorKw: 11, starterType: 'VFD' }) },
-  // Pumps split by supply phase: a small 1-ph booster vs a 3-ph transfer pump.
-  { key: 'pump1', labelKey: 'vbuilder.pump1ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump1ph', { loadW: 0, motorKw: 0.75, starterType: 'DOL', phases: 1 }) },
-  { key: 'pump3', labelKey: 'vbuilder.pump3ph', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump3ph', { loadW: 0, motorKw: 4, starterType: 'DOL', phases: 3 }) },
-  // Life-safety: fire pump — no RCD, FRC cable, must ride the essential bus.
-  { key: 'firepump', labelKey: 'vbuilder.firePump', icon: <IconFireHydrant size={14} />, action: loadCard('pump', 'vbuilder.firePump', { loadW: 0, motorKw: 15, starterType: 'DOL', startingDuty: 'heavy', lifeSafety: true }) },
-  { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
+  { key: 'heating', labelKey: 'vbuilder.heating', group: 'loads', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.heating', { loadW: 2000 }) },
+  { key: 'ev', labelKey: 'vbuilder.ev', group: 'loads', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
   // Industrial CEE-form 3φ socket: the 30 mA socket RCD rule still applies.
-  { key: 'socket3', labelKey: 'vbuilder.socket3ph', icon: <IconPlugConnected size={14} />, action: loadCard('socket', 'vbuilder.socket3ph', { loadW: 7500, phases: 3 }) },
+  { key: 'socket3', labelKey: 'vbuilder.socket3ph', group: 'loads', icon: <IconPlugConnected size={14} />, action: loadCard('socket', 'vbuilder.socket3ph', { loadW: 7500, phases: 3 }) },
   // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
-  { key: 'ups', labelKey: 'vbuilder.ups', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
+  { key: 'ups', labelKey: 'vbuilder.ups', group: 'loads', icon: <IconServer size={14} />, action: loadCard('ups', 'vbuilder.ups', { loadW: 3000 }) },
   // Welding set — low cos φ (0.7), 50% demand, D-curve; harmonic source.
-  { key: 'welding', labelKey: 'vbuilder.welding', icon: <IconTool size={14} />, action: loadCard('welding', 'vbuilder.welding', { loadW: 8000, phases: 3 }) },
+  { key: 'welding', labelKey: 'vbuilder.welding', group: 'loads', icon: <IconTool size={14} />, action: loadCard('welding', 'vbuilder.welding', { loadW: 8000, phases: 3 }) },
   // Custom/general loads with the phase stated outright — for the odd equipment
   // (kilns, lab gear, kitchen ranges…) the kind presets don't cover. Double-click
   // after dropping to set the real W / cos φ / demand factor.
-  { key: 'general1', labelKey: 'vbuilder.general1ph', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general1ph', { loadW: 2000, phases: 1 }) },
-  { key: 'general3', labelKey: 'vbuilder.general3ph', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general3ph', { loadW: 7500, phases: 3 }) },
+  { key: 'general1', labelKey: 'vbuilder.general1ph', group: 'loads', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general1ph', { loadW: 2000, phases: 1 }) },
+  { key: 'general3', labelKey: 'vbuilder.general3ph', group: 'loads', icon: <IconBolt size={14} />, action: loadCard('general', 'vbuilder.general3ph', { loadW: 7500, phases: 3 }) },
+  { key: 'motor', labelKey: 'vbuilder.motor', group: 'motors', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.motor', { loadW: 0, motorKw: 5.5, starterType: 'DOL' }) },
+  // Star-delta: large 3φ motors started at reduced (58%) current.
+  { key: 'motorSD', labelKey: 'vbuilder.starDelta', group: 'motors', icon: <IconEngine size={14} />, action: loadCard('motor', 'vbuilder.starDelta', { loadW: 0, motorKw: 15, starterType: 'STAR_DELTA' }) },
+  // VFD: variable-speed drive — the non-linear (harmonic) load the PQ pass keys on.
+  { key: 'motorVfd', labelKey: 'vbuilder.vfd', group: 'motors', icon: <IconWaveSine size={14} />, action: loadCard('motor', 'vbuilder.vfd', { loadW: 0, motorKw: 11, starterType: 'VFD' }) },
+  // Pumps split by supply phase: a small 1-ph booster vs a 3-ph transfer pump.
+  { key: 'pump1', labelKey: 'vbuilder.pump1ph', group: 'motors', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump1ph', { loadW: 0, motorKw: 0.75, starterType: 'DOL', phases: 1 }) },
+  { key: 'pump3', labelKey: 'vbuilder.pump3ph', group: 'motors', icon: <IconDroplet size={14} />, action: loadCard('pump', 'vbuilder.pump3ph', { loadW: 0, motorKw: 4, starterType: 'DOL', phases: 3 }) },
+  // Life-safety: fire pump — no RCD, FRC cable, must ride the essential bus.
+  { key: 'firepump', labelKey: 'vbuilder.firePump', group: 'motors', icon: <IconFireHydrant size={14} />, action: loadCard('pump', 'vbuilder.firePump', { loadW: 0, motorKw: 15, starterType: 'DOL', startingDuty: 'heavy', lifeSafety: true }) },
   // A spare way: installed breaker, no load/cable — boards keep 20-30% spare.
-  { key: 'spare', labelKey: 'vbuilder.spare', icon: <IconCircuitSwitchOpen size={14} />, action: loadCard('spare', 'vbuilder.spareName', { loadW: 0, lengthM: 1 }) },
-  { key: 'subpanel', labelKey: 'vbuilder.subpanel', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
+  { key: 'spare', labelKey: 'vbuilder.spare', group: 'dist', icon: <IconCircuitSwitchOpen size={14} />, action: loadCard('spare', 'vbuilder.spareName', { loadW: 0, lengthM: 1 }) },
+  { key: 'subpanel', labelKey: 'vbuilder.subpanel', group: 'dist', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
 ];
 
 /**
@@ -2546,29 +2555,43 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
           onChange={(e) => setPaletteQuery(e.currentTarget.value)}
         />
         <Stack gap={5}>
-          {SLD_PALETTE.filter((item) => t(item.labelKey).toLowerCase().includes(paletteQuery.trim().toLowerCase())).map((item) => (
-            <Paper
-              key={item.key}
-              withBorder
-              radius="sm"
-              p={5}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(SLD_DND, JSON.stringify(item.action));
-                e.dataTransfer.effectAllowed = 'copy';
-              }}
-              style={{ cursor: 'grab', userSelect: 'none' }}
-            >
-              <Group gap={6} wrap="nowrap">
-                <ThemeIcon size="sm" variant="light" color={item.action.type === 'subpanel' ? 'teal' : 'indigo'}>
-                  {item.icon}
-                </ThemeIcon>
-                <Text size="xs" fw={500} lineClamp={1}>
-                  {t(item.labelKey)}
+          {PALETTE_GROUPS.map((grp) => {
+            const q = paletteQuery.trim().toLowerCase();
+            const items = SLD_PALETTE.filter(
+              (item) => item.group === grp.key && t(item.labelKey).toLowerCase().includes(q),
+            );
+            if (items.length === 0) return null;
+            return (
+              <Fragment key={grp.key}>
+                <Text size="xs" c="dimmed" fw={600} tt="uppercase" mt={6} style={{ letterSpacing: '0.04em' }}>
+                  {t(grp.labelKey)}
                 </Text>
-              </Group>
-            </Paper>
-          ))}
+                {items.map((item) => (
+                  <Paper
+                    key={item.key}
+                    withBorder
+                    radius="sm"
+                    p={5}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(SLD_DND, JSON.stringify(item.action));
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    style={{ cursor: 'grab', userSelect: 'none' }}
+                  >
+                    <Group gap={6} wrap="nowrap">
+                      <ThemeIcon size="sm" variant="light" color={item.action.type === 'subpanel' ? 'teal' : 'indigo'}>
+                        {item.icon}
+                      </ThemeIcon>
+                      <Text size="xs" fw={500} lineClamp={1}>
+                        {t(item.labelKey)}
+                      </Text>
+                    </Group>
+                  </Paper>
+                ))}
+              </Fragment>
+            );
+          })}
 
           {/* Energy sources: dropping a card enables the source project-wide. */}
           {SOURCE_PALETTE.some((item) => t(item.labelKey).toLowerCase().includes(paletteQuery.trim().toLowerCase())) && (

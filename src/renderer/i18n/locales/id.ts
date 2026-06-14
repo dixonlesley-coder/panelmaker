@@ -1052,6 +1052,7 @@ export const id: TranslationKeys = {
     hint: 'Seret item dari palet ke kanvas — ukuran dihitung ulang seketika dan perangkat yang berubah ditandai Δ.',
     resized: '{{count}} item diubah ukurannya oleh edit terakhir',
     groupLoads: 'Beban',
+    groupMotors: 'Motor & pompa',
     groupDistribution: 'Distribusi',
     groupSupply: 'Suplai',
     lighting: 'Penerangan',

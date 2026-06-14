@@ -1047,6 +1047,7 @@ export const en = {
     hint: 'Drag items from the palette onto the canvas — sizing recomputes instantly and re-sized devices are marked Δ.',
     resized: '{{count}} item(s) re-sized by the last edit',
     groupLoads: 'Loads',
+    groupMotors: 'Motors & pumps',
     groupDistribution: 'Distribution',
     groupSupply: 'Supply',
     lighting: 'Lighting',
