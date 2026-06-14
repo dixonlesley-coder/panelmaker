@@ -13,7 +13,13 @@ import type {
   EarthingSystem,
   OccupancyType,
 } from './electrical';
-import type { StarterType, StartingDuty, PumpControlMode, LevelSensing } from './control';
+import type {
+  StarterType,
+  StartingDuty,
+  PumpControlMode,
+  LevelSensing,
+  PumpGroupConfig,
+} from './control';
 import type { LightFixture, SocketOutlet, SwitchGroup } from './fixtures';
 import type { SourcesConfig } from './sources';
 
@@ -144,6 +150,13 @@ export interface PanelInput {
   sourceType: 'utility' | 'feeder';
   fedByCircuitId?: string;
   circuits: CircuitInput[];
+  /**
+   * Functional pump groups on this panel: sets of pump circuits run together
+   * under one control scheme (alternation / assist / cascade), driven by a
+   * shared water-level controller, timer or pressure transmitter. The engine
+   * derives the shared gear, interlocks and the group control schematic.
+   */
+  pumpGroups?: PumpGroupConfig[];
 }
 
 /**

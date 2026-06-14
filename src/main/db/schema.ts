@@ -97,6 +97,8 @@ export const panels = sqliteTable('panels', {
   sourceType: text('source_type').notNull().default('utility'),
   /** When fed by a parent panel, the upstream feeder circuit id. */
   fedByCircuitId: text('fed_by_circuit_id'),
+  /** Functional pump groups (control scheme + members) as JSON. */
+  pumpGroupsJson: text('pump_groups_json'),
 });
 
 export const circuits = sqliteTable('circuits', {
@@ -136,6 +138,8 @@ export const circuits = sqliteTable('circuits', {
   busbarBreakBefore: integer('busbar_break_before', { mode: 'boolean' }),
   /** Pin a 1-ph circuit to a line: 'L1' | 'L2' | 'L3' (null = auto-balance). */
   phaseOverride: text('phase_override'),
+  /** Force the circuit's phasing: '1ph' | '3ph' (null = auto-derive). */
+  forcePhase: text('force_phase'),
   /** Per-route grouping count override (null = panel-wide groupingCount). */
   groupingOverride: integer('grouping_override'),
   // Daily operating window (absent = continuous) for the load profile.

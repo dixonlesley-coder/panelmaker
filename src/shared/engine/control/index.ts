@@ -6,5 +6,6 @@ export * from './selectVFD';
 export * from './applyStarterTemplate';
 export * from './startingAnalysis';
 export * from './pumpControl';
+export * from './pumpGroup';
 export * from './buildSchematic';
 export * from './mergeSchematic';

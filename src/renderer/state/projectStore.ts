@@ -10,6 +10,7 @@ import type {
   Part,
   ProjectInput,
   ProjectMeta,
+  PumpGroupConfig,
   SchematicRung,
   SchematicSymbol,
   SchematicSymbolType,
@@ -183,6 +184,14 @@ export interface ProjectState {
   removePanel: (panelId: string) => void;
   /** Set (or clear) a panel's building occupancy class. */
   setPanelOccupancy: (panelId: string, occupancy: OccupancyType | undefined) => void;
+
+  // pump groups (functional grouping of pump circuits under one control scheme)
+  /** Create a new (empty) pump group on a panel; returns nothing. */
+  addPumpGroup: (panelId: string) => void;
+  /** Merge a partial patch into an existing pump group. */
+  updatePumpGroup: (panelId: string, groupId: string, patch: Partial<PumpGroupConfig>) => void;
+  /** Remove a pump group from a panel. */
+  removePumpGroup: (panelId: string, groupId: string) => void;
   /** Append a new panel built from a template (fresh ids) and select it. */
   addPanelFromTemplate: (templateId: string) => void;
   /**
@@ -870,6 +879,48 @@ export const useProjectStore = create<ProjectState>((set) => ({
           }
           return { ...panel, occupancy };
         }),
+      ),
+    ),
+
+  addPumpGroup: (panelId) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => {
+          const group: PumpGroupConfig = {
+            id: nextId('pg'),
+            name: `Pump group ${(panel.pumpGroups?.length ?? 0) + 1}`,
+            mode: 'single-alternate',
+            trigger: 'level',
+            sensing: 'float',
+            memberCircuitIds: [],
+          };
+          return { ...panel, pumpGroups: [...(panel.pumpGroups ?? []), group] };
+        }),
+      ),
+    ),
+
+  updatePumpGroup: (panelId, groupId, patch) =>
+    set((s) =>
+      withHistory(
+        s,
+        (project) =>
+          mapPanel(project, panelId, (panel) => ({
+            ...panel,
+            pumpGroups: (panel.pumpGroups ?? []).map((g) =>
+              g.id === groupId ? { ...g, ...patch } : g,
+            ),
+          })),
+        `pg:${panelId}:${groupId}:${Object.keys(patch).sort().join('+')}`,
+      ),
+    ),
+
+  removePumpGroup: (panelId, groupId) =>
+    set((s) =>
+      withHistory(s, (project) =>
+        mapPanel(project, panelId, (panel) => ({
+          ...panel,
+          pumpGroups: (panel.pumpGroups ?? []).filter((g) => g.id !== groupId),
+        })),
       ),
     ),
 

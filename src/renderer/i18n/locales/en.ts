@@ -303,6 +303,7 @@ export const en = {
     circuitBuilder: 'Circuit builder',
     tabSingleLine: 'Single-line',
     tabSchematic: 'Control schematic',
+    tabPumpGroups: 'Pump groups',
     tabLayout: 'Layout',
     tabSwitching: 'Switching',
     tabBuild: 'Build',
@@ -318,6 +319,27 @@ export const en = {
     exportPanelPdf: 'Export panel PDF',
     noCircuits: 'No circuits yet. Add one to get started.',
     circuits: 'Circuits',
+  },
+
+  pumpGroups: {
+    eyebrow: 'Pump control',
+    intro:
+      'Group pump circuits and pick a control scheme. The needed components (level/timer controller, alternator relay), the cross-pump interlocks and the control wiring are generated automatically.',
+    addGroup: 'Add pump group',
+    noPumps: 'This panel has no pump or motor circuits yet. Add a pump first, then group it here.',
+    noGroups: 'No pump groups yet. Add one to control several pumps together.',
+    name: 'Group name',
+    mode: 'Control scheme',
+    trigger: 'Started by',
+    members: 'Member pumps',
+    membersPlaceholder: 'Pick the pumps in this group',
+    sensing: 'Level sensing',
+    timerOn: 'Run',
+    timerOff: 'Pause',
+    components: 'Auto components',
+    interlocks: 'Interlocks',
+    schematic: 'Group control schematic',
+    remove: 'Remove group',
   },
 
   builder: {

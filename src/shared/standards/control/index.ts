@@ -5,3 +5,4 @@ export * from './vfd';
 export * from './starters';
 export * from './starting';
 export * from './pump';
+export * from './pumpGroup';

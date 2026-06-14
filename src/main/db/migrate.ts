@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS panels (
   active_pricelist_id TEXT REFERENCES pricelists(id) ON DELETE SET NULL,
   diversity_factor REAL NOT NULL DEFAULT 0.8,
   source_type TEXT NOT NULL DEFAULT 'utility',
-  fed_by_circuit_id TEXT
+  fed_by_circuit_id TEXT,
+  pump_groups_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS circuits (
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   breaker_override_a REAL,
   busbar_break_before INTEGER,
   phase_override TEXT,
+  force_phase TEXT,
   grouping_override INTEGER,
   schedule_start_hour INTEGER,
   schedule_end_hour INTEGER,
@@ -225,6 +227,10 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'grouping_override', ddl: 'ALTER TABLE circuits ADD COLUMN grouping_override INTEGER' },
   // Conductor material (Cu / Al).
   { table: 'panels', column: 'material', ddl: 'ALTER TABLE panels ADD COLUMN material TEXT' },
+  // Explicit per-circuit phasing override (1ph / 3ph).
+  { table: 'circuits', column: 'force_phase', ddl: 'ALTER TABLE circuits ADD COLUMN force_phase TEXT' },
+  // Functional pump groups (control scheme + members) as JSON.
+  { table: 'panels', column: 'pump_groups_json', ddl: 'ALTER TABLE panels ADD COLUMN pump_groups_json TEXT' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

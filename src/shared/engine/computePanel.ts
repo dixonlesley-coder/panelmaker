@@ -7,6 +7,7 @@ import type { CircuitInput, PanelInput } from '../types/project';
 import type { CableType, SystemType, EarthingSystem } from '../types/electrical';
 import type { CircuitResult, PanelResult, Warning } from '../types/results';
 import { applyPumpControl } from './control/pumpControl';
+import { computePumpGroup, type PumpGroupMember } from './control/pumpGroup';
 import { applyStarterTemplate } from './control/applyStarterTemplate';
 import { motorFLC, motorFLC1ph } from './control/motorFLC';
 import { circuitDemandFactor } from './occupancy';
@@ -335,6 +336,31 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
 
   const circuits = comps.map((cm) => cm.result);
 
+  // Pump groups: derive the shared control gear, the cross-pump interlocks and
+  // the group control schematic from the panel's pump-group configs and their
+  // member circuits. The shared gear adds DIN modules + heat to the enclosure.
+  const pumpGroups = (panel.pumpGroups ?? []).map((cfg) => {
+    const members: PumpGroupMember[] = cfg.memberCircuitIds
+      .map((mid) => comps.find((cm) => cm.result.circuitId === mid))
+      .filter((cm): cm is CircuitComputation => cm !== undefined)
+      .map((cm) => ({
+        circuitId: cm.result.circuitId,
+        name: cm.result.name,
+        ...(cm.result.control ? { control: cm.result.control } : {}),
+      }));
+    return computePumpGroup(cfg, members);
+  });
+  for (const g of pumpGroups) {
+    for (const d of g.devices) {
+      const qty = d.qty ?? 1;
+      totalModules += ((d.widthMm ?? 0) / DIN_MODULE_WIDTH_MM) * qty;
+      totalHeatW += (d.heatLossW ?? 0) * qty;
+    }
+    for (const w of g.warnings) {
+      warnings.push({ code: 'pump-group', severity: 'warning', message: w, panelId: panel.id });
+    }
+  }
+
   if (panel.system === '3ph' && balance.imbalancePct > 15) {
     warnings.push({
       code: 'phase-imbalance',
@@ -559,5 +585,6 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     ...(opts.faultLevelA !== undefined ? { faultLevelKa: round(opts.faultLevelA / 1000, 1) } : {}),
     ...(harmonics ? { harmonics } : {}),
     ...(arcFlash ? { arcFlash } : {}),
+    ...(pumpGroups.length > 0 ? { pumpGroups } : {}),
   };
 }

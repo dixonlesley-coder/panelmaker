@@ -11,6 +11,7 @@
  */
 
 import type { CircuitInput, PanelInput, ProjectInput } from '@shared/types/project';
+import type { PumpGroupConfig } from '@shared/types/control';
 import type { Part } from '@shared/types/parts';
 import type { CircuitResult } from '@shared/types/results';
 import type {
@@ -100,6 +101,7 @@ export function circuitToRow(
     breakerOverrideA: undefToNull(c.breakerOverrideA),
     busbarBreakBefore: c.busbarBreakBefore === true ? true : null,
     phaseOverride: undefToNull(c.phaseOverride),
+    forcePhase: undefToNull(c.forcePhase),
     groupingOverride: undefToNull(c.groupingCountOverride),
     scheduleStartHour: c.schedule ? c.schedule.startHour : null,
     scheduleEndHour: c.schedule ? c.schedule.endHour : null,
@@ -155,6 +157,8 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   if (r.busbarBreakBefore) c.busbarBreakBefore = true;
   const phaseOverride = nullToUndef(r.phaseOverride);
   if (phaseOverride !== undefined) c.phaseOverride = phaseOverride as CircuitInput['phaseOverride'];
+  const forcePhase = nullToUndef(r.forcePhase);
+  if (forcePhase !== undefined) c.forcePhase = forcePhase as CircuitInput['forcePhase'];
   const groupingOverride = nullToUndef(r.groupingOverride);
   if (groupingOverride !== undefined) c.groupingCountOverride = groupingOverride;
   const ssh = nullToUndef(r.scheduleStartHour);
@@ -210,6 +214,8 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     diversityFactor: p.diversityFactor,
     sourceType: p.sourceType,
     fedByCircuitId: undefToNull(p.fedByCircuitId),
+    pumpGroupsJson:
+      p.pumpGroups && p.pumpGroups.length > 0 ? JSON.stringify(p.pumpGroups) : null,
   };
 }
 
@@ -236,6 +242,14 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (insulation !== undefined) p.insulation = insulation as PanelInput['insulation'];
   const material = nullToUndef(r.material);
   if (material !== undefined) p.material = material as PanelInput['material'];
+  if (r.pumpGroupsJson) {
+    try {
+      const groups = JSON.parse(r.pumpGroupsJson) as PumpGroupConfig[];
+      if (Array.isArray(groups) && groups.length > 0) p.pumpGroups = groups;
+    } catch {
+      /* corrupt pump-groups blob — drop it, keep the panel */
+    }
+  }
   return p;
 }
 

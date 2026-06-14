@@ -1,6 +1,7 @@
 /** Control-circuit domain types: starters, gear assemblies and interlocks. */
 
 import type { PartCategory } from './parts';
+import type { ControlSchematic } from './schematic';
 
 export type StarterType =
   | 'DOL'
@@ -129,4 +130,64 @@ export interface ControlAssembly {
     note: string;
   };
   warnings: string[];
+}
+
+/**
+ * How a set of pumps in a group share the duty. Each scheme implies the shared
+ * control gear (level/timer controller, alternator relay) and the cross-pump
+ * interlocks the engine auto-provisions.
+ */
+export type PumpGroupMode =
+  | 'single-alternate' // duty / standby — one pump runs, role alternates each cycle
+  | 'parallel-alternate' // duty / assist — lead runs, more stage in on demand, lead alternates
+  | 'lead-lag' // fixed lead then lag, assist on demand, no alternation
+  | 'parallel' // all pumps run together (no staging)
+  | 'cascade'; // sequential staging by demand (booster set)
+
+/** What initiates and modulates a pump group's run demand. */
+export type PumpGroupTrigger = 'level' | 'timer' | 'pressure' | 'manual';
+
+/**
+ * A functional grouping of pump circuits operated together under one control
+ * scheme (lead/lag alternation, parallel assist, cascade…), driven by a shared
+ * water-level controller, timer or pressure transmitter. Lives on the panel
+ * input; the engine derives the shared gear, the interlocks and the schematic.
+ */
+export interface PumpGroupConfig {
+  id: string;
+  name: string;
+  mode: PumpGroupMode;
+  trigger: PumpGroupTrigger;
+  /** Member pump circuit ids, in lead order (index 0 = the first lead). */
+  memberCircuitIds: string[];
+  /** Level-sensing technology when the trigger is a water-level controller. */
+  sensing?: LevelSensing;
+  /** Timer ON duration (minutes) when the trigger is a cyclic timer. */
+  timerOnMin?: number;
+  /** Timer OFF duration (minutes) when the trigger is a cyclic timer. */
+  timerOffMin?: number;
+}
+
+/**
+ * The derived control package for one pump group: the shared sensing/controller
+ * and alternator gear, the cross-pump interlocks, and the auto-generated group
+ * control schematic. Produced by the engine alongside per-circuit assemblies.
+ */
+export interface PumpGroupResult {
+  id: string;
+  name: string;
+  mode: PumpGroupMode;
+  trigger: PumpGroupTrigger;
+  /** Member pump circuit ids actually grouped (existing pump/motor circuits). */
+  memberCircuitIds: string[];
+  /** Member circuit display names, aligned to memberCircuitIds. */
+  memberNames: string[];
+  /** Shared control gear (level/timer/pressure controller, alternator relay…). */
+  devices: AssemblyDevice[];
+  /** Cross-circuit interlocks between the member pumps' contactors. */
+  interlocks: Interlock[];
+  /** Auto-generated group control (ladder) schematic. */
+  schematic: ControlSchematic;
+  warnings: string[];
+  note: string;
 }
