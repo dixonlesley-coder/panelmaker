@@ -90,6 +90,7 @@ function computeCircuit(
     motorKw: c.motorKw,
     hasStarter: Boolean(c.starterType),
     isFeeder,
+    forcePhase: c.forcePhase,
   });
   const motorLike = (c.loadKind === 'motor' || c.loadKind === 'pump') && c.motorKw !== undefined;
   const isMotor = motorLike && threePhase;

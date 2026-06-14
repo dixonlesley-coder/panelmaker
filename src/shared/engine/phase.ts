@@ -10,16 +10,20 @@ export interface ThreePhaseInput {
   motorKw?: number;
   hasStarter?: boolean;
   isFeeder?: boolean;
+  /** Explicit user phasing override, beating the automatic determination. */
+  forcePhase?: '1ph' | '3ph';
 }
 
 /**
  * Whether a circuit is supplied three-phase. On a single-phase panel everything
- * is single-phase. On a three-phase panel: feeders and large/motor loads are
- * three-phase; small loads stay single-phase (and get phase-balanced).
+ * is single-phase. On a three-phase panel: an explicit `forcePhase` wins; else
+ * feeders and large/motor loads are three-phase and small loads stay
+ * single-phase (and get phase-balanced).
  */
 export function circuitIsThreePhase(i: ThreePhaseInput): boolean {
   if (i.panelSystem === '1ph') return false;
   if (i.isFeeder || i.kind === 'feeder') return true;
+  if (i.forcePhase) return i.forcePhase === '3ph';
   const def = LOAD_DEFAULTS[i.kind];
   if (def.motorLike) {
     const kw = i.motorKw ?? i.loadW / 1000;

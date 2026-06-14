@@ -75,6 +75,16 @@ export interface CircuitInput {
   busbarBreakBefore?: boolean;
 
   /**
+   * Force the circuit's supply phasing, overriding the automatic single- vs
+   * three-phase determination (which is derived from load kind, size and the
+   * panel system). Lets the same load type be placed as an explicit 1-phase or
+   * 3-phase circuit — e.g. a single-phase vs three-phase air-conditioner, water
+   * heater or EV charger. Ignored on a single-phase panel (everything is 1-phase
+   * there); feeders are always three-phase.
+   */
+  forcePhase?: '1ph' | '3ph';
+
+  /**
    * Pin a single-phase circuit to a specific line. Auto-balancing re-shuffles
    * phases as loads change; an as-built schedule needs stable, locked phases.
    * Ignored for three-phase circuits.

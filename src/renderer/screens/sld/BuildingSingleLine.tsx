@@ -29,12 +29,13 @@ import {
   IconChargingPile,
   IconDroplet,
   IconEngine,
+  IconFlame,
   IconHandMove,
   IconPlug,
   IconPlugConnected,
   IconSitemap,
 } from '@tabler/icons-react';
-import type { CircuitInput, LoadKind, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import type { CircuitInput, LoadKind, PhaseAssignment, ProjectInput, SystemResult, SystemType } from '@shared/types';
 import { formatAmps, formatKw } from '@renderer/lib/format';
 import { toNodeIssues } from '@renderer/lib/nodeIssues';
 import { NodeIssues, type NodeIssue } from '@renderer/screens/sld/nodes';
@@ -47,16 +48,21 @@ import { CircuitEditor } from '@renderer/features/builder/CircuitEditor';
 const SLD_DND = 'application/x-panelmaker-sld-add';
 type SldAdd =
   | { type: 'load'; loadKind: LoadKind; nameKey: string; defaults: Partial<CircuitInput> }
-  | { type: 'subpanel' };
+  | { type: 'subpanel'; system?: SystemType };
 const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd }[] = [
   { key: 'lighting', labelKey: 'vbuilder.lighting', icon: <IconBulb size={14} />, action: { type: 'load', loadKind: 'lighting', nameKey: 'vbuilder.lighting', defaults: { loadW: 1200, isLighting: true, cosPhi: 0.9 } } },
   { key: 'socket', labelKey: 'vbuilder.sockets', icon: <IconPlug size={14} />, action: { type: 'load', loadKind: 'socket', nameKey: 'vbuilder.sockets', defaults: { loadW: 2000, cosPhi: 0.95 } } },
-  { key: 'hvac', labelKey: 'vbuilder.hvac', icon: <IconAirConditioning size={14} />, action: { type: 'load', loadKind: 'hvac', nameKey: 'vbuilder.hvac', defaults: { loadW: 5500, cosPhi: 0.9 } } },
+  { key: 'hvac1ph', labelKey: 'vbuilder.hvac1ph', icon: <IconAirConditioning size={14} />, action: { type: 'load', loadKind: 'hvac', nameKey: 'vbuilder.hvac1ph', defaults: { loadW: 2500, cosPhi: 0.9, forcePhase: '1ph' } } },
+  { key: 'hvac3ph', labelKey: 'vbuilder.hvac3ph', icon: <IconAirConditioning size={14} />, action: { type: 'load', loadKind: 'hvac', nameKey: 'vbuilder.hvac3ph', defaults: { loadW: 5500, cosPhi: 0.9, forcePhase: '3ph' } } },
+  { key: 'waterHeater1ph', labelKey: 'vbuilder.waterHeater1ph', icon: <IconFlame size={14} />, action: { type: 'load', loadKind: 'heating', nameKey: 'vbuilder.waterHeater1ph', defaults: { loadW: 3000, cosPhi: 1, forcePhase: '1ph' } } },
+  { key: 'waterHeater3ph', labelKey: 'vbuilder.waterHeater3ph', icon: <IconFlame size={14} />, action: { type: 'load', loadKind: 'heating', nameKey: 'vbuilder.waterHeater3ph', defaults: { loadW: 9000, cosPhi: 1, forcePhase: '3ph' } } },
   { key: 'motor', labelKey: 'vbuilder.motor', icon: <IconEngine size={14} />, action: { type: 'load', loadKind: 'motor', nameKey: 'vbuilder.motor', defaults: { loadW: 0, motorKw: 5.5, starterType: 'DOL', cosPhi: 0.85 } } },
   { key: 'pump', labelKey: 'vbuilder.pump', icon: <IconDroplet size={14} />, action: { type: 'load', loadKind: 'pump', nameKey: 'vbuilder.pump', defaults: { loadW: 0, motorKw: 4, starterType: 'DOL', cosPhi: 0.85 } } },
-  { key: 'ev', labelKey: 'vbuilder.ev', icon: <IconChargingPile size={14} />, action: { type: 'load', loadKind: 'ev_charger', nameKey: 'vbuilder.ev', defaults: { loadW: 7400, cosPhi: 0.98 } } },
+  { key: 'ev1ph', labelKey: 'vbuilder.ev1ph', icon: <IconChargingPile size={14} />, action: { type: 'load', loadKind: 'ev_charger', nameKey: 'vbuilder.ev1ph', defaults: { loadW: 7400, cosPhi: 0.98, forcePhase: '1ph' } } },
+  { key: 'ev3ph', labelKey: 'vbuilder.ev3ph', icon: <IconChargingPile size={14} />, action: { type: 'load', loadKind: 'ev_charger', nameKey: 'vbuilder.ev3ph', defaults: { loadW: 22000, cosPhi: 0.98, forcePhase: '3ph' } } },
   { key: 'general', labelKey: 'vbuilder.general', icon: <IconBolt size={14} />, action: { type: 'load', loadKind: 'general', nameKey: 'vbuilder.general', defaults: { loadW: 2000, cosPhi: 0.85 } } },
-  { key: 'subpanel', labelKey: 'vbuilder.subpanel', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
+  { key: 'subpanel3ph', labelKey: 'vbuilder.subpanel3ph', icon: <IconSitemap size={14} />, action: { type: 'subpanel', system: '3ph' } },
+  { key: 'subpanel1ph', labelKey: 'vbuilder.subpanel1ph', icon: <IconSitemap size={14} />, action: { type: 'subpanel', system: '1ph' } },
 ];
 
 /**
@@ -1236,7 +1242,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const addItem = useCallback(
     (panelId: string, action: SldAdd) => {
       if (action.type === 'subpanel') {
-        addSubPanel(panelId);
+        addSubPanel(panelId, action.system);
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
         return;
       }
@@ -1272,7 +1278,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         return;
       }
       if (action.type === 'subpanel') {
-        addPanel();
+        addPanel(action.system);
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
         return;
       }

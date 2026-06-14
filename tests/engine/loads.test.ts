@@ -25,6 +25,25 @@ describe('1-phase / 3-phase logic', () => {
     expect(recommendPhase('pump', 0, 11)).toBe('3ph');
   });
 
+  it('forcePhase overrides the automatic 1ph/3ph determination', () => {
+    // A small EV charger would auto-resolve single-phase; force it three-phase.
+    expect(
+      circuitIsThreePhase({ panelSystem: '3ph', kind: 'ev_charger', loadW: 7400, forcePhase: '3ph' }),
+    ).toBe(true);
+    // A large air-conditioner would auto-resolve three-phase; force it single-phase.
+    expect(
+      circuitIsThreePhase({ panelSystem: '3ph', kind: 'hvac', loadW: 9000, forcePhase: '1ph' }),
+    ).toBe(false);
+    // A single-phase panel still forces everything single-phase (panel wins).
+    expect(
+      circuitIsThreePhase({ panelSystem: '1ph', kind: 'hvac', loadW: 9000, forcePhase: '3ph' }),
+    ).toBe(false);
+    // Feeders stay three-phase regardless of a stray override.
+    expect(
+      circuitIsThreePhase({ panelSystem: '3ph', kind: 'feeder', loadW: 100, forcePhase: '1ph' }),
+    ).toBe(true);
+  });
+
   it('balances single-phase circuits across L1/L2/L3', () => {
     const b = balancePhases(
       [

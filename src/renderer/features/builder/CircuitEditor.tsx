@@ -249,7 +249,27 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             onChange={(v) => patch({ breakerOverrideA: v && v !== 'auto' ? Number(v) : undefined })}
           />
         </SimpleGrid>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+          <Select
+            label={t('circuitEditor.forcePhase')}
+            description={t('circuitEditor.forcePhaseHint')}
+            data={[
+              { value: 'auto', label: t('circuitEditor.phaseAuto') },
+              { value: '1ph', label: t('circuitEditor.phase1') },
+              { value: '3ph', label: t('circuitEditor.phase3') },
+            ]}
+            value={circuit.forcePhase ?? 'auto'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            styles={
+              circuit.forcePhase !== undefined
+                ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                : undefined
+            }
+            onChange={(v) =>
+              patch({ forcePhase: v && v !== 'auto' ? (v as CircuitInput['forcePhase']) : undefined })
+            }
+          />
           <Select
             label={t('circuitEditor.phasePin')}
             description={t('circuitEditor.phasePinHint')}

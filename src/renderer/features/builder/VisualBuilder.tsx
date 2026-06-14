@@ -20,6 +20,7 @@ import {
   IconCircuitSwitchOpen,
   IconDroplet,
   IconEngine,
+  IconFlame,
   IconHandMove,
   IconPlug,
   IconPlugConnected,
@@ -28,7 +29,7 @@ import {
   IconSolarPanel,
   IconSparkles,
 } from '@tabler/icons-react';
-import type { CircuitInput, LoadKind, PanelInput, PanelResult, SourcesResult } from '@shared/types';
+import type { CircuitInput, LoadKind, PanelInput, PanelResult, SourcesResult, SystemType } from '@shared/types';
 import { STANDARD_BREAKER_RATINGS_A } from '@shared/standards';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { balancePhases, type PhaseCircuit } from '@shared/engine';
@@ -53,7 +54,7 @@ import { useSystemResult } from '@renderer/state/useSystemResult';
 type PaletteAction =
   | { type: 'load'; loadKind: LoadKind; defaults: Partial<CircuitInput>; nameKey: string }
   | { type: 'spare' }
-  | { type: 'subpanel' }
+  | { type: 'subpanel'; system?: SystemType }
   | { type: 'connectPanel'; childPanelId: string }
   | { type: 'source'; kind: SourceKind }
   | { type: 'supply'; sourceType: PanelInput['sourceType'] };
@@ -98,14 +99,47 @@ const PALETTE: PaletteGroup[] = [
         },
       },
       {
-        key: 'hvac',
-        labelKey: 'vbuilder.hvac',
+        key: 'hvac1ph',
+        labelKey: 'vbuilder.hvac1ph',
         icon: <IconAirConditioning size={16} />,
         action: {
           type: 'load',
           loadKind: 'hvac',
-          nameKey: 'vbuilder.hvac',
-          defaults: { loadW: 5500, cosPhi: 0.9 },
+          nameKey: 'vbuilder.hvac1ph',
+          defaults: { loadW: 2500, cosPhi: 0.9, forcePhase: '1ph' },
+        },
+      },
+      {
+        key: 'hvac3ph',
+        labelKey: 'vbuilder.hvac3ph',
+        icon: <IconAirConditioning size={16} />,
+        action: {
+          type: 'load',
+          loadKind: 'hvac',
+          nameKey: 'vbuilder.hvac3ph',
+          defaults: { loadW: 5500, cosPhi: 0.9, forcePhase: '3ph' },
+        },
+      },
+      {
+        key: 'waterHeater1ph',
+        labelKey: 'vbuilder.waterHeater1ph',
+        icon: <IconFlame size={16} />,
+        action: {
+          type: 'load',
+          loadKind: 'heating',
+          nameKey: 'vbuilder.waterHeater1ph',
+          defaults: { loadW: 3000, cosPhi: 1, forcePhase: '1ph' },
+        },
+      },
+      {
+        key: 'waterHeater3ph',
+        labelKey: 'vbuilder.waterHeater3ph',
+        icon: <IconFlame size={16} />,
+        action: {
+          type: 'load',
+          loadKind: 'heating',
+          nameKey: 'vbuilder.waterHeater3ph',
+          defaults: { loadW: 9000, cosPhi: 1, forcePhase: '3ph' },
         },
       },
       {
@@ -131,14 +165,25 @@ const PALETTE: PaletteGroup[] = [
         },
       },
       {
-        key: 'ev',
-        labelKey: 'vbuilder.ev',
+        key: 'ev1ph',
+        labelKey: 'vbuilder.ev1ph',
         icon: <IconChargingPile size={16} />,
         action: {
           type: 'load',
           loadKind: 'ev_charger',
-          nameKey: 'vbuilder.ev',
-          defaults: { loadW: 7400, cosPhi: 0.98 },
+          nameKey: 'vbuilder.ev1ph',
+          defaults: { loadW: 7400, cosPhi: 0.98, forcePhase: '1ph' },
+        },
+      },
+      {
+        key: 'ev3ph',
+        labelKey: 'vbuilder.ev3ph',
+        icon: <IconChargingPile size={16} />,
+        action: {
+          type: 'load',
+          loadKind: 'ev_charger',
+          nameKey: 'vbuilder.ev3ph',
+          defaults: { loadW: 22000, cosPhi: 0.98, forcePhase: '3ph' },
         },
       },
       {
@@ -164,10 +209,16 @@ const PALETTE: PaletteGroup[] = [
         action: { type: 'spare' },
       },
       {
-        key: 'subpanel',
-        labelKey: 'vbuilder.subpanel',
+        key: 'subpanel3ph',
+        labelKey: 'vbuilder.subpanel3ph',
         icon: <IconSitemap size={16} />,
-        action: { type: 'subpanel' },
+        action: { type: 'subpanel', system: '3ph' },
+      },
+      {
+        key: 'subpanel1ph',
+        labelKey: 'vbuilder.subpanel1ph',
+        icon: <IconSitemap size={16} />,
+        action: { type: 'subpanel', system: '1ph' },
       },
     ],
   },
@@ -722,7 +773,7 @@ export function VisualBuilder({ panel, result }: { panel: PanelInput; result: Pa
         notifications.show({ message: t('vbuilder.added', { name: t('vbuilder.spare') }), color: 'teal' });
         break;
       case 'subpanel':
-        addSubPanel(panel.id);
+        addSubPanel(panel.id, action.system);
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
         break;
       case 'connectPanel': {
