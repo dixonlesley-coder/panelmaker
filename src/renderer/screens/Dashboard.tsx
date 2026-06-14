@@ -50,6 +50,13 @@ export function Dashboard() {
     [profile],
   );
   const series = profile.byPanel.map((p, i) => ({ name: p.name, color: PALETTE[i % PALETTE.length]! }));
+  // Tie the peak-contributor bars back to the stacked-area chart: each panel keeps
+  // the same legend colour in both places.
+  const panelColor = useMemo(() => {
+    const m = new Map<string, string>();
+    profile.byPanel.forEach((p, i) => m.set(p.name, PALETTE[i % PALETTE.length]!));
+    return m;
+  }, [profile]);
 
   const solarKwh = system.sources?.solar?.dailyKwh ?? 0;
   const offsetPct = profile.dailyKwh > 0 ? Math.min(100, (solarKwh / profile.dailyKwh) * 100) : 0;
@@ -150,7 +157,7 @@ export function Dashboard() {
                         <Progress
                           value={(c.kw / profile.peakKw) * 100}
                           w={90}
-                          color="indigo"
+                          color={panelColor.get(c.panelName) ?? 'indigo.6'}
                           size="sm"
                         />
                         <Text size="sm" fw={600} w={56} ta="right">

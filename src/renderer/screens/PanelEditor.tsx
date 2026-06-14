@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Alert, Card, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
+import { Alert, Badge, Card, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
 import {
   IconAlertTriangle,
   IconBulb,
@@ -61,6 +61,7 @@ export function PanelEditor() {
   }
 
   const issueCount = result.warnings.length;
+  const errorCount = result.warnings.filter((w) => w.severity === 'error').length;
 
   return (
     <Stack gap="md">
@@ -148,9 +149,16 @@ export function PanelEditor() {
               leftSection={<IconListDetails size={16} />}
               rightSection={
                 issueCount > 0 ? (
-                  <Text size="xs" c="orange" fw={700}>
+                  // Same count badge as the canvas-toolbar Issues chip: filled
+                  // (red) when any error blocks, light (orange) for advisories.
+                  <Badge
+                    size="xs"
+                    circle
+                    variant={errorCount > 0 ? 'filled' : 'light'}
+                    color={errorCount > 0 ? 'red' : 'orange'}
+                  >
                     {issueCount}
-                  </Text>
+                  </Badge>
                 ) : null
               }
             >

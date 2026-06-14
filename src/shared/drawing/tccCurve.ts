@@ -216,16 +216,38 @@ export function buildTccSvg(input: BuildTccInput): string {
         `<polyline points="${pts}" fill="none" stroke="${colour}" stroke-width="1.6"/>`,
       );
     }
-    // Legend swatch + label, stacked at top-right inside the plot.
-    const ly = plotY0 + 6 + idx * (MIN_FONT * 1.8);
-    const lx = plotX1 - 140;
-    parts.push(
-      `<line x1="${n(lx)}" y1="${n(ly + MIN_FONT)}" x2="${n(lx + 18)}" y2="${n(ly + MIN_FONT)}" stroke="${colour}" stroke-width="1.6"/>`,
-    );
-    parts.push(
-      `<text x="${n(lx + 24)}" y="${n(ly + MIN_FONT * 1.4)}" font-size="${n(MIN_FONT * 1.3)}" fill="${INK}">${escapeXml(dev.label)}</text>`,
-    );
   });
+
+  // --- Legend (top-right), on its own inset panel so it never collides with the
+  //     gridlines, with text sized to match the axis ticks. ---
+  if (input.devices.length > 0) {
+    const legendFont = MIN_FONT * 1.4; // align to the axis tick size
+    const rowH = legendFont * 1.7;
+    const padX = 8;
+    const padY = 6;
+    const swatchW = 18;
+    const gap = 6;
+    // Rough glyph-width estimate for the widest label sets the panel width.
+    const maxLabelLen = Math.max(...input.devices.map((d) => d.label.length));
+    const boxW = padX * 2 + swatchW + gap + maxLabelLen * legendFont * 0.56;
+    const boxH = padY * 2 + input.devices.length * rowH;
+    const boxX = plotX1 - boxW - 8;
+    const boxY = plotY0 + 8;
+    parts.push(
+      `<rect x="${n(boxX)}" y="${n(boxY)}" width="${n(boxW)}" height="${n(boxH)}" rx="3" fill="#ffffff" fill-opacity="0.92" stroke="${GRID}" stroke-width="1"/>`,
+    );
+    input.devices.forEach((dev, idx) => {
+      const colour = DEVICE_COLOURS[idx % DEVICE_COLOURS.length] ?? INK;
+      const cy = boxY + padY + idx * rowH + rowH / 2;
+      const sx = boxX + padX;
+      parts.push(
+        `<line x1="${n(sx)}" y1="${n(cy)}" x2="${n(sx + swatchW)}" y2="${n(cy)}" stroke="${colour}" stroke-width="1.6"/>`,
+      );
+      parts.push(
+        `<text x="${n(sx + swatchW + gap)}" y="${n(cy + legendFont * 0.35)}" font-size="${n(legendFont)}" fill="${INK}">${escapeXml(dev.label)}</text>`,
+      );
+    });
+  }
 
   // --- Optional prospective-fault vertical line. ---
   if (input.faultA !== undefined && Number.isFinite(input.faultA) && input.faultA > 0) {
@@ -233,8 +255,13 @@ export function buildTccSvg(input: BuildTccInput): string {
     parts.push(
       `<line x1="${n(fx)}" y1="${n(plotY0)}" x2="${n(fx)}" y2="${n(plotY1)}" stroke="${FAULT}" stroke-width="1.4" stroke-dasharray="6 4"/>`,
     );
+    // Label sits low on the line (clear of the legend) and flips to the left of
+    // the line when the fault is near the right frame so it never clips.
+    const nearRight = fx > plotX1 - 56;
+    const lx = nearRight ? fx - 6 : fx + 6;
+    const anchor = nearRight ? 'end' : 'start';
     parts.push(
-      `<text x="${n(fx + 4)}" y="${n(plotY0 + MIN_FONT * 1.6)}" font-size="${n(MIN_FONT * 1.3)}" fill="${FAULT}">Ik ${escapeXml(tickLabel(input.faultA))}A</text>`,
+      `<text x="${n(lx)}" y="${n(plotY1 - MIN_FONT * 1.2)}" font-size="${n(MIN_FONT * 1.4)}" text-anchor="${anchor}" fill="${FAULT}">Ik ${escapeXml(tickLabel(input.faultA))}A</text>`,
     );
   }
 

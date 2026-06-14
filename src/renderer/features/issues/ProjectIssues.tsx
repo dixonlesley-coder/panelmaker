@@ -24,6 +24,7 @@ interface IssueRow {
 function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string) => void }) {
   const { t } = useTranslation();
   const applyFix = useProjectStore((s) => s.applyFix);
+  const [expanded, setExpanded] = useState(false);
   const w = row.warning;
 
   const onApply = (fix: SuggestedFix) => {
@@ -50,7 +51,18 @@ function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string
           {w.code}
         </Text>
       </Group>
-      <Text size="sm">{w.message}</Text>
+      {/* Several feeders can raise near-identical long messages (e.g. the same
+          Zs verdict per source); clamp to two lines so the drawer stays scannable,
+          click to read the full text. */}
+      <Text
+        size="sm"
+        lineClamp={expanded ? undefined : 2}
+        title={w.message}
+        style={{ cursor: 'pointer' }}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {w.message}
+      </Text>
       <Group gap="xs" mt="xs">
         {(w.fixes ?? []).map((fix, i) => (
           <Button

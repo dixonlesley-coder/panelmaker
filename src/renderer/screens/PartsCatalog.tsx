@@ -113,7 +113,10 @@ function FamilyFinder() {
                     {m.family.breakingKa !== undefined ? `${m.family.breakingKa} kA` : '—'}
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs" ff="monospace" c="dimmed">
+                    {/* Same monospace treatment as the parts table below — the
+                        representative nature is stated in the finder disclaimer,
+                        so greying it (which read as "no value") is dropped. */}
+                    <Text size="xs" ff="monospace" c={m.family.orderCodeHint ? undefined : 'dimmed'}>
                       {m.family.orderCodeHint ?? '—'}
                     </Text>
                   </Table.Td>

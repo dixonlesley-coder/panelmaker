@@ -102,10 +102,14 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
           <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
             {t('service.supply')}
           </Text>
-          <Group justify="space-between">
-            <Text size="sm">{t('service.phase')}</Text>
+          {/* Label-above + fullWidth, matching every other SegmentedControl in
+              the app (Sources duty/transfer) so the widget reads consistently. */}
+          <div>
+            <Text size="sm" fw={500} mb={4}>
+              {t('service.phase')}
+            </Text>
             <SegmentedControl
-              size="xs"
+              fullWidth
               value={phase}
               onChange={(v) => setPhase(v as '1ph' | '3ph')}
               data={[
@@ -113,7 +117,7 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
                 { value: '3ph', label: t('service.phase3') },
               ]}
             />
-          </Group>
+          </div>
           <Select
             label={t('service.daya')}
             description={
