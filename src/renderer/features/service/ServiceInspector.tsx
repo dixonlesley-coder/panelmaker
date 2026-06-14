@@ -10,7 +10,7 @@
  * so there is no separate model to reconcile.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Anchor,
@@ -57,6 +57,14 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
   const recommended = supply.recommendedDayaVa;
   const contracted = project.meta?.contractedDayaVa;
 
+  // Lightning risk is opt-in: don't show three empty dimension spinners by
+  // default. Auto-revealed once any dimension is set.
+  const hasDims = Boolean(
+    project.site?.buildingLengthM || project.site?.buildingWidthM || project.site?.buildingHeightM,
+  );
+  const [estimateLightning, setEstimateLightning] = useState(hasDims);
+  const showLightning = estimateLightning || hasDims;
+
   const dayaOptions = useMemo(() => {
     const opts = dayaTiers(phaseNum).map((va) => ({
       value: String(va),
@@ -91,7 +99,7 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
       <Stack gap="lg">
         {/* Supply */}
         <Stack gap="xs">
-          <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+          <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
             {t('service.supply')}
           </Text>
           <Group justify="space-between">
@@ -133,7 +141,7 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
 
         {/* Earthing */}
         <Stack gap="xs">
-          <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+          <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
             {t('service.earthing')}
           </Text>
           <Select
@@ -143,6 +151,16 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
             onChange={(v) => v && setEarthingSystem(v as EarthingSystem)}
             allowDeselect={false}
           />
+        </Stack>
+
+        <Divider />
+
+        {/* Lightning & surge — its own section (not "earthing"); the IEC 62305
+            risk screen is opt-in so we don't show three empty dimension fields. */}
+        <Stack gap="xs">
+          <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+            {t('service.lightningSurge')}
+          </Text>
           <Switch
             label={t('service.overhead')}
             checked={project.site?.overheadSupply === true}
@@ -153,41 +171,55 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
             checked={project.site?.externalLps === true}
             onChange={(e) => setSiteConditions({ externalLps: e.currentTarget.checked })}
           />
-          {/* IEC 62305 lightning-risk screening from the building footprint. */}
-          <Text size="xs" c="dimmed" mt={4}>
-            {t('service.lightning')}
-          </Text>
-          <SimpleGrid cols={3} spacing="xs">
-            <NumberInput
-              label={t('service.bL')}
-              min={0}
-              value={project.site?.buildingLengthM ?? ''}
-              onChange={(v) => setSiteConditions({ buildingLengthM: typeof v === 'number' ? v : undefined })}
-            />
-            <NumberInput
-              label={t('service.bW')}
-              min={0}
-              value={project.site?.buildingWidthM ?? ''}
-              onChange={(v) => setSiteConditions({ buildingWidthM: typeof v === 'number' ? v : undefined })}
-            />
-            <NumberInput
-              label={t('service.bH')}
-              min={0}
-              value={project.site?.buildingHeightM ?? ''}
-              onChange={(v) => setSiteConditions({ buildingHeightM: typeof v === 'number' ? v : undefined })}
-            />
-          </SimpleGrid>
-          {system.lightningRisk && (
-            <Group gap="xs">
-              <Badge size="sm" variant="light" color={system.lightningRisk.lpsRequired ? 'orange' : 'teal'}>
-                {system.lightningRisk.lpsRequired
-                  ? t('service.lpsLevel', { level: system.lightningRisk.level })
-                  : t('service.lpsNone')}
-              </Badge>
-              <Text size="xs" c="dimmed">
-                {t('service.lpsEvents', { n: system.lightningRisk.eventsPerYear })}
-              </Text>
-            </Group>
+          <Switch
+            label={t('service.estimateLightning')}
+            description={t('service.estimateLightningHint')}
+            checked={showLightning}
+            onChange={(e) => {
+              setEstimateLightning(e.currentTarget.checked);
+              if (!e.currentTarget.checked) {
+                setSiteConditions({ buildingLengthM: undefined, buildingWidthM: undefined, buildingHeightM: undefined });
+              }
+            }}
+          />
+          {showLightning && (
+            <>
+              <SimpleGrid cols={3} spacing="xs">
+                <NumberInput
+                  label={t('service.bL')}
+                  min={0}
+                  hideControls
+                  value={project.site?.buildingLengthM ?? ''}
+                  onChange={(v) => setSiteConditions({ buildingLengthM: typeof v === 'number' ? v : undefined })}
+                />
+                <NumberInput
+                  label={t('service.bW')}
+                  min={0}
+                  hideControls
+                  value={project.site?.buildingWidthM ?? ''}
+                  onChange={(v) => setSiteConditions({ buildingWidthM: typeof v === 'number' ? v : undefined })}
+                />
+                <NumberInput
+                  label={t('service.bH')}
+                  min={0}
+                  hideControls
+                  value={project.site?.buildingHeightM ?? ''}
+                  onChange={(v) => setSiteConditions({ buildingHeightM: typeof v === 'number' ? v : undefined })}
+                />
+              </SimpleGrid>
+              {system.lightningRisk && (
+                <Group gap="xs">
+                  <Badge size="sm" variant="light" color={system.lightningRisk.lpsRequired ? 'orange' : 'teal'}>
+                    {system.lightningRisk.lpsRequired
+                      ? t('service.lpsLevel', { level: system.lightningRisk.level })
+                      : t('service.lpsNone')}
+                  </Badge>
+                  <Text size="xs" c="dimmed">
+                    {t('service.lpsEvents', { n: system.lightningRisk.eventsPerYear })}
+                  </Text>
+                </Group>
+              )}
+            </>
           )}
         </Stack>
 
@@ -195,7 +227,7 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
 
         {/* Building + power factor */}
         <Stack gap="xs">
-          <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+          <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
             {t('service.building')}
           </Text>
           <Select
@@ -223,7 +255,7 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
         {/* Energy sources (quick toggles) */}
         <Stack gap="xs">
           <Group justify="space-between">
-            <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+            <Text size="sm" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
               {t('service.sources')}
             </Text>
             <Anchor size="xs" onClick={() => { onClose(); setScreen('sources'); }}>

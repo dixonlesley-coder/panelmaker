@@ -210,7 +210,7 @@ export function SystemView() {
             <Menu.Target>
               <Button
                 size="xs"
-                variant="light"
+                variant="default"
                 leftSection={<IconPackageExport size={14} />}
                 rightSection={<IconChevronDown size={14} />}
               >

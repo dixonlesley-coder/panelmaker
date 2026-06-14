@@ -215,12 +215,15 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
     <>
       <Button
         size="xs"
-        variant="light"
+        // A status control, not a primary action — keep it quiet (subtle), and
+        // reserve a FILLED count badge for genuinely blocking errors; advisory
+        // warnings get a light badge so the toolbar stays calm.
+        variant="subtle"
         color={color}
         leftSection={total > 0 ? <IconAlertTriangle size={14} /> : <IconCircleCheck size={14} />}
         rightSection={
           total > 0 ? (
-            <Badge size="xs" circle variant="filled" color={color}>
+            <Badge size="xs" circle variant={errors > 0 ? 'filled' : 'light'} color={color}>
               {total}
             </Badge>
           ) : undefined
