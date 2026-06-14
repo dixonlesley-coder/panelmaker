@@ -34,6 +34,7 @@ const STAGE: Record<PowerNodeKind, number> = {
   'pv-inverter': 1,
   'battery-inverter': 1,
   ats: 2,
+  'hybrid-inverter': 2,
   bus: 3,
   'main-panel': 4,
 };
@@ -48,6 +49,7 @@ const LANE: Record<string, number> = {
   pvinv: 2,
   batt: 3,
   battinv: 3,
+  hinv: 1.5,
   bus: 1.5,
   main: 1.5,
 };
@@ -64,6 +66,7 @@ const KIND_ICON: Record<PowerNodeKind, React.ReactNode> = {
   'pv-inverter': <IconBox size={16} />,
   battery: <IconBattery size={16} />,
   'battery-inverter': <IconBox size={16} />,
+  'hybrid-inverter': <IconBox size={16} />,
   bus: <IconBolt size={16} />,
   'main-panel': <IconBox size={16} />,
 };
@@ -77,6 +80,7 @@ const KIND_COLOR: Record<PowerNodeKind, string> = {
   'pv-inverter': 'teal',
   battery: 'green',
   'battery-inverter': 'teal',
+  'hybrid-inverter': 'teal',
   bus: 'indigo',
   'main-panel': 'gray',
 };
@@ -172,7 +176,8 @@ export function PowerOneline({ system }: { system: SystemResult }) {
       kind === 'pv' ||
       kind === 'pv-inverter' ||
       kind === 'battery' ||
-      kind === 'battery-inverter'
+      kind === 'battery-inverter' ||
+      kind === 'hybrid-inverter'
     ) {
       setScreen('sources');
     }
@@ -186,16 +191,28 @@ export function PowerOneline({ system }: { system: SystemResult }) {
       data: { kind: n.kind, label: n.label, sub: n.sub },
     }));
 
-    const rfEdges: Edge[] = ol.edges.map((e) => ({
-      id: e.id,
-      source: e.from,
-      target: e.to,
-      sourceHandle: 'r',
-      targetHandle: 'l',
-      type: 'smoothstep',
-      label: e.label,
-      animated: e.label === 'mains' || e.label === 'genset' || e.label === 'AC',
-    }));
+    const AC_FLOW = new Set(['mains', 'genset', 'AC', 'AC grid']);
+    const rfEdges: Edge[] = ol.edges.map((e) => {
+      const isDc = e.label === 'DC';
+      return {
+        id: e.id,
+        source: e.from,
+        target: e.to,
+        sourceHandle: 'r',
+        targetHandle: 'l',
+        type: 'smoothstep',
+        label: e.label,
+        // AC power flows animate; DC links (PV/battery → inverter) read as a
+        // distinct dashed amber pair so the wiring is unambiguous on the canvas.
+        animated: e.label !== undefined && AC_FLOW.has(e.label),
+        ...(isDc
+          ? {
+              style: { stroke: 'var(--mantine-color-yellow-6)', strokeDasharray: '5 4' },
+              labelStyle: { fill: 'var(--mantine-color-yellow-7)', fontWeight: 700 },
+            }
+          : {}),
+      };
+    });
 
     // interlock connectors (dashed, vertical) for mutual-exclusion pairs (the ATS)
     const seen = new Set<string>();

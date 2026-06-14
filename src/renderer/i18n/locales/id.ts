@@ -296,6 +296,8 @@ export const id: TranslationKeys = {
     eyebrow: 'Editor panel',
     title: 'Editor panel',
     activePanel: 'Panel aktif',
+    moveUp: 'Pindahkan panel lebih awal',
+    moveDown: 'Pindahkan panel lebih akhir',
     occupancy: 'Peruntukan',
     occupancyPlaceholder: 'Belum diatur',
     occupancyHint: 'Menerapkan preset diversitas / kebutuhan standar',
@@ -737,6 +739,10 @@ export const id: TranslationKeys = {
     required: 'Dibutuhkan',
     installed: 'Terpasang',
     modules: 'Modul',
+    hybridInverter: 'Inverter hibrida tunggal',
+    hybridInverterHint:
+      'Gabungkan array surya (DC), baterai (DC), dan jaringan PLN (AC) ke dalam satu inverter multi-mode yang memasok rel, alih-alih inverter terpisah per sumber. Diagram satu-garis daya akan menggambar ulang inverter bersama dan koneksinya.',
+    combinedInverter: 'Inverter gabungan',
   },
 
   quotation: {

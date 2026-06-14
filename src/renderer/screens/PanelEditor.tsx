@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Alert, Card, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Alert, Card, Group, Select, Stack, Tabs, Text, TextInput, Tooltip } from '@mantine/core';
 import {
   IconAlertTriangle,
+  IconArrowDown,
+  IconArrowUp,
   IconBulb,
   IconDragDrop,
   IconColumns,
@@ -39,6 +41,7 @@ export function PanelEditor() {
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
   const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
   const updatePanel = useProjectStore((s) => s.updatePanel);
+  const movePanel = useProjectStore((s) => s.movePanel);
 
   // Compute the whole system so feeder loads aggregate correctly, then pick this panel.
   const system = useSystemResult();
@@ -47,6 +50,7 @@ export function PanelEditor() {
   const result = panel ? system.panels[panel.id] : undefined;
 
   const panelOptions = project.panels.map((p) => ({ value: p.id, label: panelLabel(p) }));
+  const panelIndex = project.panels.findIndex((p) => p.id === activePanelId);
   const occupancyOptions = OCCUPANCY_TYPES.map((o) => ({
     value: o,
     label: OCCUPANCY_PRESETS[o].label,
@@ -116,14 +120,40 @@ export function PanelEditor() {
             onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
             w={210}
           />
-          <Select
-            label={t('panel.activePanel')}
-            data={panelOptions}
-            value={activePanelId}
-            allowDeselect={false}
-            onChange={(v) => v && setActivePanel(v)}
-            w={240}
-          />
+          <Group gap={4} align="flex-end">
+            <Select
+              label={t('panel.activePanel')}
+              data={panelOptions}
+              value={activePanelId}
+              allowDeselect={false}
+              onChange={(v) => v && setActivePanel(v)}
+              w={240}
+            />
+            {/* Reorder the active panel within the project: drives the selector
+                order, the building single-line layout and the report order. */}
+            <Tooltip label={t('panel.moveUp')} withArrow>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('panel.moveUp')}
+                disabled={panelIndex <= 0}
+                onClick={() => movePanel(activePanelId, 'up')}
+              >
+                <IconArrowUp size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('panel.moveDown')} withArrow>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('panel.moveDown')}
+                disabled={panelIndex < 0 || panelIndex >= project.panels.length - 1}
+                onClick={() => movePanel(activePanelId, 'down')}
+              >
+                <IconArrowDown size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
       </Group>
 

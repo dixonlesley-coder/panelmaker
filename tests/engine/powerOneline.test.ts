@@ -56,20 +56,57 @@ describe('computePowerOneline', () => {
     expect(ats.every((i) => i.relation === 'mutual_exclusion')).toBe(true);
   });
 
-  it('solar + battery add inverters and their interlocks (hybrid note)', () => {
+  it('solar + battery default to ONE hybrid inverter (PV+battery DC, grid AC) feeding the bus', () => {
+    const sys = computeSystem(
+      projectWith({
+        solar: { enabled: true, targetKwp: 30, panelWp: 550, dcAcRatio: 1.2 },
+        battery: { enabled: true, backupKw: 10, autonomyHours: 4, chemistry: 'lifepo4' },
+      }),
+    );
+    expect(sys.sources?.hybridInverter).toBe(true);
+    expect(sys.sources?.hybridInverterKw).toBeGreaterThan(0);
+
+    const ol = computePowerOneline(sys);
+    // A single hybrid inverter, no separate per-source inverters.
+    expect(ol.nodes.filter((n) => n.kind === 'hybrid-inverter')).toHaveLength(1);
+    expect(ol.nodes.some((n) => n.kind === 'pv-inverter')).toBe(false);
+    expect(ol.nodes.some((n) => n.kind === 'battery-inverter')).toBe(false);
+    // PV and battery couple via DC; the grid couples via AC; the inverter feeds the bus.
+    expect(ol.edges.some((e) => e.from === 'pv' && e.to === 'hinv' && e.label === 'DC')).toBe(true);
+    expect(ol.edges.some((e) => e.from === 'batt' && e.to === 'hinv' && e.label === 'DC')).toBe(true);
+    expect(ol.edges.some((e) => e.from === 'utility' && e.to === 'hinv')).toBe(true);
+    expect(ol.edges.some((e) => e.from === 'hinv' && e.to === 'bus' && e.label === 'AC')).toBe(true);
+    // The grid no longer feeds the bus directly — everything goes through the inverter.
+    expect(ol.edges.some((e) => e.from === 'utility' && e.to === 'bus')).toBe(false);
+    expect(ol.interlocks.some((i) => i.id === 'il-hybrid')).toBe(true);
+  });
+
+  it('hybridInverter:false forces separate per-source inverters with their own interlocks', () => {
     const ol = computePowerOneline(
       computeSystem(
         projectWith({
+          hybridInverter: false,
           solar: { enabled: true, targetKwp: 30, panelWp: 550, dcAcRatio: 1.2 },
           battery: { enabled: true, backupKw: 10, autonomyHours: 4, chemistry: 'lifepo4' },
         }),
       ),
     );
+    expect(ol.nodes.some((n) => n.kind === 'hybrid-inverter')).toBe(false);
     expect(ol.nodes.some((n) => n.kind === 'pv-inverter')).toBe(true);
     expect(ol.nodes.some((n) => n.kind === 'battery-inverter')).toBe(true);
     expect(ol.interlocks.some((i) => i.id === 'il-pv')).toBe(true);
     expect(ol.interlocks.some((i) => i.id === 'il-batt')).toBe(true);
     expect(ol.interlocks.find((i) => i.id === 'il-pv')?.note).toContain('Hybrid');
+  });
+
+  it('solar-only keeps its own grid-tied inverter (no hybrid without a battery)', () => {
+    const sys = computeSystem(
+      projectWith({ solar: { enabled: true, targetKwp: 30, panelWp: 550, dcAcRatio: 1.2 } }),
+    );
+    expect(sys.sources?.hybridInverter).toBeUndefined();
+    const ol = computePowerOneline(sys);
+    expect(ol.nodes.some((n) => n.kind === 'pv-inverter')).toBe(true);
+    expect(ol.nodes.some((n) => n.kind === 'hybrid-inverter')).toBe(false);
   });
 
   it('MV supply inserts a transformer', () => {
