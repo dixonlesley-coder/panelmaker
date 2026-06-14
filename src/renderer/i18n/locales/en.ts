@@ -372,6 +372,8 @@ export const en = {
     eyebrow: 'Panel editor',
     title: 'Panel editor',
     activePanel: 'Active panel',
+    moveUp: 'Move panel earlier',
+    moveDown: 'Move panel later',
     occupancy: 'Occupancy',
     occupancyPlaceholder: 'Not set',
     occupancyHint: 'Applies standard diversity / demand presets',
@@ -943,6 +945,10 @@ export const en = {
     required: 'Required',
     installed: 'Installed',
     modules: 'Modules',
+    hybridInverter: 'Single hybrid inverter',
+    hybridInverterHint:
+      'Combine the solar array (DC), the battery (DC) and the grid (AC) into one multi-mode inverter feeding the bus, instead of a separate inverter per source. The power one-line redraws the shared inverter and its connections.',
+    combinedInverter: 'Combined inverter',
   },
 
   quotation: {

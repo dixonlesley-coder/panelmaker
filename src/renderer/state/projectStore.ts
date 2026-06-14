@@ -249,6 +249,15 @@ export interface ProjectState {
    * "(copy)" names, feeder links stripped — one undoable step.
    */
   pasteCircuits: (items: { panelId: string; circuit: CircuitInput }[]) => void;
+  /**
+   * Reorder the project's panels to match `orderedIds` (the new top-to-bottom /
+   * left-to-right sequence). Ids not present keep their relative order at the end;
+   * unknown ids are ignored. One undoable step. Drives the panel selector order,
+   * the building single-line layout within each feeder depth, and report order.
+   */
+  reorderPanels: (orderedIds: string[]) => void;
+  /** Nudge a single panel one slot earlier/later in the project's panel order. */
+  movePanel: (panelId: string, direction: 'up' | 'down') => void;
 
   // fixes
   applyFix: (panelId: string, circuitId: string, fix: SuggestedFix) => void;
@@ -998,6 +1007,37 @@ export const useProjectStore = create<ProjectState>((set) => ({
         activePanelId: newPanel.id,
         activeScreen: 'system',
       };
+    }),
+
+  reorderPanels: (orderedIds) =>
+    set((s) => {
+      const rank = new Map(orderedIds.map((id, i) => [id, i] as const));
+      // Stable sort by the requested rank; panels absent from orderedIds
+      // (rank = +Infinity) keep their existing relative position at the end.
+      const panels = s.project.panels
+        .map((p, i) => ({ p, i }))
+        .sort((a, b) => {
+          const ra = rank.get(a.p.id) ?? Number.POSITIVE_INFINITY;
+          const rb = rank.get(b.p.id) ?? Number.POSITIVE_INFINITY;
+          return ra === rb ? a.i - b.i : ra - rb;
+        })
+        .map((x) => x.p);
+      // No change — leave state untouched so a stray reorder doesn't churn the
+      // undo stack or mark the project dirty.
+      if (panels.every((p, i) => p === s.project.panels[i])) return s;
+      return withHistory(s, (project) => ({ ...project, panels }));
+    }),
+
+  movePanel: (panelId, direction) =>
+    set((s) => {
+      const from = s.project.panels.findIndex((p) => p.id === panelId);
+      if (from === -1) return s;
+      const to = direction === 'up' ? from - 1 : from + 1;
+      if (to < 0 || to >= s.project.panels.length) return s;
+      const panels = [...s.project.panels];
+      const [moved] = panels.splice(from, 1);
+      if (moved) panels.splice(to, 0, moved);
+      return withHistory(s, (project) => ({ ...project, panels }));
     }),
 
   setPanelOccupancy: (panelId, occupancy) =>

@@ -43,6 +43,15 @@ export interface SourcesConfig {
   generator?: GeneratorConfig;
   solar?: SolarConfig;
   battery?: BatteryConfig;
+  /**
+   * Topology of the DC-coupled sources. A hybrid (multi-mode) inverter combines
+   * the solar array (MPPT input), the battery (DC port) and the grid (AC port)
+   * into ONE unit feeding the bus, instead of a separate string inverter per
+   * source. Undefined = auto: a single hybrid inverter whenever both solar and
+   * battery are present (the usual PV + storage + PLN arrangement); set `false`
+   * to force separate per-source inverters.
+   */
+  hybridInverter?: boolean;
 }
 
 export interface GeneratorResult {
@@ -104,4 +113,13 @@ export interface SourcesResult {
   gensetStart?: GensetStartResult;
   solar?: SolarResult;
   battery?: BatteryResult;
+  /**
+   * True when the DC sources (solar + battery) and the grid are combined into a
+   * single hybrid inverter rather than separate per-source inverters. Resolved
+   * from {@link SourcesConfig.hybridInverter} (auto = on when both PV and battery
+   * are present).
+   */
+  hybridInverter?: boolean;
+  /** Continuous AC rating of the combined hybrid inverter (kW), when hybrid. */
+  hybridInverterKw?: number;
 }

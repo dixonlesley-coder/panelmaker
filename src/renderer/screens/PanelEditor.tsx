@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Alert, Badge, Card, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Alert, Badge, Card, Group, Select, Stack, Tabs, Text, TextInput, Tooltip } from '@mantine/core';
 import {
   IconAlertTriangle,
+  IconArrowDown,
+  IconArrowUp,
   IconBulb,
   IconColumns,
   IconCpu,
@@ -36,6 +38,7 @@ export function PanelEditor() {
   const activePanelId = useProjectStore((s) => s.activePanelId);
   const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
   const updatePanel = useProjectStore((s) => s.updatePanel);
+  const movePanel = useProjectStore((s) => s.movePanel);
 
   // Compute the whole system so feeder loads aggregate correctly, then pick this panel.
   const system = useSystemResult();
@@ -43,6 +46,7 @@ export function PanelEditor() {
   const panel = project.panels.find((p) => p.id === activePanelId);
   const result = panel ? system.panels[panel.id] : undefined;
 
+  const panelIndex = project.panels.findIndex((p) => p.id === activePanelId);
   const occupancyOptions = OCCUPANCY_TYPES.map((o) => ({
     value: o,
     label: OCCUPANCY_PRESETS[o].label,
@@ -102,18 +106,45 @@ export function PanelEditor() {
             />
           </Group>
         </div>
-        {/* You opened THIS panel deliberately — switch panels on the canvas, not
-            from a redundant in-drawer picker. Occupancy stays (it's panel-level). */}
-        <Select
-          label={t('panel.occupancy')}
-          placeholder={t('panel.occupancyPlaceholder')}
-          description={t('panel.occupancyHint')}
-          data={occupancyOptions}
-          value={panel.occupancy ?? null}
-          clearable
-          onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
-          w={210}
-        />
+        <Group gap="sm" align="flex-end">
+          <Select
+            label={t('panel.occupancy')}
+            placeholder={t('panel.occupancyPlaceholder')}
+            description={t('panel.occupancyHint')}
+            data={occupancyOptions}
+            value={panel.occupancy ?? null}
+            clearable
+            onChange={(v) => setPanelOccupancy(panel.id, (v as OccupancyType | null) ?? undefined)}
+            w={210}
+          />
+          {/* Reorder THIS panel within the project (panels are switched on the
+              canvas, not here): drives the building single-line layout within
+              each feeder depth and the report order. */}
+          <Group gap={4} align="flex-end">
+            <Tooltip label={t('panel.moveUp')} withArrow>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('panel.moveUp')}
+                disabled={panelIndex <= 0}
+                onClick={() => movePanel(panel.id, 'up')}
+              >
+                <IconArrowUp size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('panel.moveDown')} withArrow>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                aria-label={t('panel.moveDown')}
+                disabled={panelIndex < 0 || panelIndex >= project.panels.length - 1}
+                onClick={() => movePanel(panel.id, 'down')}
+              >
+                <IconArrowDown size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </Group>
       </Group>
 
       <Card withBorder radius="md" padding="md">

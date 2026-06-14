@@ -12,7 +12,7 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core';
-import { IconBattery, IconBolt, IconSun } from '@tabler/icons-react';
+import { IconBattery, IconBolt, IconBox, IconSun } from '@tabler/icons-react';
 import type { BatteryConfig, GeneratorConfig, GeneratorMode, SolarConfig } from '@shared/types';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
@@ -90,6 +90,11 @@ export function Sources() {
   const setGen = (p: Partial<GeneratorConfig>) => updateSources({ generator: { ...gen, ...p } });
   const setSolar = (p: Partial<SolarConfig>) => updateSources({ solar: { ...solar, ...p } });
   const setBatt = (p: Partial<BatteryConfig>) => updateSources({ battery: { ...batt, ...p } });
+
+  // The hybrid-inverter topology only matters once both DC sources exist; the
+  // default (undefined) auto-resolves to ON when both are enabled.
+  const showHybrid = solar.enabled && batt.enabled;
+  const hybridOn = project.sources?.hybridInverter ?? (solar.enabled && batt.enabled);
 
   return (
     <Stack gap="md">
@@ -332,6 +337,27 @@ export function Sources() {
           </>
         )}
       </Card>
+
+      {/* Inverter topology: combine the DC sources + grid into one hybrid unit. */}
+      {showHybrid && (
+        <Card withBorder radius="md" padding="md">
+          <SourceHeader
+            icon={<IconBox size={16} />}
+            title={t('sources.hybridInverter')}
+            enabled={hybridOn}
+            onToggle={(v) => updateSources({ hybridInverter: v })}
+          />
+          <Text size="xs" c="dimmed" mt="xs">
+            {t('sources.hybridInverterHint')}
+          </Text>
+          {hybridOn && res?.hybridInverterKw !== undefined && (
+            <ResultBlock
+              note=""
+              stats={[[t('sources.combinedInverter'), `${res.hybridInverterKw} kW`]]}
+            />
+          )}
+        </Card>
+      )}
     </Stack>
   );
 }

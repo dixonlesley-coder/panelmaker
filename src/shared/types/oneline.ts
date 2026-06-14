@@ -9,6 +9,7 @@ export type PowerNodeKind =
   | 'pv-inverter'
   | 'battery'
   | 'battery-inverter'
+  | 'hybrid-inverter'
   | 'bus'
   | 'main-panel';
 

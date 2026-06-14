@@ -170,5 +170,21 @@ export function computeSources(
   }
   if (config.solar?.enabled) out.solar = sizeSolar(config.solar);
   if (config.battery?.enabled) out.battery = sizeBattery(config.battery, undefined, critical);
+
+  // Topology: a single hybrid (multi-mode) inverter combines the PV array, the
+  // battery and the grid into one unit. Default to hybrid whenever both DC
+  // sources are present (the usual PV + storage + PLN install); the user can
+  // force separate per-source inverters by setting hybridInverter = false.
+  const solarOn = Boolean(out.solar);
+  const battOn = Boolean(out.battery);
+  const hybrid = (config.hybridInverter ?? (solarOn && battOn)) && (solarOn || battOn);
+  if (hybrid) {
+    out.hybridInverter = true;
+    // The combined unit's continuous AC output must cover the larger of the PV
+    // throughput and the battery discharge power; snap up to a standard size.
+    out.hybridInverterKw = selectInverterKw(
+      Math.max(out.solar?.inverterKw ?? 0, out.battery?.inverterKw ?? 0),
+    );
+  }
   return out;
 }

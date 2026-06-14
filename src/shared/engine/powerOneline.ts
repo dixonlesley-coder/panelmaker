@@ -6,7 +6,8 @@ import type { PowerEdge, PowerInterlock, PowerNode, PowerOneline } from '../type
  * MV through a transformer), an optional generator transferred by an ATS, and
  * grid-tied solar PV and/or battery converging on the main LV bus — together
  * with the source interlocks (mains<->genset mutual exclusion, PV anti-islanding,
- * battery transfer).
+ * battery transfer). When the DC sources share one hybrid (multi-mode) inverter,
+ * the PV array, the battery and the grid all land on a single unit feeding the bus.
  */
 export function computePowerOneline(system: SystemResult): PowerOneline {
   const nodes: PowerNode[] = [];
@@ -60,14 +61,22 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
     utilityOut = 'tx';
   }
 
-  // Generator via ATS, with the mains<->genset interlock. With marked
-  // essential panels the ATS transfers a dedicated ESSENTIAL BUS (fed from the
-  // main bus in normal service); otherwise it transfers the whole building.
+  const solar = system.sources?.solar;
+  const batt = system.sources?.battery;
+  // A single hybrid inverter combines the DC sources + grid into one unit; the
+  // AC source path then feeds that inverter instead of the bus directly.
+  const hybrid = Boolean(system.sources?.hybridInverter);
+
+  // Generator via ATS, with the mains<->genset interlock. With marked essential
+  // panels the ATS transfers a dedicated ESSENTIAL BUS (fed from the main bus in
+  // normal service); otherwise it transfers the whole building. The AC feed that
+  // ultimately reaches the bus (or the hybrid inverter) is `gridOut`.
   const gen = system.sources?.generator;
   const essentialCount = gen?.essentialPanelCount ?? 0;
   // Where backed loads (battery inverter) connect: the essential bus when split.
   let backedBus = 'bus';
   const manualTransfer = gen?.transfer === 'manual';
+  let gridOut = utilityOut;
   if (gen) {
     nodes.push({ id: 'gen', kind: 'generator', label: 'Generator', sub: `${gen.ratingKva} kVA ${gen.mode}` });
     nodes.push(
@@ -75,7 +84,8 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
         ? { id: 'ats', kind: 'ats', label: 'COS', sub: 'manual changeover' }
         : { id: 'ats', kind: 'ats', label: 'ATS', sub: 'transfer switch' },
     );
-    if (essentialCount > 0) {
+    gridOut = 'ats';
+    if (!hybrid && essentialCount > 0) {
       nodes.push({
         id: 'ess-bus',
         kind: 'bus',
@@ -90,7 +100,8 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
     } else {
       edge(utilityOut, 'ats', 'mains');
       edge('gen', 'ats', 'genset');
-      edge('ats', 'bus');
+      // When hybrid, the ATS output feeds the hybrid inverter (handled below).
+      if (!hybrid) edge('ats', 'bus');
     }
     interlocks.push({
       id: 'il-ats-mech',
@@ -112,75 +123,116 @@ export function computePowerOneline(system: SystemResult): PowerOneline {
         ? 'Manual transfer: an operator must start the genset and switch — the backed loads see an outage until then.'
         : 'Cross-wired electrical interlock + break-before-make transfer (mains-failure sensing).',
     });
-  } else {
+  } else if (!hybrid) {
     edge(utilityOut, 'bus', 'mains');
   }
 
-  // Solar PV via inverter (grid-tied), with anti-islanding / hybrid interlock
-  const solar = system.sources?.solar;
-  if (solar) {
-    nodes.push({ id: 'pv', kind: 'pv', label: 'Solar array', sub: `${solar.arrayKwp} kWp` });
-    nodes.push({ id: 'pvinv', kind: 'pv-inverter', label: 'PV inverter', sub: `${solar.inverterKw} kW` });
-    edge('pv', 'pvinv');
-    edge('pvinv', 'bus', 'AC');
+  if (hybrid) {
+    // ONE hybrid (multi-mode) inverter: the PV array (DC/MPPT input), the battery
+    // (DC port) and the grid (AC port) all land on a single unit that feeds the
+    // bus. This is the PV + storage + PLN arrangement drawn as the user expects.
+    const hinvKw = system.sources?.hybridInverterKw;
+    nodes.push({
+      id: 'hinv',
+      kind: 'hybrid-inverter',
+      label: 'Hybrid inverter',
+      ...(hinvKw ? { sub: `${hinvKw} kW` } : {}),
+    });
+    if (solar) {
+      nodes.push({ id: 'pv', kind: 'pv', label: 'Solar array', sub: `${solar.arrayKwp} kWp` });
+      edge('pv', 'hinv', 'DC');
+    }
+    if (batt) {
+      nodes.push({ id: 'batt', kind: 'battery', label: 'Battery', sub: `${batt.installedKwh} kWh` });
+      edge('batt', 'hinv', 'DC');
+    }
+    edge(gridOut, 'hinv', 'AC grid');
+    edge('hinv', 'bus', 'AC');
     interlocks.push({
-      id: 'il-pv',
+      id: 'il-hybrid',
       kind: 'electrical',
-      aId: 'pvinv',
+      aId: 'hinv',
       bId: 'bus',
       relation: 'permissive',
-      note: system.sources?.battery
-        ? 'Hybrid: PV + battery island the essential bus on grid loss.'
-        : 'Anti-islanding: the grid-tied PV inverter disconnects within ~2 s on grid loss.',
+      note: 'Anti-islanding + transfer: the hybrid inverter disconnects export on grid loss and re-feeds the essential bus from PV/battery (island/UPS mode).',
     });
     if (gen) {
       interlocks.push({
-        id: 'il-pv-gen',
+        id: 'il-hybrid-gen',
         kind: 'electrical',
-        aId: 'pvinv',
+        aId: 'hinv',
         bId: 'gen',
         relation: 'permissive',
-        note: 'On generator supply the PV inverter must disconnect or derate — a standby genset cannot absorb reverse PV feed.',
+        note: 'On generator supply the hybrid inverter must stop exporting (charge-only / derate) — a standby genset cannot absorb reverse feed.',
       });
     }
-  }
+  } else {
+    // Separate per-source inverters; the grid already feeds the bus above.
 
-  // Battery via inverter/charger, with transfer/island interlock. With an
-  // essential-bus split the battery backs that bus, not the whole building;
-  // with UPS-backed (critical) panels it feeds a dedicated UPS bus instead.
-  const batt = system.sources?.battery;
-  if (batt) {
-    nodes.push({ id: 'batt', kind: 'battery', label: 'Battery', sub: `${batt.installedKwh} kWh` });
-    nodes.push({ id: 'battinv', kind: 'battery-inverter', label: 'Battery inverter', sub: `${batt.inverterKw} kW` });
-    edge('batt', 'battinv');
-    const critCount = batt.criticalPanelCount ?? 0;
-    if (critCount > 0) {
-      nodes.push({
-        id: 'ups-bus',
-        kind: 'bus',
-        label: 'UPS / critical bus',
-        sub: `${critCount} panel(s) · ${batt.backupKw} kW`,
-      });
-      edge(backedBus, 'battinv', 'charge');
-      edge('battinv', 'ups-bus', 'UPS');
+    // Solar PV via inverter (grid-tied), with anti-islanding / hybrid interlock
+    if (solar) {
+      nodes.push({ id: 'pv', kind: 'pv', label: 'Solar array', sub: `${solar.arrayKwp} kWp` });
+      nodes.push({ id: 'pvinv', kind: 'pv-inverter', label: 'PV inverter', sub: `${solar.inverterKw} kW` });
+      edge('pv', 'pvinv');
+      edge('pvinv', 'bus', 'AC');
       interlocks.push({
-        id: 'il-batt',
+        id: 'il-pv',
         kind: 'electrical',
-        aId: 'battinv',
-        bId: 'ups-bus',
-        relation: 'sequence',
-        note: 'Double-conversion UPS: the critical bus rides the battery through any transfer gap (genset start, ATS changeover).',
+        aId: 'pvinv',
+        bId: 'bus',
+        relation: 'permissive',
+        note: batt
+          ? 'Hybrid: PV + battery island the essential bus on grid loss.'
+          : 'Anti-islanding: the grid-tied PV inverter disconnects within ~2 s on grid loss.',
       });
-    } else {
-      edge('battinv', backedBus, 'AC');
-      interlocks.push({
-        id: 'il-batt',
-        kind: 'electrical',
-        aId: 'battinv',
-        bId: backedBus,
-        relation: 'sequence',
-        note: 'Battery inverter transfers the essential load on outage (UPS / island mode).',
-      });
+      if (gen) {
+        interlocks.push({
+          id: 'il-pv-gen',
+          kind: 'electrical',
+          aId: 'pvinv',
+          bId: 'gen',
+          relation: 'permissive',
+          note: 'On generator supply the PV inverter must disconnect or derate — a standby genset cannot absorb reverse PV feed.',
+        });
+      }
+    }
+
+    // Battery via inverter/charger, with transfer/island interlock. With an
+    // essential-bus split the battery backs that bus, not the whole building;
+    // with UPS-backed (critical) panels it feeds a dedicated UPS bus instead.
+    if (batt) {
+      nodes.push({ id: 'batt', kind: 'battery', label: 'Battery', sub: `${batt.installedKwh} kWh` });
+      nodes.push({ id: 'battinv', kind: 'battery-inverter', label: 'Battery inverter', sub: `${batt.inverterKw} kW` });
+      edge('batt', 'battinv');
+      const critCount = batt.criticalPanelCount ?? 0;
+      if (critCount > 0) {
+        nodes.push({
+          id: 'ups-bus',
+          kind: 'bus',
+          label: 'UPS / critical bus',
+          sub: `${critCount} panel(s) · ${batt.backupKw} kW`,
+        });
+        edge(backedBus, 'battinv', 'charge');
+        edge('battinv', 'ups-bus', 'UPS');
+        interlocks.push({
+          id: 'il-batt',
+          kind: 'electrical',
+          aId: 'battinv',
+          bId: 'ups-bus',
+          relation: 'sequence',
+          note: 'Double-conversion UPS: the critical bus rides the battery through any transfer gap (genset start, ATS changeover).',
+        });
+      } else {
+        edge('battinv', backedBus, 'AC');
+        interlocks.push({
+          id: 'il-batt',
+          kind: 'electrical',
+          aId: 'battinv',
+          bId: backedBus,
+          relation: 'sequence',
+          note: 'Battery inverter transfers the essential load on outage (UPS / island mode).',
+        });
+      }
     }
   }
 
