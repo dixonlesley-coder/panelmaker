@@ -660,14 +660,16 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
             </text>
             <rect x={LEFT} y={b.y - h / 2} width={w} height={h} rx={h / 2} fill={color} filter="url(#sldBarShadow)" />
             <rect x={LEFT + 2} y={b.y - h / 2 + 0.6} width={w - 4} height={1.1} rx={0.5} fill="#fff" opacity={0.45} />
+            {/* N sits just ABOVE its bar, PE just BELOW its bar — the two rails
+                are close, so splitting the labels keeps them from overlapping. */}
             {b.key === 'N' && (
-              <text x={right - 2} y={b.y - 6} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
-                {d.neutralSpec}
+              <text x={right - 2} y={b.y - 7} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
+                N {d.neutralSpec}
               </text>
             )}
             {b.key === 'PE' && (
-              <text x={right - 2} y={b.y - 6} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
-                {d.peSpec}
+              <text x={right - 2} y={b.y + 12} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
+                PE {d.peSpec}
               </text>
             )}
           </g>
@@ -1587,16 +1589,20 @@ function FeederEdge({
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              fontSize: 13,
+              fontSize: 11,
               fontWeight: 700,
+              lineHeight: 1.15,
+              textAlign: 'center',
               background: 'var(--mantine-color-body)',
-              padding: '1px 6px',
+              padding: '1px 5px',
               borderRadius: 4,
-              whiteSpace: 'nowrap',
+              // Drop-cable labels stack onto two lines ("3×1.5 mm²" / "52%") so a
+              // row of narrow loads can't collide; feeder labels stay one line.
+              whiteSpace: data?.stack ? 'pre-line' : 'nowrap',
               ...(color ? { color } : {}),
             }}
           >
-            {label}
+            {data?.stack && typeof label === 'string' ? label.replace(' · ', '\n') : label}
           </div>
         </EdgeLabelRenderer>
       )}
@@ -2042,17 +2048,15 @@ function buildUnified(
           targetHandle: 'in',
           type: 'feeder',
           style: { stroke: PHASE_COLOR[wy.phase] ?? 'var(--mantine-color-gray-5)', strokeWidth: 1.6 },
-          // Alternate the label height on neighbouring drops so even long
-          // labels ("4×50 mm² · 68%") never sit side-by-side on one line.
           data: {
             label: loadLabel,
             util: wy.util,
             panelId: id,
             circuitId: wy.id,
-            // Bias the label DOWN into the lower-middle of the drop (away from
-            // the feeder-outlet dot at the panel bottom), alternating the two
-            // heights so neighbouring drops never share a line.
-            offset: i % 2 === 0 ? 6 : 22,
+            // Stack the drop label onto two lines so a row of narrow loads never
+            // collides; still alternate the height a little for extra clearance.
+            stack: true,
+            offset: i % 2 === 0 ? 4 : 20,
           },
         });
       });
