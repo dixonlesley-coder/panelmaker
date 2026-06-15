@@ -18,27 +18,34 @@ export const STANDARD_SECTIONS_MM2 = [
 export type StandardSection = (typeof STANDARD_SECTIONS_MM2)[number];
 
 /**
- * Base KHA (current carrying capacity) in Amperes, copper / PVC, reference
- * method (in conduit, 30 degC). Values ~aligned with PUIL 2011 Table 7.3-1 and
- * IEC 60364-5-52 reference method B.
+ * Base KHA (current carrying capacity) in Amperes, copper / PVC, 30 °C.
+ *
+ * Source: Supreme Cable (PT Supreme Cable Mfg & Commerce / SUCACO) Low-Voltage
+ * PVC Cable catalogue — Cu/PVC/PVC (NYY) 0.6/1 kV, 3-core, "in air" column,
+ * IEC 60502-1 / SNI IEC 60502-1. The catalogue's reference is "one circuit of
+ * three-phase load, load factor 1.0" at 30 °C; its own note requires the
+ * tabulated ratings to be multiplied by the temperature/grouping derating
+ * factors below for the actual installation. Used as the above-ground base
+ * (conduit/trunking/clipped/free-air all read this); buried uses the catalogue's
+ * "in ground" column (see KHA_CU_PVC_BY_METHOD.D).
  */
 export const KHA_COPPER_PVC: Readonly<Record<number, number>> = {
-  1.5: 17,
-  2.5: 24,
-  4: 32,
-  6: 41,
-  10: 57,
-  16: 76,
-  25: 101,
-  35: 125,
-  50: 151,
-  70: 192,
-  95: 232,
-  120: 269,
-  150: 309,
-  185: 353,
-  240: 415,
-  300: 477,
+  1.5: 18,
+  2.5: 25,
+  4: 34,
+  6: 44,
+  10: 60,
+  16: 80,
+  25: 105,
+  35: 130,
+  50: 160,
+  70: 200,
+  95: 245,
+  120: 285,
+  150: 325,
+  185: 370,
+  240: 435,
+  300: 500,
 };
 
 /**
@@ -85,24 +92,29 @@ export const REF_METHOD_FOR_INSTALL: Readonly<Record<string, RefMethod>> = {
 };
 
 /**
- * Per-method copper/PVC ampacities (A), multicore 3-loaded, 30 °C air / 20 °C
- * ground — ~aligned with IEC 60364-5-52 Tables B.52.2/B.52.4/B.52.5. Note the
- * SHAPES differ: buried (D) beats conduit at small sections (soil is a good
- * heat sink) but falls to ~70% at 300 mm² — a flat method factor cannot
- * represent this. B1 is {@link KHA_COPPER_PVC}.
+ * Per-method copper/PVC ampacities (A), 30 °C — Supreme Cable NYY 0.6/1 kV
+ * 3-core (IEC 60502-1 / SNI IEC 60502-1). The catalogue distinguishes only two
+ * regimes — "in air" and "in ground" — so every above-ground method (clipped C,
+ * free-air/tray E) reads the catalogue's "in air" column (== {@link KHA_COPPER_PVC}),
+ * and buried (D) reads the catalogue's "in ground" column. The in-ground rating
+ * beats in-air at small sections (soil is a good heat sink) and crosses below it
+ * at large sections — matching the catalogue exactly.
  */
 export const KHA_CU_PVC_BY_METHOD: Readonly<Record<Exclude<RefMethod, 'B1'>, Readonly<Record<number, number>>>> = {
+  // Clipped to a wall — Supreme NYY "in air".
   C: {
-    1.5: 19.5, 2.5: 27, 4: 36, 6: 46, 10: 63, 16: 85, 25: 112, 35: 138,
-    50: 168, 70: 213, 95: 258, 120: 299, 150: 344, 185: 392, 240: 461, 300: 530,
+    1.5: 18, 2.5: 25, 4: 34, 6: 44, 10: 60, 16: 80, 25: 105, 35: 130,
+    50: 160, 70: 200, 95: 245, 120: 285, 150: 325, 185: 370, 240: 435, 300: 500,
   },
+  // Free air / perforated tray — Supreme NYY "in air".
   E: {
-    1.5: 22, 2.5: 30, 4: 40, 6: 51, 10: 70, 16: 94, 25: 119, 35: 148,
-    50: 180, 70: 232, 95: 282, 120: 328, 150: 379, 185: 434, 240: 514, 300: 593,
+    1.5: 18, 2.5: 25, 4: 34, 6: 44, 10: 60, 16: 80, 25: 105, 35: 130,
+    50: 160, 70: 200, 95: 245, 120: 285, 150: 325, 185: 370, 240: 435, 300: 500,
   },
+  // Buried — Supreme NYY "in ground".
   D: {
-    1.5: 18, 2.5: 24, 4: 30, 6: 38, 10: 50, 16: 64, 25: 82, 35: 98,
-    50: 116, 70: 143, 95: 169, 120: 192, 150: 217, 185: 243, 240: 280, 300: 316,
+    1.5: 24, 2.5: 32, 4: 41, 6: 52, 10: 69, 16: 89, 25: 116, 35: 138,
+    50: 165, 70: 205, 95: 245, 120: 285, 150: 315, 185: 355, 240: 415, 300: 465,
   },
 };
 

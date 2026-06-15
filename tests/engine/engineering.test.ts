@@ -160,29 +160,27 @@ describe('XLPE insulation', () => {
 });
 
 describe('per-method ampacity tables', () => {
-  it('buried beats conduit at small sections but falls well below at large ones', () => {
-    // The method changes the SHAPE of the curve — a flat factor cannot do this.
+  // The Supreme catalogue distinguishes only two regimes — "in air" and "in
+  // ground" — so every above-ground method reads the same in-air column.
+  it('every above-ground method shares the catalogue "in air" rating', () => {
+    for (const s of [1.5, 35, 300]) {
+      const air = khaFor(s, { installMethod: 'air' });
+      expect(khaFor(s, { installMethod: 'conduit' })).toBe(air);
+      expect(khaFor(s, { installMethod: 'trunking' })).toBe(air);
+      expect(khaFor(s, { installMethod: 'wall' })).toBe(air);
+      expect(khaFor(s, { installMethod: 'tray' })).toBe(air);
+    }
+  });
+
+  it('buried (in ground) beats above-ground at small sections, crosses below at large', () => {
+    // Soil is a good heat sink at small CSA; at large CSA the conductor's own
+    // heat dominates and the in-ground rating crosses below in-air.
     expect(khaFor(1.5, { installMethod: 'buried' })).toBeGreaterThan(
       khaFor(1.5, { installMethod: 'conduit' }),
     );
-    const buried300 = khaFor(300, { installMethod: 'buried' });
-    const conduit300 = khaFor(300, { installMethod: 'conduit' });
-    expect(buried300 / conduit300).toBeLessThan(0.75);
-  });
-
-  it('free air / tray carries more than conduit, increasingly so at large sections', () => {
-    expect(khaFor(300, { installMethod: 'air' })).toBeGreaterThan(
+    expect(khaFor(300, { installMethod: 'buried' })).toBeLessThan(
       khaFor(300, { installMethod: 'conduit' }),
     );
-    expect(khaFor(70, { installMethod: 'tray' })).toBe(khaFor(70, { installMethod: 'air' }));
-  });
-
-  it('clipped-direct (wall) sits between conduit and free air', () => {
-    const conduit = khaFor(95, { installMethod: 'conduit' });
-    const wall = khaFor(95, { installMethod: 'wall' });
-    const air = khaFor(95, { installMethod: 'air' });
-    expect(wall).toBeGreaterThan(conduit);
-    expect(air).toBeGreaterThan(wall);
   });
 
   it('a buried feeder needs more total conductor than the same feeder in conduit', () => {
