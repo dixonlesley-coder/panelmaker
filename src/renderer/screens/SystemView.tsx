@@ -108,11 +108,11 @@ export function SystemView() {
     const L = (en: string, idt: string) => (id === 'id' ? idt : en);
     return [
       { id: 'service', label: L('Set up your service', 'Atur layanan listrik'), hint: L('Supply, earthing & connected power', 'Suplai, pembumian & daya tersambung'), done: serviceDone, onClick: () => requestService() },
-      { id: 'panel', label: L('Add a panel', 'Tambah panel'), hint: L('Right-click the canvas or use “Add panel”', 'Klik kanan kanvas atau “Tambah panel”'), done: hasPanel },
+      { id: 'panel', label: L('Add a panel', 'Tambah panel'), hint: L('Adds a sub-panel you can wire up', 'Menambah sub-panel untuk dirangkai'), done: hasPanel, onClick: () => addPanel() },
       { id: 'circuit', label: L('Add a load / circuit', 'Tambah beban / sirkit'), hint: L('Drag a load from the palette onto a panel', 'Seret beban dari palet ke panel'), done: hasCircuit },
       { id: 'export', label: L('Export your drawings', 'Ekspor gambar'), hint: L('SLD, schedules & BOM', 'SLD, jadwal & BOM'), done: false, onClick: () => void exportAllDeliverables() },
     ];
-  }, [project, i18n.language, requestService]);
+  }, [project, i18n.language, requestService, addPanel]);
   const showOnboarding =
     !onboardingDismissed && !(onboardingSteps[0]!.done && onboardingSteps[1]!.done && onboardingSteps[2]!.done);
 
@@ -296,7 +296,7 @@ export function SystemView() {
         </Group>
       </Group>
 
-      {isEmpty && (
+      {isEmpty && !showOnboarding && (
         <Card withBorder radius="md" padding="lg" bg="var(--mantine-color-indigo-light)">
           <Group justify="space-between" wrap="nowrap">
             <Group gap="md" wrap="nowrap">

@@ -1,5 +1,9 @@
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
 import {
+  Button,
+  Collapse,
+  Group,
   Modal,
   NumberInput,
   Select,
@@ -16,8 +20,9 @@ const INSTALL_METHODS: InstallMethod[] = ['conduit', 'trunking', 'wall', 'air', 
 
 /**
  * Edit the panel's supply / electrical context straight from the single-line —
- * opened by double-clicking the incomer or busbar. System, voltage, supply type,
- * ambient, install method, grouping and diversity all feed the live sizing.
+ * opened by double-clicking the incomer or busbar. The everyday fields (system,
+ * voltage, supply, occupancy) lead; the cable/derating context folds behind
+ * "Show advanced" (collapsed by default in beginner mode).
  */
 export function PanelSettingsEditor({
   panel,
@@ -31,6 +36,8 @@ export function PanelSettingsEditor({
   const { t } = useTranslation();
   const updatePanel = useProjectStore((s) => s.updatePanel);
   const setPanelOccupancy = useProjectStore((s) => s.setPanelOccupancy);
+  const beginnerMode = useProjectStore((s) => s.beginnerMode);
+  const [showAdvanced, setShowAdvanced] = useState(!beginnerMode);
   const patch = (p: Partial<PanelInput>) => updatePanel(panel.id, p);
 
   return (
@@ -84,90 +91,100 @@ export function PanelSettingsEditor({
             comboboxProps={{ withinPortal: true }}
             onChange={(v) => setPanelOccupancy(panel.id, (v as PanelInput['occupancy']) ?? undefined)}
           />
-          <Select
-            label={t('panelSettings.installMethod')}
-            data={INSTALL_METHODS.map((m) => ({ value: m, label: t(`installMethod.${m}`) }))}
-            value={panel.installMethod}
-            allowDeselect={false}
-            comboboxProps={{ withinPortal: true }}
-            onChange={(v) => v && patch({ installMethod: v as InstallMethod })}
-          />
-          {panel.installMethod === 'buried' && (
-            <NumberInput
-              label={t('panelSettings.groundTempC')}
-              description={t('panelSettings.groundTempHint')}
-              value={panel.groundTempC ?? 20}
-              min={5}
-              max={50}
-              suffix=" °C"
-              onChange={(v) => typeof v === 'number' && patch({ groundTempC: v })}
-            />
-          )}
-          {panel.installMethod === 'buried' && (
-            <NumberInput
-              label={t('panelSettings.depthM')}
-              description={t('panelSettings.depthHint')}
-              value={panel.depthM ?? 0.5}
-              min={0.5}
-              max={2}
-              step={0.1}
-              decimalScale={2}
-              suffix=" m"
-              onChange={(v) => typeof v === 'number' && patch({ depthM: v })}
-            />
-          )}
-          <Select
-            label={t('panelSettings.insulation')}
-            description={t('panelSettings.insulationHint')}
-            data={[
-              { value: 'PVC', label: 'PVC 70 °C (NYM / NYY)' },
-              { value: 'XLPE', label: 'XLPE 90 °C (N2XY)' },
-            ]}
-            value={panel.insulation ?? 'PVC'}
-            allowDeselect={false}
-            comboboxProps={{ withinPortal: true }}
-            onChange={(v) => v && patch({ insulation: v as PanelInput['insulation'] })}
-          />
-          <Select
-            label={t('panelSettings.material')}
-            description={t('panelSettings.materialHint')}
-            data={[
-              { value: 'Cu', label: t('panelSettings.materialCu') },
-              { value: 'Al', label: t('panelSettings.materialAl') },
-            ]}
-            value={panel.material ?? 'Cu'}
-            allowDeselect={false}
-            comboboxProps={{ withinPortal: true }}
-            onChange={(v) => v && patch({ material: v as PanelInput['material'] })}
-          />
-          <NumberInput
-            label={t('panelSettings.ambient')}
-            value={panel.ambientTempC}
-            min={10}
-            max={60}
-            step={5}
-            suffix=" °C"
-            onChange={(v) => typeof v === 'number' && patch({ ambientTempC: v })}
-          />
-          <NumberInput
-            label={t('panelSettings.grouping')}
-            description={t('panelSettings.groupingHint')}
-            value={panel.groupingCount}
-            min={1}
-            max={20}
-            onChange={(v) => typeof v === 'number' && patch({ groupingCount: v })}
-          />
-          <NumberInput
-            label={t('panelSettings.diversity')}
-            description={t('panelSettings.diversityHint')}
-            value={panel.diversityFactor}
-            min={0.1}
-            max={1}
-            step={0.05}
-            decimalScale={2}
-            onChange={(v) => typeof v === 'number' && patch({ diversityFactor: v })}
-          />
         </SimpleGrid>
+
+        <Group justify="flex-end">
+          <Button variant="subtle" size="xs" onClick={() => setShowAdvanced((s) => !s)}>
+            {showAdvanced ? t('circuitEditor.hideAdvanced') : t('circuitEditor.showAdvanced')}
+          </Button>
+        </Group>
+        <Collapse in={showAdvanced}>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Select
+              label={t('panelSettings.installMethod')}
+              data={INSTALL_METHODS.map((m) => ({ value: m, label: t(`installMethod.${m}`) }))}
+              value={panel.installMethod}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true }}
+              onChange={(v) => v && patch({ installMethod: v as InstallMethod })}
+            />
+            {panel.installMethod === 'buried' && (
+              <NumberInput
+                label={t('panelSettings.groundTempC')}
+                description={t('panelSettings.groundTempHint')}
+                value={panel.groundTempC ?? 20}
+                min={5}
+                max={50}
+                suffix=" °C"
+                onChange={(v) => typeof v === 'number' && patch({ groundTempC: v })}
+              />
+            )}
+            {panel.installMethod === 'buried' && (
+              <NumberInput
+                label={t('panelSettings.depthM')}
+                description={t('panelSettings.depthHint')}
+                value={panel.depthM ?? 0.5}
+                min={0.5}
+                max={2}
+                step={0.1}
+                decimalScale={2}
+                suffix=" m"
+                onChange={(v) => typeof v === 'number' && patch({ depthM: v })}
+              />
+            )}
+            <Select
+              label={t('panelSettings.insulation')}
+              description={t('panelSettings.insulationHint')}
+              data={[
+                { value: 'PVC', label: 'PVC 70 °C (NYM / NYY)' },
+                { value: 'XLPE', label: 'XLPE 90 °C (N2XY)' },
+              ]}
+              value={panel.insulation ?? 'PVC'}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true }}
+              onChange={(v) => v && patch({ insulation: v as PanelInput['insulation'] })}
+            />
+            <Select
+              label={t('panelSettings.material')}
+              description={t('panelSettings.materialHint')}
+              data={[
+                { value: 'Cu', label: t('panelSettings.materialCu') },
+                { value: 'Al', label: t('panelSettings.materialAl') },
+              ]}
+              value={panel.material ?? 'Cu'}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true }}
+              onChange={(v) => v && patch({ material: v as PanelInput['material'] })}
+            />
+            <NumberInput
+              label={t('panelSettings.ambient')}
+              value={panel.ambientTempC}
+              min={10}
+              max={60}
+              step={5}
+              suffix=" °C"
+              onChange={(v) => typeof v === 'number' && patch({ ambientTempC: v })}
+            />
+            <NumberInput
+              label={t('panelSettings.grouping')}
+              description={t('panelSettings.groupingHint')}
+              value={panel.groupingCount}
+              min={1}
+              max={20}
+              onChange={(v) => typeof v === 'number' && patch({ groupingCount: v })}
+            />
+            <NumberInput
+              label={t('panelSettings.diversity')}
+              description={t('panelSettings.diversityHint')}
+              value={panel.diversityFactor}
+              min={0.1}
+              max={1}
+              step={0.05}
+              decimalScale={2}
+              onChange={(v) => typeof v === 'number' && patch({ diversityFactor: v })}
+            />
+          </SimpleGrid>
+        </Collapse>
       </Stack>
     </Modal>
   );
