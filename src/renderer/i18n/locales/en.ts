@@ -1192,6 +1192,8 @@ export const en = {
     cableTypeNYA: 'NYA · single-core in conduit',
     cableTypeNYAF: 'NYAF · flexible wiring',
     motorKw: 'Motor rating',
+    pfLabel: 'Power factor (pf)',
+    pfHint: '0–1; motors and fluorescent lighting draw more current at a lower pf',
     phases: 'Supply phase',
     phasesHint: 'Force single- or three-phase, overriding the size-based default',
     phasesAuto: 'Auto (by rating)',

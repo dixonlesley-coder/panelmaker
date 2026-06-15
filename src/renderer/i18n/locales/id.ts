@@ -1197,6 +1197,8 @@ export const id: TranslationKeys = {
     cableTypeNYA: 'NYA · inti tunggal dalam konduit',
     cableTypeNYAF: 'NYAF · kabel fleksibel',
     motorKw: 'Daya motor',
+    pfLabel: 'Faktor daya (pf)',
+    pfHint: '0–1; motor dan lampu neon menarik arus lebih besar pada pf rendah',
     phases: 'Fase suplai',
     phasesHint: 'Paksa satu- atau tiga-fase, menggantikan default berdasarkan ukuran',
     phasesAuto: 'Otomatis (sesuai daya)',

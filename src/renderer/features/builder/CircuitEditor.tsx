@@ -396,7 +396,8 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             />
           )}
           <DebouncedNumberInput
-            label={t('builder.colPf')}
+            label={t('circuitEditor.pfLabel')}
+            description={beginnerMode ? t('circuitEditor.pfHint') : undefined}
             value={circuit.cosPhi}
             min={0.1}
             max={1}
