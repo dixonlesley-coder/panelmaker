@@ -15,6 +15,7 @@ import {
   IconArrowForwardUp,
   IconLanguage,
   IconCheck,
+  IconSchool,
 } from '@tabler/icons-react';
 
 import { setLanguage, SUPPORTED_LANGUAGES, type Language } from '@renderer/i18n';
@@ -77,6 +78,26 @@ function ColorSchemeToggle() {
         onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
       >
         {isDark ? <IconSun size={18} /> : <IconMoon size={18} />}
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
+/** Beginner mode: hides advanced fields and softens the UI for newcomers. */
+function BeginnerModeToggle() {
+  const { t } = useTranslation();
+  const beginnerMode = useProjectStore((s) => s.beginnerMode);
+  const setBeginnerMode = useProjectStore((s) => s.setBeginnerMode);
+  return (
+    <Tooltip label={t(beginnerMode ? 'beginner.on' : 'beginner.off')}>
+      <ActionIcon
+        variant={beginnerMode ? 'light' : 'default'}
+        color={beginnerMode ? 'teal' : undefined}
+        size="lg"
+        aria-label={t('beginner.toggle')}
+        onClick={() => setBeginnerMode(!beginnerMode)}
+      >
+        <IconSchool size={18} />
       </ActionIcon>
     </Tooltip>
   );
@@ -282,6 +303,7 @@ export function App() {
             </Tooltip>
             <HistoryControls />
             <AutosaveIndicator saveState={saveState} target={target} savedAt={savedAt} />
+            <BeginnerModeToggle />
             <LanguageMenu />
             <ColorSchemeToggle />
           </Group>

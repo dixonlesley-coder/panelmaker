@@ -712,6 +712,7 @@ export const en = {
     busbar: 'busbar',
   },
   sldNode: {
+    addCircuit: 'Add circuit',
     supply: 'PLN',
     fed: 'fed',
     unfed: 'not connected',
@@ -797,7 +798,7 @@ export const en = {
     helpDelete: 'Select a panel or floating load and press Delete; right-click a way to delete it',
     helpCopy: 'Drag a box on empty canvas (or Shift-click) to select several; Ctrl+C, then Ctrl+V pastes at the cursor (copied ways join the nearest panel)',
     helpReorder: 'Drag a load (or a column inside the panel) left/right to reorder the ways',
-    helpZoom: 'Scroll to zoom (panels reveal their internals up close); middle-button drag to pan',
+    helpZoom: 'Drag the empty canvas to pan; scroll to zoom (panels reveal their internals up close); Shift-drag to box-select',
     supplyMv: 'Medium voltage + transformer',
     supplyLv: 'Low voltage (direct PLN)',
     demandKva: '{{kva}} kVA demand',
@@ -1136,6 +1137,11 @@ export const en = {
     busbarSection: 'Busbar §{{index}}',
     waysCount: '{{count}} ways',
   },
+  beginner: {
+    toggle: 'Beginner mode',
+    on: 'Beginner mode ON — advanced options are hidden. Click to show everything.',
+    off: 'Beginner mode OFF. Click to simplify the editors (hide advanced options).',
+  },
   lightCalc: {
     title: 'Lighting calculator',
     add: 'Add fitting',
@@ -1167,6 +1173,8 @@ export const en = {
     device: 'Device',
     cableSection: 'Cable run',
     advanced: 'Advanced',
+    showAdvanced: 'Show advanced',
+    hideAdvanced: 'Hide advanced',
     cableType: 'Cable type',
     laying: 'Cable laying',
     layingAir: 'In air (default)',

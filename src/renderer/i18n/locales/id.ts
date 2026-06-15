@@ -716,6 +716,7 @@ export const id: TranslationKeys = {
     busbar: 'busbar',
   },
   sldNode: {
+    addCircuit: 'Tambah sirkit',
     supply: 'PLN',
     fed: 'disuplai',
     unfed: 'belum tersambung',
@@ -801,7 +802,7 @@ export const id: TranslationKeys = {
     helpDelete: 'Pilih panel atau beban lepas lalu tekan Delete; klik kanan jalur untuk menghapusnya',
     helpCopy: 'Seret kotak di kanvas kosong (atau Shift-klik) untuk memilih beberapa; Ctrl+C, lalu Ctrl+V menempel di posisi kursor (jalur salinan masuk ke panel terdekat)',
     helpReorder: 'Seret beban (atau kolom di dalam panel) ke kiri/kanan untuk menata ulang jalur',
-    helpZoom: 'Gulir untuk zoom (panel menampilkan isinya saat didekati); seret tombol tengah untuk menggeser',
+    helpZoom: 'Seret kanvas kosong untuk menggeser; gulir untuk zoom (panel menampilkan isinya saat didekati); Shift-seret untuk seleksi kotak',
     supplyMv: 'Tegangan menengah + trafo',
     supplyLv: 'Tegangan rendah (langsung PLN)',
     demandKva: 'kebutuhan {{kva}} kVA',
@@ -1141,6 +1142,11 @@ export const id: TranslationKeys = {
     busbarSection: 'Busbar §{{index}}',
     waysCount: '{{count}} jalur',
   },
+  beginner: {
+    toggle: 'Mode pemula',
+    on: 'Mode pemula AKTIF — opsi lanjutan disembunyikan. Klik untuk menampilkan semuanya.',
+    off: 'Mode pemula NONAKTIF. Klik untuk menyederhanakan editor (sembunyikan opsi lanjutan).',
+  },
   lightCalc: {
     title: 'Kalkulator pencahayaan',
     add: 'Tambah armatur',
@@ -1172,6 +1178,8 @@ export const id: TranslationKeys = {
     device: 'Perangkat',
     cableSection: 'Jalur kabel',
     advanced: 'Lanjutan',
+    showAdvanced: 'Tampilkan lanjutan',
+    hideAdvanced: 'Sembunyikan lanjutan',
     cableType: 'Jenis kabel',
     laying: 'Pemasangan kabel',
     layingAir: 'Di udara (bawaan)',

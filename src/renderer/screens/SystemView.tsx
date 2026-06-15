@@ -40,6 +40,7 @@ import { ProjectIssues } from '@renderer/features/issues/ProjectIssues';
 import { ServiceInspector } from '@renderer/features/service/ServiceInspector';
 import { LoadImportModal } from '@renderer/features/loadimport/LoadImportModal';
 import { BuildingSingleLine } from '@renderer/screens/sld/BuildingSingleLine';
+import { GettingStarted, type OnboardingStep } from '@renderer/features/onboarding/GettingStarted';
 import { PowerOneline } from '@renderer/screens/sld/PowerOneline';
 import { partsForBrand, CATALOG_BRANDS } from '@shared/data/catalog';
 import { costSystemConsolidated } from '@renderer/lib/bom';
@@ -54,8 +55,11 @@ import { exportLabelsPdf, exportSystemPdf, saveProjectToDisk } from '@renderer/a
 import { exportAllDeliverables, exportAllMessage } from '@renderer/lib/exportAll';
 
 export function SystemView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const project = useProjectStore((s) => s.project);
+  const onboardingDismissed = useProjectStore((s) => s.onboardingDismissed);
+  const dismissOnboarding = useProjectStore((s) => s.dismissOnboarding);
+  const requestService = useProjectStore((s) => s.requestService);
   const parts = useProjectStore((s) => s.parts);
   const prices = useProjectStore((s) => s.prices);
   const preferredBrand = useProjectStore((s) => s.preferredBrand);
@@ -92,6 +96,25 @@ export function SystemView() {
     () => project.panels.length <= 1 && project.panels.every((p) => p.circuits.length === 0),
     [project.panels],
   );
+
+  // Getting-started checklist: shown until the three core steps are done (or the
+  // user dismisses it). Steps check themselves off from the live project.
+  const onboardingSteps: OnboardingStep[] = useMemo(() => {
+    const id = i18n.language === 'id' ? 'id' : 'en';
+    const serviceDone =
+      Boolean(project.meta?.contractedDayaVa) || Boolean(project.sources) || project.earthingSystem === 'TT';
+    const hasPanel = project.panels.length > 1 || project.panels.some((p) => p.circuits.length > 0);
+    const hasCircuit = project.panels.some((p) => p.circuits.length > 0);
+    const L = (en: string, idt: string) => (id === 'id' ? idt : en);
+    return [
+      { id: 'service', label: L('Set up your service', 'Atur layanan listrik'), hint: L('Supply, earthing & connected power', 'Suplai, pembumian & daya tersambung'), done: serviceDone, onClick: () => requestService() },
+      { id: 'panel', label: L('Add a panel', 'Tambah panel'), hint: L('Right-click the canvas or use “Add panel”', 'Klik kanan kanvas atau “Tambah panel”'), done: hasPanel },
+      { id: 'circuit', label: L('Add a load / circuit', 'Tambah beban / sirkit'), hint: L('Drag a load from the palette onto a panel', 'Seret beban dari palet ke panel'), done: hasCircuit },
+      { id: 'export', label: L('Export your drawings', 'Ekspor gambar'), hint: L('SLD, schedules & BOM', 'SLD, jadwal & BOM'), done: false, onClick: () => void exportAllDeliverables() },
+    ];
+  }, [project, i18n.language, requestService]);
+  const showOnboarding =
+    !onboardingDismissed && !(onboardingSteps[0]!.done && onboardingSteps[1]!.done && onboardingSteps[2]!.done);
 
   // Consolidated project-wide BOM (per-panel lines merged by part/description).
   const projectBom = useMemo(() => {
@@ -305,6 +328,14 @@ export function SystemView() {
             </Group>
           </Group>
         </Card>
+      )}
+
+      {showOnboarding && (
+        <GettingStarted
+          steps={onboardingSteps}
+          onDismiss={dismissOnboarding}
+          lang={i18n.language === 'id' ? 'id' : 'en'}
+        />
       )}
 
       <Card withBorder radius="md" padding="xs">

@@ -138,6 +138,10 @@ export interface ProjectState {
   activeScreen: Screen;
   /** Preferred manufacturer for order-code matching / exports (null = all brands). */
   preferredBrand: string | null;
+  /** Beginner mode: hide advanced fields + soften jargon (persisted). */
+  beginnerMode: boolean;
+  /** The getting-started onboarding card has been dismissed (persisted). */
+  onboardingDismissed: boolean;
   /** User-defined panel templates (persisted to localStorage across projects). */
   userTemplates: UserPanelTemplate[];
   /** Control/ladder schematics, keyed by circuitId. */
@@ -170,6 +174,8 @@ export interface ProjectState {
   requestService: () => void;
   /** Clear a consumed service request. */
   clearServiceRequest: () => void;
+  setBeginnerMode: (on: boolean) => void;
+  dismissOnboarding: () => void;
   setPreferredBrand: (brand: string | null) => void;
 
   // circuit editing
@@ -502,6 +508,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   inspectorRequest: null,
   activeScreen: 'system',
   preferredBrand: null,
+  beginnerMode: typeof localStorage !== 'undefined' && localStorage.getItem('pm:beginnerMode') === '1',
+  onboardingDismissed: typeof localStorage !== 'undefined' && localStorage.getItem('pm:onboardingDismissed') === '1',
   userTemplates: loadUserTemplates(),
   schematics: {},
   past: [],
@@ -517,6 +525,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
   serviceRequest: false,
   requestService: () => set({ serviceRequest: true }),
   clearServiceRequest: () => set({ serviceRequest: false }),
+  setBeginnerMode: (on) => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('pm:beginnerMode', on ? '1' : '0');
+    set({ beginnerMode: on });
+  },
+  dismissOnboarding: () => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('pm:onboardingDismissed', '1');
+    set({ onboardingDismissed: true });
+  },
   setPreferredBrand: (brand) => set({ preferredBrand: brand }),
 
   updateCircuit: (panelId, circuitId, patch) =>

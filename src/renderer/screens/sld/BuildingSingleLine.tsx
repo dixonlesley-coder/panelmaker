@@ -31,6 +31,7 @@ import {
   IconBattery2,
   IconBolt,
   IconBulb,
+  IconPlus,
   IconChargingPile,
   IconCircuitSwitchOpen,
   IconClock,
@@ -1083,6 +1084,23 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
           </Box>
         </Group>
         <Group gap={4} wrap="nowrap">
+          {d.onAddItem && (
+            <Tooltip label={t('sldNode.addCircuit')} withinPortal>
+              <ActionIcon
+                size="sm"
+                variant="light"
+                color="indigo"
+                aria-label={t('sldNode.addCircuit')}
+                className="nodrag"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  d.onAddItem?.(loadCard('socket', 'vbuilder.sockets', { loadW: 2000 }));
+                }}
+              >
+                <IconPlus size={14} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           {worstUtil !== undefined && (
             <Badge
               size="xs"
@@ -3004,13 +3022,14 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             nodesConnectable
             nodesDraggable
             elementsSelectable
-            // CAD-style gestures: left-drag on empty canvas draws a selection
-            // box (touching a node selects it — Partial, like a crossing
-            // window); the SCROLL WHEEL zooms; middle-button (wheel-click) drag
-            // pans. The left button is purely select + move.
-            selectionOnDrag
+            // Intuitive navigation (ease of use): LEFT-DRAG PANS the canvas (the
+            // universal map/diagram expectation); SHIFT+drag draws a crossing
+            // selection box; the scroll wheel zooms. Dragging a node still moves
+            // it; clicking selects.
+            panOnDrag
+            selectionOnDrag={false}
+            selectionKeyCode="Shift"
             selectionMode={SelectionMode.Partial}
-            panOnDrag={[1]}
             deleteKeyCode={['Backspace', 'Delete']}
             zoomOnDoubleClick={false}
             onInit={(inst) => {

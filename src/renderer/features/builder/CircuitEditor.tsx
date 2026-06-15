@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Alert,
   Button,
+  Collapse,
   Divider,
   Group,
   List,
@@ -39,6 +40,7 @@ import { derivedPointsLoadW } from '@shared/engine/fixtures';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { circuitOrderCodes } from '@shared/engine/bom';
 import { partsForBrand } from '@shared/data/catalog';
+import { GlossaryInfo } from '@renderer/features/help/JargonTip';
 import { DebouncedNumberInput, DebouncedTextInput } from '@renderer/features/builder/DebouncedField';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { formatAmps, formatPercent } from '@renderer/lib/format';
@@ -222,7 +224,12 @@ interface Props {
  * Edits dispatch immediately, so the canvas and this panel recompute live.
  */
 export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang: 'en' | 'id' = i18n.language === 'id' ? 'id' : 'en';
+  const beginnerMode = useProjectStore((s) => s.beginnerMode);
+  // Beginner mode keeps the cable details folded away; opening on the cable
+  // (focus='cable') always shows them since that's what the user came to edit.
+  const [showAdvanced, setShowAdvanced] = useState(focus === 'cable' ? true : !beginnerMode);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const parts = useProjectStore((s) => s.parts);
@@ -284,24 +291,30 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
         {/* Live sizing summary (read-only) — leads with utilisation. */}
         {result && (
           <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
-            <Stat label={t('circuitEditor.design')} value={formatAmps(result.designCurrentA)} />
+            <Stat label={t('circuitEditor.design')} value={formatAmps(result.designCurrentA)} tip="ib" lang={lang} />
             <Stat
               label={t('circuitEditor.breaker')}
               value={`${result.breaker.ratingA} A ${result.breaker.curve}`}
               color={result.breaker.overridden ? 'violet' : undefined}
               hint={codes?.breaker}
+              tip="in"
+              lang={lang}
             />
             <Stat
               label={t('circuitEditor.cable')}
               value={`${result.cable.runsPerPhase && result.cable.runsPerPhase > 1 ? `${result.cable.runsPerPhase}× ` : ''}${result.cable.csaMm2} mm²`}
               color={result.cable.overridden ? 'violet' : undefined}
               hint={codes?.cable}
+              tip="kha"
+              lang={lang}
             />
             <Stat
               label={t('circuitEditor.utilisation')}
               value={util !== undefined ? `${util}%` : '—'}
               color={util !== undefined ? utilColor(util) : undefined}
               hint={`Iz ${formatAmps(result.cable.deratedIzA)}`}
+              tip="iz"
+              lang={lang}
             />
           </SimpleGrid>
         )}
@@ -501,16 +514,27 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
 
         <Divider label={t('circuitEditor.cableSection')} />
 
-        {/* Cable run */}
+        {/* Cable run — Length is the everyday field; cable type / laying /
+            overrides / protection fold away (collapsed by default in beginner
+            mode) to keep the editor calm. */}
+        <Group align="flex-end" wrap="nowrap" gap="sm">
+          <div style={{ flex: 1 }}>
+            <DebouncedNumberInput
+              label={t('builder.colLength')}
+              value={circuit.lengthM}
+              min={0}
+              step={5}
+              suffix=" m"
+              onCommit={(v) => patch({ lengthM: v })}
+            />
+          </div>
+          <Button variant="subtle" size="xs" onClick={() => setShowAdvanced((s) => !s)}>
+            {showAdvanced ? t('circuitEditor.hideAdvanced') : t('circuitEditor.showAdvanced')}
+          </Button>
+        </Group>
+        <Collapse in={showAdvanced}>
+          <Stack gap="sm">
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <DebouncedNumberInput
-            label={t('builder.colLength')}
-            value={circuit.lengthM}
-            min={0}
-            step={5}
-            suffix=" m"
-            onCommit={(v) => patch({ lengthM: v })}
-          />
           <Select
             label={t('circuitEditor.cableType')}
             data={[
@@ -665,6 +689,8 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
           checked={circuit.busbarBreakBefore === true}
           onChange={(e) => patch({ busbarBreakBefore: e.currentTarget.checked ? true : undefined })}
         />
+          </Stack>
+        </Collapse>
 
         <Group justify="space-between" mt="xs">
           <Button
@@ -694,17 +720,25 @@ function Stat({
   value,
   color,
   hint,
+  tip,
+  lang,
 }: {
   label: string;
   value: string;
   color?: string;
   hint?: string;
+  /** Glossary id — adds a plain-language "?" tooltip beside the label. */
+  tip?: string;
+  lang?: 'en' | 'id';
 }) {
   return (
     <div>
-      <Text size="xs" c="dimmed">
-        {label}
-      </Text>
+      <Group gap={3} wrap="nowrap" align="center">
+        <Text size="xs" c="dimmed">
+          {label}
+        </Text>
+        {tip && <GlossaryInfo id={tip} lang={lang} />}
+      </Group>
       <Text size="sm" fw={700} c={color}>
         {value}
       </Text>
