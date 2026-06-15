@@ -803,7 +803,7 @@ export const en = {
     helpLoad: 'Drag a load onto a panel to wire it (creates the MCB)',
     helpCable: 'Double-click a cable to set its length and size',
     helpDelete: 'Select a panel or floating load and press Delete; right-click a way to delete it',
-    helpCopy: 'Drag a box on empty canvas (or Shift-click) to select several; Ctrl+C, then Ctrl+V pastes at the cursor (copied ways join the nearest panel)',
+    helpCopy: 'Shift-drag a box on empty canvas (or Shift-click) to select several; Ctrl+C, then Ctrl+V pastes at the cursor (copied ways join the nearest panel)',
     helpReorder: 'Drag a load (or a column inside the panel) left/right to reorder the ways',
     helpZoom: 'Drag the empty canvas to pan; scroll to zoom (panels reveal their internals up close); Shift-drag to box-select',
     supplyMv: 'Medium voltage + transformer',
