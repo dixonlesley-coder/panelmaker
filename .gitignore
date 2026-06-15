@@ -22,3 +22,6 @@ machine.id
 /resources/extractor/
 /.pyinstaller-build/
 scripts/__pycache__/
+
+# Claude Code agent worktrees / local scaffolding (ephemeral)
+/.claude/
