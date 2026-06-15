@@ -280,6 +280,8 @@ interface UnifiedPanelData {
   critical?: boolean;
   /** Tenant kWh sub-meter label ("kWh" or "CT 150/5"), when fitted. */
   submeter?: string;
+  /** Horizontal (left-to-right) tree: incomer enters LEFT, feeders exit RIGHT. */
+  horizontal?: boolean;
   feederIds: string[];
   issues?: NodeIssue[];
   /** Edit a specific way's circuit inline (double-click a component). */
@@ -1036,15 +1038,15 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
         }
       }}
     >
-      {/* Feed-in target: as big and obvious as the outlet dot below, so the
-          drag-to-feed gesture has an easy landing zone at both ends. */}
+      {/* Feed-in target: as big and obvious as the outlet dot, so the
+          drag-to-feed gesture has an easy landing zone at both ends. In the
+          left-to-right tree the incomer enters from the LEFT instead of the top. */}
       <Handle
         type="target"
-        position={Position.Top}
+        position={d.horizontal ? Position.Left : Position.Top}
         id="in"
         style={{
-          left: '50%',
-          top: -14,
+          ...(d.horizontal ? { top: '50%', left: -14 } : { left: '50%', top: -14 }),
           width: 26,
           height: 26,
           borderRadius: 13,
@@ -1135,15 +1137,15 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
         return <Handle key={w.id} type="source" id={w.id} position={Position.Bottom} style={{ left }} isConnectable={false} />;
       })}
       {/* Outlet: drag from here onto another panel to feed it (creates the feeder).
-          Big + low so it's an easy target. */}
+          Big so it's an easy target. In the left-to-right tree sub-panel feeders
+          leave from the RIGHT; loads still drop from the per-way handles below. */}
       <Handle
         type="source"
         id="out"
-        position={Position.Bottom}
+        position={d.horizontal ? Position.Right : Position.Bottom}
         title="Drag to another panel to feed it"
         style={{
-          left: '50%',
-          bottom: -14,
+          ...(d.horizontal ? { top: '50%', right: -14 } : { left: '50%', bottom: -14 }),
           width: 26,
           height: 26,
           borderRadius: 13,
@@ -1813,6 +1815,7 @@ function buildUnified(
         name: res.name,
         ...(panel.tag ? { tag: panel.tag } : {}),
         source: panel.sourceType,
+        ...(dir === 'horizontal' ? { horizontal: true } : {}),
         system: panel.system,
         loadKw: formatKw(res.totalConnectedLoadW),
         incomerA: formatAmps(res.totalDemandCurrentA),
@@ -1859,9 +1862,24 @@ function buildUnified(
         // online UPS / source-transfer gateway. Otherwise the sources feed the
         // bus in parallel (grid-tied / AC-coupled).
         const hybrid = Boolean(src?.hybridInverter);
+        const horizontal = dir === 'horizontal';
+        // VERTICAL: the service head sits in rows ABOVE the panel and feeds the
+        // top incomer. HORIZONTAL: it sits in a column to the LEFT (sources
+        // stacked, inverter nearest the panel) and feeds the left incomer.
+        const SRC_GAP = 16;
+        const COL_GAP = 40;
+        const plnX = w / 2 - GRID_SRC_W / 2;
+        const headCY = (heightFor(id) + PANEL_CHROME) / 2 - GRID_SRC_H / 2; // panel vertical centre
         const INV_ROW_Y = -(GRID_SRC_H + 30); // row directly above the panel
         const SRC_ROW_Y = hybrid ? INV_ROW_Y - (GRID_SRC_H + 44) : INV_ROW_Y;
-        const plnX = w / 2 - GRID_SRC_W / 2;
+        const INV_COL_X = -(GRID_SRC_W + COL_GAP);
+        const SRC_COL_X = hybrid ? INV_COL_X - (GRID_SRC_W + COL_GAP) : INV_COL_X;
+        const invPos = horizontal ? { x: INV_COL_X, y: headCY } : { x: plnX, y: INV_ROW_Y };
+        const gridPos = horizontal ? { x: SRC_COL_X, y: headCY } : { x: plnX, y: SRC_ROW_Y };
+        const srcPos = (k: number) =>
+          horizontal
+            ? { x: SRC_COL_X, y: headCY + (k + 1) * (GRID_SRC_H + SRC_GAP) }
+            : { x: plnX - (k + 1) * (GRID_SRC_W + SRC_GAP), y: SRC_ROW_Y };
         // Everything feeds the inverter when hybrid, else the panel directly.
         const sinkId = hybrid ? `hinv-${id}` : id;
 
@@ -1872,7 +1890,7 @@ function buildUnified(
             id: sinkId,
             type: 'hinv',
             parentId: id,
-            position: { x: plnX, y: INV_ROW_Y },
+            position: invPos,
             deletable: false,
             draggable: false,
             selectable: false,
@@ -1895,7 +1913,7 @@ function buildUnified(
           id: gridId,
           type: 'grid',
           parentId: id,
-          position: { x: plnX, y: SRC_ROW_Y },
+          position: gridPos,
           deletable: false,
           draggable: false,
           // Display-only: it can't be copied or deleted, so a click-selection
@@ -1945,7 +1963,6 @@ function buildUnified(
         if (src?.battery) {
           srcList.push({ kind: 'battery', sub: `${src.battery.installedKwh} kWh · ${src.battery.inverterKw} kW` });
         }
-        const SRC_GAP = 16;
         srcList.forEach((sd, k) => {
           const srcId = `src-${sd.kind}-${id}`;
           // DC link for the PV/battery into a hybrid inverter; AC otherwise.
@@ -1954,8 +1971,8 @@ function buildUnified(
             id: srcId,
             type: 'source',
             parentId: id,
-            // To the LEFT of the PLN intake, on the sources row.
-            position: { x: plnX - (k + 1) * (GRID_SRC_W + SRC_GAP), y: SRC_ROW_Y },
+            // Beside the PLN intake (left in horizontal, stacked above in vertical).
+            position: srcPos(k),
             draggable: false,
             data: sd,
           });
@@ -2114,7 +2131,9 @@ function buildUnified(
       edges.push({
         id: `feed-${circuitId}`,
         source: parentId,
-        sourceHandle: circuitId,
+        // Left-to-right tree: feeders to sub-panels leave from the RIGHT outlet;
+        // top-to-bottom: from the way's own column on the bottom busbar.
+        sourceHandle: dir === 'horizontal' ? 'out' : circuitId,
         target: childId,
         targetHandle: 'in',
         type: 'feeder',
@@ -2170,6 +2189,11 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const removeFloatingLoad = useProjectStore((s) => s.removeFloatingLoad);
   const attachFloatingLoad = useProjectStore((s) => s.attachFloatingLoad);
   const rfRef = useRef<ReactFlowInstance | null>(null);
+  // Drag-to-feed state: the node a connection drag started from, and whether it
+  // landed on a real handle (onConnect) so onConnectEnd can fall back to a
+  // drop ANYWHERE on the target panel.
+  const connectFrom = useRef<string | null>(null);
+  const connectHandled = useRef(false);
   // Where a just-created panel should land (the drop point), consumed once by
   // the node-sync effect — new nodes otherwise get the auto-layout position.
   const pendingPanelPos = useRef(new Map<string, { x: number; y: number }>());
@@ -2179,6 +2203,34 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   const pasteCircuits = useProjectStore((s) => s.pasteCircuits);
   const reorderCircuits = useProjectStore((s) => s.reorderCircuits);
   const updateCircuit = useProjectStore((s) => s.updateCircuit);
+  // Shared connect handler: a floating-load → panel wiring, or a panel → panel
+  // feeder. Used both by onConnect (dropped on a handle) and onConnectEnd
+  // (dropped anywhere on the target panel — no need to hit the incomer dot).
+  const handleConnect = useCallback(
+    (source?: string | null, target?: string | null) => {
+      if (!source || !target || source === target) return;
+      const isFloat = (id: string) => id.startsWith('float-');
+      const isPanel = (id: string) =>
+        !id.startsWith('float-') &&
+        !id.startsWith('load-') &&
+        !id.startsWith('grid-') &&
+        !id.startsWith('src-') &&
+        !id.startsWith('hinv-');
+      if (isFloat(source) && isPanel(target)) attachFloatingLoad(source.replace(/^float-/, ''), target);
+      else if (isFloat(target) && isPanel(source)) attachFloatingLoad(target.replace(/^float-/, ''), source);
+      else if (isPanel(source) && isPanel(target)) {
+        // A refused connect must say WHY — a gesture that silently does nothing
+        // reads as a bug, not as a rule.
+        const res = connectPanelAsFeeder(source, target);
+        const child = project.panels.find((p) => p.id === target);
+        const name = child ? (child.tag ?? child.name) : '';
+        if (res === 'connected') notifications.show({ message: t('vbuilder.panelConnected', { name }), color: 'teal' });
+        else if (res === 'has-parent') notifications.show({ message: t('sldConnect.hasParent', { name }), color: 'yellow' });
+        else if (res === 'cycle') notifications.show({ message: t('sldConnect.cycle'), color: 'yellow' });
+      }
+    },
+    [attachFloatingLoad, connectPanelAsFeeder, project, t],
+  );
   const duplicateCircuit = useProjectStore((s) => s.duplicateCircuit);
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const saveAsTemplate = useProjectStore((s) => s.saveAsTemplate);
@@ -2911,28 +2963,30 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             onInit={(inst) => {
               rfRef.current = inst;
             }}
+            onConnectStart={(_e, params) => {
+              connectFrom.current = params.nodeId ?? null;
+              connectHandled.current = false;
+            }}
             onConnect={(c) => {
-              if (!c.source || !c.target || c.source === c.target) return;
-              const isFloat = (id: string) => id.startsWith('float-');
-              const isPanel = (id: string) =>
-                !id.startsWith('float-') && !id.startsWith('load-') && !id.startsWith('grid-') && !id.startsWith('src-');
-              // Wire a floating load to a panel → create its MCB; or panel→panel feeder.
-              if (isFloat(c.source) && isPanel(c.target)) attachFloatingLoad(c.source.replace(/^float-/, ''), c.target);
-              else if (isFloat(c.target) && isPanel(c.source)) attachFloatingLoad(c.target.replace(/^float-/, ''), c.source);
-              else if (isPanel(c.source) && isPanel(c.target)) {
-                // A refused connect must say WHY — a gesture that silently does
-                // nothing reads as a bug, not as a rule.
-                const res = connectPanelAsFeeder(c.source, c.target);
-                const child = project.panels.find((p) => p.id === c.target);
-                const name = child ? (child.tag ?? child.name) : '';
-                if (res === 'connected') {
-                  notifications.show({ message: t('vbuilder.panelConnected', { name }), color: 'teal' });
-                } else if (res === 'has-parent') {
-                  notifications.show({ message: t('sldConnect.hasParent', { name }), color: 'yellow' });
-                } else if (res === 'cycle') {
-                  notifications.show({ message: t('sldConnect.cycle'), color: 'yellow' });
-                }
-              }
+              connectHandled.current = true;
+              handleConnect(c.source, c.target);
+            }}
+            onConnectEnd={(e) => {
+              const source = connectFrom.current;
+              connectFrom.current = null;
+              // If the drag already landed on a real handle, onConnect did it.
+              if (connectHandled.current || !source) return;
+              // Otherwise treat a drop ANYWHERE on a panel as the connection:
+              // find the node under the pointer and wire to it.
+              const pt =
+                'changedTouches' in e && e.changedTouches.length > 0
+                  ? e.changedTouches[0]
+                  : (e as MouseEvent);
+              if (!pt) return;
+              const el = document.elementFromPoint(pt.clientX, pt.clientY) as HTMLElement | null;
+              const nodeEl = el?.closest('.react-flow__node') as HTMLElement | null;
+              const target = nodeEl?.getAttribute('data-id') ?? undefined;
+              handleConnect(source, target);
             }}
             onBeforeDelete={async ({ nodes: dn }) => {
               // Deleting a panel that feeds sub-panels disconnects them all —
