@@ -71,6 +71,7 @@ export function SystemView() {
   const addPanelFromUserTemplate = useProjectStore((s) => s.addPanelFromUserTemplate);
   const removeUserTemplate = useProjectStore((s) => s.removeUserTemplate);
   const importPanels = useProjectStore((s) => s.importPanels);
+  const addCircuit = useProjectStore((s) => s.addCircuit);
 
   const system = useSystemResult();
 
@@ -109,10 +110,10 @@ export function SystemView() {
     return [
       { id: 'service', label: L('Set up your service', 'Atur layanan listrik'), hint: L('Supply, earthing & connected power', 'Suplai, pembumian & daya tersambung'), done: serviceDone, onClick: () => requestService() },
       { id: 'panel', label: L('Add a panel', 'Tambah panel'), hint: L('Adds a sub-panel you can wire up', 'Menambah sub-panel untuk dirangkai'), done: hasPanel, onClick: () => addPanel() },
-      { id: 'circuit', label: L('Add a load / circuit', 'Tambah beban / sirkit'), hint: L('Drag a load from the palette onto a panel', 'Seret beban dari palet ke panel'), done: hasCircuit },
+      { id: 'circuit', label: L('Add a load / circuit', 'Tambah beban / sirkit'), hint: L('Drag a load from the palette — or click to add one', 'Seret beban dari palet — atau klik untuk menambah'), done: hasCircuit, onClick: () => { const first = project.panels[0]; if (first) addCircuit(first.id); } },
       { id: 'export', label: L('Export your drawings', 'Ekspor gambar'), hint: L('SLD, schedules & BOM', 'SLD, jadwal & BOM'), done: false, onClick: () => void exportAllDeliverables() },
     ];
-  }, [project, i18n.language, requestService, addPanel]);
+  }, [project, i18n.language, requestService, addPanel, addCircuit]);
   const showOnboarding =
     !onboardingDismissed && !(onboardingSteps[0]!.done && onboardingSteps[1]!.done && onboardingSteps[2]!.done);
 

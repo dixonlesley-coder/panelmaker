@@ -508,7 +508,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
   inspectorRequest: null,
   activeScreen: 'system',
   preferredBrand: null,
-  beginnerMode: typeof localStorage !== 'undefined' && localStorage.getItem('pm:beginnerMode') === '1',
+  // Default ON for first-run users (ease of use is the priority); respect an
+  // explicit choice once the toggle has ever been used. Stored '0'/'1'.
+  beginnerMode:
+    typeof localStorage === 'undefined' || localStorage.getItem('pm:beginnerMode') !== '0',
   onboardingDismissed: typeof localStorage !== 'undefined' && localStorage.getItem('pm:onboardingDismissed') === '1',
   userTemplates: loadUserTemplates(),
   schematics: {},
