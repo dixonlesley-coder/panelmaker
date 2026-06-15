@@ -1,4 +1,4 @@
-import { AL_MIN_SECTION_MM2, STANDARD_SECTIONS_MM2, khaFor } from '../standards/conductors';
+import { AL_MIN_SECTION_MM2, STANDARD_SECTIONS_MM2, cableKha, khaFor, type CableFamily } from '../standards/conductors';
 import type { ConductorMaterial, InstallMethod, Insulation, SystemType } from '../types/electrical';
 import type { CableResult } from '../types/results';
 import { round } from './util';
@@ -31,6 +31,11 @@ export interface CableSizingInput {
   material?: ConductorMaterial;
   /** Installation method — selects the per-method IEC ampacity table. */
   installMethod?: InstallMethod;
+  /** Cable construction family (NYY/NYM/NYA/NYAF) — when set, the manufacturer
+   *  (Supreme) per-type ampacity is used instead of the generic copper/PVC table. */
+  cableFamily?: CableFamily;
+  /** Three-phase circuit — selects the multi-core (vs 2-core) ampacity column. */
+  threePhase?: boolean;
   /** When set, also upsize the cable to hold voltage drop within its limit. */
   vd?: CableVoltageDropConstraint;
 }
@@ -64,9 +69,16 @@ export function sizeCable({
   insulation = 'PVC',
   material = 'Cu',
   installMethod = 'conduit',
+  cableFamily,
+  threePhase = false,
   vd,
 }: CableSizingInput): CableResult {
-  const kha = (section: number): number => khaFor(section, { insulation, material, installMethod });
+  // A specific copper/PVC cable type (NYY/NYM/NYA/NYAF) uses the manufacturer's
+  // per-type, per-core-count ampacity; everything else uses the generic tables.
+  const kha = (section: number): number =>
+    cableFamily
+      ? cableKha(section, { family: cableFamily, threePhase, installMethod })
+      : khaFor(section, { insulation, material, installMethod });
   // Aluminum is only practical from 16 mm² (NAYY / NA2XY).
   const minByMaterial = material === 'Al' ? Math.max(minSectionMm2, AL_MIN_SECTION_MM2) : minSectionMm2;
   const izRequired = Math.max(breakerRatingA, CONTINUOUS_FACTOR * designCurrentA);

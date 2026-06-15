@@ -179,6 +179,76 @@ export function khaFor(sectionMm2: number, opts: KhaLookup = {}): number {
   return (opts.material ?? 'Cu') === 'Al' ? kha * AL_AMPACITY_RATIO : kha;
 }
 
+/* --------- Per-cable-type ampacities (Supreme Cable / SUCACO catalogues) -------
+ * Copper/PVC current-carrying capacities at 30 °C, transcribed from the Supreme
+ * "Low Voltage PVC Cable" and "Building Wire" catalogues (IEC 60502-1 /
+ * IEC 60227 / SNI). Sizing picks the table by the circuit's cable TYPE, its core
+ * count (1-phase = 2-core, 3-phase = 3/4/5-core), and the install regime
+ * (conduit/air/ground). Missing sections/regimes fall back to {@link khaFor}.
+ * Verify against the manufacturer datasheet for the specific construction. */
+export type CableFamily = 'NYY' | 'NYM' | 'NYA' | 'NYAF';
+
+// NYY 0.6/1 kV power cable — "in air" / "in ground", by core count.
+const KHA_NYY_2C_AIR: Readonly<Record<number, number>> = {
+  1.5: 21, 2.5: 29, 4: 38, 6: 46, 10: 66, 16: 90, 25: 120, 35: 150,
+  50: 180, 70: 230, 95: 275, 120: 320, 150: 375, 185: 430, 240: 510, 300: 590,
+};
+const KHA_NYY_2C_GND: Readonly<Record<number, number>> = {
+  1.5: 27, 2.5: 36, 4: 47, 6: 59, 10: 78, 16: 102, 25: 134, 35: 160,
+  50: 187, 70: 230, 95: 280, 120: 320, 150: 355, 185: 409, 240: 472, 300: 525,
+};
+const KHA_NYY_M_AIR: Readonly<Record<number, number>> = {
+  1.5: 18, 2.5: 25, 4: 34, 6: 44, 10: 60, 16: 80, 25: 105, 35: 130,
+  50: 160, 70: 200, 95: 245, 120: 285, 150: 325, 185: 370, 240: 435, 300: 500,
+};
+const KHA_NYY_M_GND: Readonly<Record<number, number>> = {
+  1.5: 24, 2.5: 32, 4: 41, 6: 52, 10: 69, 16: 89, 25: 116, 35: 138,
+  50: 165, 70: 205, 95: 245, 120: 285, 150: 315, 185: 355, 240: 415, 300: 465,
+};
+// NYM 300/500 V building wire — "in air" only (installation cable; ≤ 10 mm²).
+const KHA_NYM_2C_AIR: Readonly<Record<number, number>> = { 1.5: 19, 2.5: 25, 4: 34, 6: 44, 10: 61 };
+const KHA_NYM_M_AIR: Readonly<Record<number, number>> = { 1.5: 17, 2.5: 22, 4: 30, 6: 39, 10: 54 };
+// NYA / NYAF 450/750 V single-core — "in pipe" (conduit) / "in air".
+const KHA_NYA_PIPE: Readonly<Record<number, number>> = {
+  1.5: 15, 2.5: 20, 4: 25, 6: 33, 10: 45, 16: 61, 25: 83, 35: 104,
+  50: 132, 70: 166, 95: 198, 120: 236, 150: 270, 185: 305,
+};
+const KHA_NYA_AIR: Readonly<Record<number, number>> = {
+  1.5: 24, 2.5: 32, 4: 43, 6: 54, 10: 74, 16: 98, 25: 140, 35: 159,
+  50: 197, 70: 247, 95: 299, 120: 345, 150: 391, 185: 449, 240: 529, 300: 609,
+};
+
+/** Set of cable types that have a dedicated manufacturer ampacity table. */
+export const CABLE_FAMILIES: ReadonlySet<string> = new Set(['NYY', 'NYM', 'NYA', 'NYAF']);
+
+/**
+ * Manufacturer (Supreme) ampacity for a copper/PVC cable of a given TYPE, at its
+ * actual core count and install regime. Falls back to the generic {@link khaFor}
+ * tables for sections/regimes the catalogue doesn't cover (e.g. NYM > 10 mm², or
+ * any family laid in ground other than NYY).
+ */
+export function cableKha(
+  sectionMm2: number,
+  opts: { family: CableFamily; threePhase: boolean; installMethod?: string },
+): number {
+  const { family, threePhase, installMethod = 'conduit' } = opts;
+  const method = REF_METHOD_FOR_INSTALL[installMethod] ?? 'B1';
+  const buried = method === 'D';
+  let table: Readonly<Record<number, number>> | undefined;
+  if (family === 'NYY') {
+    table = threePhase ? (buried ? KHA_NYY_M_GND : KHA_NYY_M_AIR) : buried ? KHA_NYY_2C_GND : KHA_NYY_2C_AIR;
+  } else if (family === 'NYM' && !buried) {
+    table = threePhase ? KHA_NYM_M_AIR : KHA_NYM_2C_AIR;
+  } else if ((family === 'NYA' || family === 'NYAF') && !buried) {
+    // Single-core: "in pipe" when in conduit/trunking (B1), else "in air".
+    table = method === 'B1' ? KHA_NYA_PIPE : KHA_NYA_AIR;
+  }
+  const v = table?.[sectionMm2];
+  if (v !== undefined) return v;
+  // Generic copper/PVC fallback (itself the Supreme NYY reference).
+  return khaFor(sectionMm2, { insulation: 'PVC', material: 'Cu', installMethod });
+}
+
 /**
  * AC resistance of copper conductors, ohm/km at ~70 degC operating temperature
  * (IEC 60909 / manufacturer data). Used for voltage-drop calculations.

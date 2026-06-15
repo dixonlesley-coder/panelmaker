@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { computePanel, computeSystem } from '@shared/engine';
-import { khaFor, conductorResistanceOhmPerKm, AL_MIN_SECTION_MM2 } from '@shared/standards/conductors';
+import { khaFor, cableKha, conductorResistanceOhmPerKm, AL_MIN_SECTION_MM2 } from '@shared/standards/conductors';
 import { checkZs } from '@shared/engine/fault';
 import { motorFLC1ph } from '@shared/engine/control/motorFLC';
 import { applyStarterTemplate } from '@shared/engine/control/applyStarterTemplate';
@@ -180,6 +180,28 @@ describe('per-method ampacity tables', () => {
     );
     expect(khaFor(300, { installMethod: 'buried' })).toBeLessThan(
       khaFor(300, { installMethod: 'conduit' }),
+    );
+  });
+});
+
+// Manufacturer (Supreme Cable) per-type ampacity — by cable family, core count
+// (1-phase = 2-core, 3-phase = multi-core) and install regime.
+describe('per-cable-type ampacity (Supreme catalogues)', () => {
+  it('NYM (building wire) reads the 2-core column for 1-phase, the 3-5 core column for 3-phase', () => {
+    expect(cableKha(4, { family: 'NYM', threePhase: false, installMethod: 'conduit' })).toBe(34);
+    expect(cableKha(4, { family: 'NYM', threePhase: true, installMethod: 'conduit' })).toBe(30);
+  });
+  it('NYY (power cable) gives in-air above ground and the higher in-ground when buried', () => {
+    expect(cableKha(4, { family: 'NYY', threePhase: true, installMethod: 'air' })).toBe(34);
+    expect(cableKha(4, { family: 'NYY', threePhase: true, installMethod: 'buried' })).toBe(41);
+  });
+  it('NYA single-core uses "in pipe" in conduit and "in air" on tray', () => {
+    expect(cableKha(4, { family: 'NYA', threePhase: false, installMethod: 'conduit' })).toBe(25);
+    expect(cableKha(4, { family: 'NYA', threePhase: false, installMethod: 'tray' })).toBe(43);
+  });
+  it('falls back to the generic copper/PVC table beyond a family’s catalogue range (NYM > 10 mm²)', () => {
+    expect(cableKha(25, { family: 'NYM', threePhase: false, installMethod: 'conduit' })).toBe(
+      khaFor(25, { insulation: 'PVC', material: 'Cu', installMethod: 'conduit' }),
     );
   });
 

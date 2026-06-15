@@ -1,7 +1,7 @@
 import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM, sheetThicknessMm } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
-import { STANDARD_SECTIONS_MM2 } from '../standards/conductors';
+import { STANDARD_SECTIONS_MM2, CABLE_FAMILIES, type CableFamily } from '../standards/conductors';
 import { selectBuswayRating } from '../standards/busway';
 import {
   selectTransformerKva,
@@ -144,6 +144,19 @@ function computeCircuit(
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const insulation = panel.insulation ?? 'PVC';
   const material = panel.material ?? 'Cu';
+  // Copper/PVC cables size against the manufacturer's per-TYPE ampacity (Supreme
+  // catalogue): an explicit type wins; otherwise the Cu/PVC default is NYY for
+  // three-phase, NYM for single-phase finals (matching the cable-spec defaults).
+  // Aluminium, XLPE and life-safety (FRC) keep the generic tables (cableFamily
+  // left undefined).
+  const cableFamily: CableFamily | undefined =
+    material === 'Al' || insulation === 'XLPE' || c.lifeSafety
+      ? undefined
+      : c.cableType && CABLE_FAMILIES.has(c.cableType)
+        ? (c.cableType as CableFamily)
+        : threePhase
+          ? 'NYY'
+          : 'NYM';
   const cable = sizeCable({
     designCurrentA: ib,
     breakerRatingA: breaker.ratingA,
@@ -152,6 +165,8 @@ function computeCircuit(
     insulation,
     material,
     installMethod: panel.installMethod,
+    ...(cableFamily ? { cableFamily } : {}),
+    threePhase,
     // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the
     // resulting `vd` below is then within limit by construction in normal cases,
     // and any residual over-limit is the genuinely-impossible (max-section) case.
