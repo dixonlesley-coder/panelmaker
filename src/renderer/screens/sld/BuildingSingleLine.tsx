@@ -42,6 +42,7 @@ import {
   IconHandMove,
   IconLayoutDistributeHorizontal,
   IconLayoutDistributeVertical,
+  IconLayoutGrid,
   IconSearch,
   IconPlug,
   IconPlugConnected,
@@ -1722,32 +1723,59 @@ function buildUnified(
   );
   const colPitch = maxPanelW + 160;
 
+  // Tidy-tree placement: lay each subtree out so a PARENT is centred over its
+  // children and siblings stay contiguous — feeders never cross — while every
+  // panel still sits on its depth's row (vertical) or column (horizontal). The
+  // breadth axis is X when vertical, Y when horizontal.
+  const childrenOrdered = (id: string): string[] => {
+    const out: string[] = [];
+    for (const c of byId.get(id)?.circuits ?? []) {
+      if (c.feedsPanelId && system.panels[c.feedsPanelId]) out.push(c.feedsPanelId);
+    }
+    return out;
+  };
+  const bodyExtent = (id: string): number =>
+    dir === 'vertical'
+      ? panelWidth(system.panels[id]?.circuits.length ?? 0, busDevicesFor(id).length)
+      : heightFor(id) + PANEL_CHROME;
+  const posById = new Map<string, { x: number; y: number }>();
+  let cursor = 0;
+  const placeSubtree = (id: string, d: number): number => {
+    const kids = childrenOrdered(id);
+    const ext = bodyExtent(id);
+    let center: number;
+    if (kids.length === 0) {
+      center = cursor + ext / 2;
+      cursor += dir === 'vertical' ? ext + GAP : rowPitch;
+    } else {
+      const cs = kids.map((k) => placeSubtree(k, d + 1));
+      center = (cs[0]! + cs[cs.length - 1]!) / 2;
+    }
+    posById.set(
+      id,
+      dir === 'vertical' ? { x: center - ext / 2, y: d * rowPitch } : { x: d * colPitch, y: center - ext / 2 },
+    );
+    return center;
+  };
+  const layoutRoots = project.panels.filter((p) => system.panels[p.id] && !parentOf.has(p.id));
+  for (const r of layoutRoots) {
+    placeSubtree(r.id, 0);
+    cursor += GAP; // separate sibling roots (forest)
+  }
+  // Fallback for any panel a feeder cycle left unreachable from a root.
+  for (const p of project.panels) {
+    if (system.panels[p.id] && !posById.has(p.id)) placeSubtree(p.id, depthOf(p.id));
+  }
+
   const nodes: Node[] = [];
   const edges: Edge[] = [];
-  for (const [d, ids] of [...rows.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [, ids] of [...rows.entries()].sort((a, b) => a[0] - b[0])) {
     const widths = ids.map((id) => panelWidth(system.panels[id]?.circuits.length ?? 0, busDevicesFor(id).length));
-    // Slot positions for this depth: vertical spreads panels along X at y=depth;
-    // horizontal stacks them along Y at x=depth (source on top vs at the left).
-    const slots: { x: number; y: number }[] = [];
-    if (dir === 'horizontal') {
-      let y = -(ids.length * rowPitch) / 2;
-      for (let i = 0; i < ids.length; i += 1) {
-        slots.push({ x: d * colPitch, y });
-        y += rowPitch;
-      }
-    } else {
-      const rowWidth = widths.reduce((s, w) => s + w, 0) + GAP * (ids.length - 1);
-      let x = -rowWidth / 2;
-      for (let i = 0; i < ids.length; i += 1) {
-        slots.push({ x, y: d * rowPitch });
-        x += widths[i]! + GAP;
-      }
-    }
     ids.forEach((id, i) => {
       const panel = byId.get(id);
       const res = system.panels[id];
       const w = widths[i]!;
-      const slot = slots[i]!;
+      const slot = posById.get(id) ?? { x: 0, y: 0 };
       if (!panel || !res) return;
       const inputById = new Map(panel.circuits.map((ci) => [ci.id, ci]));
       const ways: UnifiedWay[] = res.circuits.map((c) => {
@@ -2449,6 +2477,18 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     });
   }, [built.nodes, setNodes, layoutDir]);
 
+  // Tidy: discard manual drag offsets and snap every node back to the clean,
+  // depth-aligned auto-layout (panels grouped by feeder level, centred, feeders
+  // un-crossed), then fit the view. Selection is preserved.
+  const tidy = useCallback(() => {
+    pendingPanelPos.current.clear();
+    setNodes((cur) => {
+      const selected = new Set(cur.filter((n) => n.selected).map((n) => n.id));
+      return built.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
+    });
+    setTimeout(() => rfRef.current?.fitView({ padding: 0.2, duration: 350 }), 60);
+  }, [built.nodes, setNodes]);
+
   // A panel's EXPANDED footprint (width × detail height), so a drag can be nudged
   // clear of other panels even while zoomed out (where the card looks short).
   const panelBox = useCallback(
@@ -2967,6 +3007,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
             />
             <Panel position="top-right">
               <Group gap={6} wrap="nowrap">
+                <Tooltip label={t('system.tidy')}>
+                  <ActionIcon
+                    variant="default"
+                    size="lg"
+                    aria-label={t('system.tidy')}
+                    onClick={tidy}
+                  >
+                    <IconLayoutGrid size={18} />
+                  </ActionIcon>
+                </Tooltip>
                 <Tooltip
                   label={layoutDir === 'vertical' ? t('system.layoutHorizontal') : t('system.layoutVertical')}
                 >

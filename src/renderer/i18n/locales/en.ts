@@ -759,6 +759,7 @@ export const en = {
     layoutToggle: 'Diagram orientation',
     layoutHorizontal: 'Lay out left-to-right',
     layoutVertical: 'Lay out top-to-bottom',
+    tidy: 'Auto-arrange (tidy)',
     dualTransformer: 'Dual transformer (split bus + N.O. coupler)',
     myTemplates: 'My templates',
     templateMeta_one: '{{count}} circuit · from {{panel}}',

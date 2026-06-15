@@ -763,6 +763,7 @@ export const id: TranslationKeys = {
     layoutToggle: 'Orientasi diagram',
     layoutHorizontal: 'Tata kiri-ke-kanan',
     layoutVertical: 'Tata atas-ke-bawah',
+    tidy: 'Rapikan otomatis',
     dualTransformer: 'Trafo ganda (bus terpisah + kopler N.O.)',
     myTemplates: 'Templat saya',
     templateMeta_one: '{{count}} sirkuit · dari {{panel}}',
