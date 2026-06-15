@@ -192,8 +192,21 @@ export function PowerOneline({ system }: { system: SystemResult }) {
     }));
 
     const AC_FLOW = new Set(['mains', 'genset', 'AC', 'AC grid']);
+    // Theme-aware label chip so flow tags ("mains"/"AC"/"DC") read as dark chips
+    // on the canvas instead of React Flow's default stark-white boxes.
+    const labelChip = (stroke: string) => ({
+      labelBgPadding: [5, 2] as [number, number],
+      labelBgBorderRadius: 4,
+      labelBgStyle: {
+        fill: 'var(--mantine-color-body)',
+        fillOpacity: 0.95,
+        stroke,
+        strokeWidth: 1,
+      },
+    });
     const rfEdges: Edge[] = ol.edges.map((e) => {
       const isDc = e.label === 'DC';
+      const hasLabel = e.label !== undefined && e.label !== '';
       return {
         id: e.id,
         source: e.from,
@@ -205,10 +218,15 @@ export function PowerOneline({ system }: { system: SystemResult }) {
         // AC power flows animate; DC links (PV/battery → inverter) read as a
         // distinct dashed amber pair so the wiring is unambiguous on the canvas.
         animated: e.label !== undefined && AC_FLOW.has(e.label),
-        ...(isDc
+        ...(isDc ? { style: { stroke: 'var(--mantine-color-yellow-6)', strokeDasharray: '5 4' } } : {}),
+        ...(hasLabel
           ? {
-              style: { stroke: 'var(--mantine-color-yellow-6)', strokeDasharray: '5 4' },
-              labelStyle: { fill: 'var(--mantine-color-yellow-7)', fontWeight: 700 },
+              labelStyle: {
+                fill: isDc ? 'var(--mantine-color-yellow-7)' : 'var(--mantine-color-text)',
+                fontWeight: 700,
+                fontSize: 11,
+              },
+              ...labelChip(isDc ? 'var(--mantine-color-yellow-6)' : 'var(--mantine-color-default-border)'),
             }
           : {}),
       };
