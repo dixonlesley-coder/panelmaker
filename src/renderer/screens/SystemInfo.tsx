@@ -324,10 +324,14 @@ function FaultLevelsCard({ system }: { system: SystemResult }) {
           const inadequate = p.warnings.some((w) => w.code === 'breaking-capacity-inadequate');
           return (
             <Group key={p.panelId} justify="space-between" wrap="nowrap" gap="xs">
-              <Text size="sm" truncate>
+              <Text size="sm" truncate title={panelLabel(p)}>
                 {panelLabel(p)}
               </Text>
-              <Badge variant={inadequate ? 'filled' : 'light'} color={inadequate ? 'red' : 'gray'}>
+              <Badge
+                variant={inadequate ? 'filled' : 'light'}
+                color={inadequate ? 'red' : 'gray'}
+                style={{ flexShrink: 0 }}
+              >
                 {p.faultLevelKa} kA
               </Badge>
             </Group>

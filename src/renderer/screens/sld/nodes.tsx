@@ -228,7 +228,7 @@ export function BusbarNode({ data }: NodeProps) {
             </Badge>
           )}
         </Group>
-        <Group gap={8} wrap="nowrap">
+        <Group gap={8} wrap="nowrap" style={{ flexShrink: 0 }}>
           {d.waysLabel && (
             <Text size="xs" style={{ opacity: 0.85 }}>
               {d.waysLabel}
@@ -330,7 +330,7 @@ export function BranchNode({ data }: NodeProps) {
         <Text size="xs" fw={600} lineClamp={2} title={d.name} style={{ minWidth: 0 }}>
           {d.name}
         </Text>
-        <Group gap={4} wrap="nowrap">
+        <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
           <NodeIssues issues={d.issues} />
           {changed && (
             <Badge size="xs" variant="filled" color="teal" title={d.changed!.join('\n')}>
