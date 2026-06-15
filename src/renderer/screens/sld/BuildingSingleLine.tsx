@@ -186,7 +186,7 @@ const BRK_H = 20;
 const RCD_BAND = 15;
 const STARTER_BAND = 28;
 const LOAD_W = 70; // external load-node width (≤ WAY_W so siblings don't overlap)
-const LOAD_NODE_H = 74; // approx external load-node height (for layout clearance)
+const LOAD_NODE_H = 88; // approx external load-node height (for layout clearance; allows a 2-line name)
 // The panel card's chrome ABOVE the schematic SVG (title/badges header + card
 // padding + the schematic's top margin), in the expanded/zoomed-in state. The
 // `layout().height` only covers the SVG, so loads must clear schematic + chrome
@@ -1262,7 +1262,7 @@ function LoadNode({ data, selected }: NodeProps) {
         <line x1={(LOAD_W - 12) / 2} y1={0} x2={(LOAD_W - 12) / 2} y2={6} stroke={PHASE_COLOR[d.phase] ?? FG} strokeWidth={1.6} />
         {loadSymbol((LOAD_W - 12) / 2, 8, symW, d.threePhase)}
       </svg>
-      <Text size="9px" fw={700} ta="center" lineClamp={1} title={d.name}>
+      <Text size="9px" fw={700} ta="center" lineClamp={2} title={d.name} style={{ lineHeight: 1.15 }}>
         {d.name}
       </Text>
       <Text
@@ -1314,7 +1314,7 @@ function FloatLoadNode({ data, selected }: NodeProps) {
       <svg width={LOAD_W - 4} height={30} style={{ display: 'block', margin: '0 auto' }}>
         {loadSymbol((LOAD_W - 4) / 2, 8, symW, false)}
       </svg>
-      <Text size="9px" fw={700} ta="center" lineClamp={1} title={d.name}>
+      <Text size="9px" fw={700} ta="center" lineClamp={2} title={d.name} style={{ lineHeight: 1.15 }}>
         {d.name}
       </Text>
       <Text size="9px" c="orange.6" ta="center" lineClamp={1}>
