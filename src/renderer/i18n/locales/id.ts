@@ -1348,6 +1348,10 @@ export const id: TranslationKeys = {
     model: 'Model',
     unitPrice: 'Harga satuan',
     noCatalogMatch: '{{key}} — tidak ada padanan katalog',
+    downloadTemplate: 'Unduh templat',
+    templateHint: 'Dua kolom — model dan harga. Isi harga Anda lalu impor.',
+    currentlyPriced: 'Harga saat ini',
+    noneYet: 'Belum ada harga — impor daftar harga atau unduh templat untuk mulai.',
   },
 
   autosave: {

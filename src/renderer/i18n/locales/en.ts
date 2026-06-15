@@ -1343,6 +1343,10 @@ export const en = {
     model: 'Model',
     unitPrice: 'Unit price',
     noCatalogMatch: '{{key}} — no catalog match',
+    downloadTemplate: 'Download template',
+    templateHint: 'Two columns — model and price. Fill in your prices and import.',
+    currentlyPriced: 'Currently priced',
+    noneYet: 'No prices yet — import a pricelist or download the template to start.',
   },
 
   autosave: {
