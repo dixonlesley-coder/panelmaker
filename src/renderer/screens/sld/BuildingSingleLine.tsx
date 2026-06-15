@@ -198,6 +198,20 @@ const PANEL_CHROME = 64;
 const LOAD_DROP_GAP = 64;
 const GRID_SRC_W = 158; // utility-supply (grid) node, drawn above a utility panel
 const GRID_SRC_H = 54;
+/** Theme-aware AC/DC edge-label chip: matches the canvas instead of React Flow's
+ *  default white box (which reads as a stark tile in dark mode). The colored
+ *  border is set per-edge to the line's colour. */
+const EDGE_LABEL_BASE = {
+  labelStyle: { fill: 'var(--mantine-color-text)', fontSize: 10, fontWeight: 700 },
+  labelBgPadding: [5, 2] as [number, number],
+  labelBgBorderRadius: 4,
+};
+const edgeLabelBg = (stroke: string) => ({
+  fill: 'var(--mantine-color-body)',
+  fillOpacity: 0.95,
+  stroke,
+  strokeWidth: 1,
+});
 /** Layout grid: panels + loads snap to it so wiring stays legible. */
 const GRID = 16;
 const snap = (n: number) => Math.round(n / GRID) * GRID;
@@ -2030,7 +2044,9 @@ function buildUnified(
           target: sinkId,
           targetHandle: inputHandle(0),
           // PLN is the inverter's AC source when hybrid; label it so.
-          ...(hybrid ? { label: 'AC' } : {}),
+          ...(hybrid
+            ? { label: 'AC', ...EDGE_LABEL_BASE, labelBgStyle: edgeLabelBg('var(--mantine-color-indigo-5)') }
+            : {}),
           type: 'smoothstep',
           style: { stroke: 'var(--mantine-color-indigo-5)', strokeWidth: 2 },
         });
@@ -2056,7 +2072,13 @@ function buildUnified(
             sourceHandle: 'out',
             target: sinkId,
             targetHandle: inputHandle(k + 1),
-            ...(hybrid ? { label: isDc ? 'DC' : 'AC' } : {}),
+            ...(hybrid
+              ? {
+                  label: isDc ? 'DC' : 'AC',
+                  ...EDGE_LABEL_BASE,
+                  labelBgStyle: edgeLabelBg(SOURCE_NODE_STYLE[sd.kind].color),
+                }
+              : {}),
             type: 'smoothstep',
             style: { stroke: SOURCE_NODE_STYLE[sd.kind].color, strokeWidth: 2, strokeDasharray: '5 3' },
           });
