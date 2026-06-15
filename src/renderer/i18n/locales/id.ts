@@ -1141,6 +1141,14 @@ export const id: TranslationKeys = {
     busbarSection: 'Busbar §{{index}}',
     waysCount: '{{count}} jalur',
   },
+  lightCalc: {
+    title: 'Kalkulator pencahayaan',
+    add: 'Tambah armatur',
+    empty: 'Tambahkan armatur (downlight, strip LED, panel…) untuk menghitung beban otomatis.',
+    summary: '{{count}} armatur',
+    custom: 'Armatur khusus',
+    fromFittings: 'Otomatis dari armatur',
+  },
   circuitEditor: {
     design: 'Arus desain',
     breaker: 'Pemutus',

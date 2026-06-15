@@ -1136,6 +1136,14 @@ export const en = {
     busbarSection: 'Busbar §{{index}}',
     waysCount: '{{count}} ways',
   },
+  lightCalc: {
+    title: 'Lighting calculator',
+    add: 'Add fitting',
+    empty: 'Add fittings (downlights, LED strip, panels…) to auto-calculate the load.',
+    summary: '{{count}} fittings',
+    custom: 'Custom fitting',
+    fromFittings: 'Auto from fittings',
+  },
   circuitEditor: {
     design: 'Design current',
     breaker: 'Breaker',

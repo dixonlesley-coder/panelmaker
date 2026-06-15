@@ -12,16 +12,19 @@ import {
   Stack,
   Switch,
   Text,
+  ActionIcon,
 } from '@mantine/core';
-import { IconBulb, IconTrash } from '@tabler/icons-react';
-import type { CableType, CircuitInput, CircuitResult, LoadKind, StarterType } from '@shared/types';
+import { IconBulb, IconPlus, IconTrash } from '@tabler/icons-react';
+import type { CableType, CircuitInput, CircuitResult, LightFixture, LoadKind, StarterType } from '@shared/types';
 import {
   LOAD_KINDS,
   LOAD_DEFAULTS,
+  LIGHTING_FIXTURE_PRESETS,
   SCHEDULE_PRESETS,
   STANDARD_BREAKER_RATINGS_A,
   presetKeyFor,
 } from '@shared/standards';
+import { derivedPointsLoadW } from '@shared/engine/fixtures';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { circuitOrderCodes } from '@shared/engine/bom';
 import { partsForBrand } from '@shared/data/catalog';
@@ -52,6 +55,115 @@ const CABLE_TYPES: CableType[] = ['NYY', 'NYM', 'NYA', 'NYAF'];
 
 function isMotorKind(kind: LoadKind): boolean {
   return kind === 'motor' || kind === 'pump';
+}
+
+function rid(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** Match a fixture row back to a preset (for the picker), else "custom". */
+function presetIdFor(f: LightFixture): string {
+  const hit = LIGHTING_FIXTURE_PRESETS.find(
+    (p) => p.id !== 'custom' && p.label === f.name && p.watts === f.wattsPerFitting,
+  );
+  return hit ? hit.id : 'custom';
+}
+
+/**
+ * Quick lighting-load calculator: tally common fittings (downlights, LED strip,
+ * panels, …) at their typical wattages and the connected load is the sum. Builds
+ * the circuit's `fixtures[]` so the engine derives the load from the points (and
+ * the count flows to the lighting & small-power sheet); the kW field then shows
+ * that derived figure. Each row's wattage is editable for non-standard fittings.
+ */
+function LightingCalculator({
+  fixtures,
+  onChange,
+}: {
+  fixtures: LightFixture[];
+  onChange: (next: LightFixture[]) => void;
+}) {
+  const { t } = useTranslation();
+  const total = fixtures.reduce((s, f) => s + Math.max(0, f.wattsPerFitting) * Math.max(0, f.qty), 0);
+  const count = fixtures.reduce((s, f) => s + Math.max(0, f.qty), 0);
+  const patchRow = (id: string, p: Partial<LightFixture>) =>
+    onChange(fixtures.map((f) => (f.id === id ? { ...f, ...p } : f)));
+  const addRow = () => {
+    const p = LIGHTING_FIXTURE_PRESETS[1]!; // LED downlight 12 W
+    onChange([...fixtures, { id: rid('fx'), name: p.label, wattsPerFitting: p.watts, qty: 1 }]);
+  };
+  return (
+    <Stack gap="xs">
+      <Group justify="space-between" align="center">
+        <Group gap={6}>
+          <IconBulb size={15} />
+          <Text size="sm" fw={600}>
+            {t('lightCalc.title')}
+          </Text>
+        </Group>
+        <Button size="compact-xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addRow}>
+          {t('lightCalc.add')}
+        </Button>
+      </Group>
+      {fixtures.length === 0 ? (
+        <Text size="xs" c="dimmed">
+          {t('lightCalc.empty')}
+        </Text>
+      ) : (
+        <Stack gap={6}>
+          {fixtures.map((f) => (
+            <Group key={f.id} gap={6} wrap="nowrap" align="center">
+              <Select
+                style={{ flex: 1 }}
+                size="xs"
+                data={LIGHTING_FIXTURE_PRESETS.map((p) => ({ value: p.id, label: p.label }))}
+                value={presetIdFor(f)}
+                allowDeselect={false}
+                comboboxProps={{ withinPortal: true }}
+                onChange={(v) => {
+                  const p = LIGHTING_FIXTURE_PRESETS.find((x) => x.id === v);
+                  if (!p) return;
+                  patchRow(f.id, p.id === 'custom' ? { name: t('lightCalc.custom') } : { name: p.label, wattsPerFitting: p.watts });
+                }}
+              />
+              <NumberInput
+                size="xs"
+                w={82}
+                min={0}
+                suffix=" W"
+                value={f.wattsPerFitting}
+                onChange={(v) => patchRow(f.id, { wattsPerFitting: typeof v === 'number' ? v : 0 })}
+              />
+              <Text size="xs" c="dimmed">
+                ×
+              </Text>
+              <NumberInput
+                size="xs"
+                w={64}
+                min={0}
+                value={f.qty}
+                onChange={(v) => patchRow(f.id, { qty: typeof v === 'number' ? v : 0 })}
+              />
+              <Text size="xs" w={60} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {Math.round(Math.max(0, f.wattsPerFitting) * Math.max(0, f.qty))} W
+              </Text>
+              <ActionIcon variant="subtle" color="red" onClick={() => onChange(fixtures.filter((x) => x.id !== f.id))}>
+                <IconTrash size={14} />
+              </ActionIcon>
+            </Group>
+          ))}
+        </Stack>
+      )}
+      <Group justify="space-between">
+        <Text size="xs" c="dimmed">
+          {t('lightCalc.summary', { count })}
+        </Text>
+        <Text size="sm" fw={700} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {(total / 1000).toFixed(2)} kW · {total} W
+        </Text>
+      </Group>
+    </Stack>
+  );
 }
 
 /** Cable loading colour: calm < 80%, warm 80–100%, hot ≥ 100%. */
@@ -219,6 +331,15 @@ export function CircuitEditor({ panelId, circuit, result, opened, onClose }: Pro
               suffix=" kW"
               onCommit={(v) => patch({ motorKw: v })}
             />
+          ) : circuit.fixtures && circuit.fixtures.length > 0 ? (
+            <NumberInput
+              label={t('builder.colLoad')}
+              description={t('lightCalc.fromFittings')}
+              value={(derivedPointsLoadW(circuit) ?? circuit.loadW) / 1000}
+              readOnly
+              decimalScale={2}
+              suffix=" kW"
+            />
           ) : (
             <DebouncedNumberInput
               label={t('builder.colLoad')}
@@ -278,6 +399,25 @@ export function CircuitEditor({ panelId, circuit, result, opened, onClose }: Pro
             onChange={(v) => patch({ schedule: SCHEDULE_PRESETS.find((p) => p.key === v)?.schedule })}
           />
         </SimpleGrid>
+
+        {/* Lighting load calculator — tally fittings; the load derives from them. */}
+        {circuit.loadKind === 'lighting' && (
+          <>
+            <Divider label={t('lightCalc.title')} />
+            <LightingCalculator
+              fixtures={circuit.fixtures ?? []}
+              onChange={(next) => {
+                const total = next.reduce(
+                  (s, f) => s + Math.max(0, f.wattsPerFitting) * Math.max(0, f.qty),
+                  0,
+                );
+                // Keep loadW in step with the tally; clearing all rows reverts to
+                // the manual kW field (last total retained).
+                patch(next.length > 0 ? { fixtures: next, loadW: total } : { fixtures: undefined });
+              }}
+            />
+          </>
+        )}
 
         <Divider label={t('circuitEditor.cableSection')} />
 

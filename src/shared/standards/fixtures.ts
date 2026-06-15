@@ -64,3 +64,36 @@ export const SMART_PROTOCOL_LABELS: Readonly<Record<SmartProtocol, string>> = {
 /** Governing references for the point/switching checks. */
 export const FIXTURES_CLAUSE =
   'PUIL 2011 final-circuit practice; IEC 60669-1 (switches); IEC 60364-5-52 (point loading)';
+
+/**
+ * Common LED luminaire types with typical wattages (incl. driver losses) for the
+ * quick lighting-load calculator. These are planning defaults — editable per row
+ * — covering the fittings used on Indonesian commercial/residential jobs.
+ * LED strip is quoted per metre (enter the run length as the quantity).
+ */
+export interface FixturePreset {
+  /** Stable key for the picker. */
+  id: string;
+  /** Human label shown in the calculator. */
+  label: string;
+  /** Typical power per fitting (W) — or per metre for strip. */
+  watts: number;
+}
+
+export const LIGHTING_FIXTURE_PRESETS: readonly FixturePreset[] = [
+  { id: 'downlight9', label: 'LED downlight 9 W', watts: 9 },
+  { id: 'downlight12', label: 'LED downlight 12 W', watts: 12 },
+  { id: 'downlight18', label: 'LED downlight 18 W', watts: 18 },
+  { id: 'panel18', label: 'LED panel 30×30 / 40×40', watts: 18 },
+  { id: 'panel40', label: 'LED panel 60×60', watts: 40 },
+  { id: 'batten18', label: 'LED batten / TL 0.6 m', watts: 18 },
+  { id: 'batten36', label: 'LED batten / TL 1.2 m', watts: 36 },
+  { id: 'strip10', label: 'LED strip (per metre)', watts: 10 },
+  { id: 'spot15', label: 'LED spotlight / track', watts: 15 },
+  { id: 'flood50', label: 'LED floodlight 50 W', watts: 50 },
+  { id: 'flood100', label: 'LED floodlight 100 W', watts: 100 },
+  { id: 'highbay150', label: 'LED highbay 150 W', watts: 150 },
+  { id: 'bulkhead12', label: 'Bulkhead / emergency', watts: 12 },
+  { id: 'pendant25', label: 'Pendant / decorative', watts: 25 },
+  { id: 'custom', label: 'Custom fitting…', watts: 12 },
+];

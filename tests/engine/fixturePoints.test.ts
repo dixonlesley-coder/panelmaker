@@ -12,6 +12,7 @@ import {
   MAX_W_PER_CONVENTIONAL_GANG,
   MAX_W_PER_SMART_CHANNEL,
   VA_PER_SOCKET_POINT,
+  LIGHTING_FIXTURE_PRESETS,
 } from '@shared/standards/fixtures';
 import { assemblyHoursForCategory } from '@shared/standards/labor';
 import type { CircuitInput, PanelInput, Part } from '@shared/types';
@@ -43,6 +44,23 @@ function panel(circuits: CircuitInput[]): PanelInput {
     circuits,
   };
 }
+
+describe('lighting fixture presets', () => {
+  it('the calculator library is non-empty, has a custom entry, and positive wattages', () => {
+    expect(LIGHTING_FIXTURE_PRESETS.length).toBeGreaterThan(5);
+    expect(LIGHTING_FIXTURE_PRESETS.some((p) => p.id === 'custom')).toBe(true);
+    for (const p of LIGHTING_FIXTURE_PRESETS) expect(p.watts).toBeGreaterThan(0);
+  });
+  it('a preset-built fixture row derives its load', () => {
+    const dl = LIGHTING_FIXTURE_PRESETS.find((p) => p.id === 'downlight12')!;
+    const c = circuit({
+      id: 'cp',
+      name: 'Downlights',
+      fixtures: [{ id: 'f', name: dl.label, wattsPerFitting: dl.watts, qty: 8 }],
+    });
+    expect(derivedPointsLoadW(c)).toBe(dl.watts * 8);
+  });
+});
 
 describe('derived point loads', () => {
   it('sums fixture rows: watts × qty', () => {
