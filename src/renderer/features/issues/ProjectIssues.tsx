@@ -21,11 +21,17 @@ interface IssueRow {
 }
 
 /** One warning row with severity, code, message and its apply-able fixes. */
-function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string) => void }) {
+function IssueRowCard({
+  row,
+  onLocate,
+}: {
+  row: IssueRow;
+  onLocate: (panelId: string, circuitId?: string) => void;
+}) {
   const { t } = useTranslation();
   const applyFix = useProjectStore((s) => s.applyFix);
-  const [expanded, setExpanded] = useState(false);
   const w = row.warning;
+  const canLocate = Boolean(row.panelId);
 
   const onApply = (fix: SuggestedFix) => {
     if (!row.panelId || !w.circuitId) return;
@@ -43,7 +49,14 @@ function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string
       withBorder
       radius="md"
       padding="xs"
-      style={{ borderLeft: `3px solid var(--mantine-color-${severityColor(w.severity)}-6)` }}
+      // The whole card locates the offending component on the canvas (centre +
+      // pulse-highlight); inner controls stopPropagation so they still work.
+      onClick={canLocate ? () => onLocate(row.panelId!, w.circuitId) : undefined}
+      title={canLocate ? t('issues.locateHint') : undefined}
+      style={{
+        borderLeft: `3px solid var(--mantine-color-${severityColor(w.severity)}-6)`,
+        cursor: canLocate ? 'pointer' : undefined,
+      }}
     >
       <Group gap="xs" mb={2}>
         <WarningBadge severity={w.severity} />
@@ -51,16 +64,10 @@ function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string
           {w.code}
         </Text>
       </Group>
-      {/* Several feeders can raise near-identical long messages (e.g. the same
-          Zs verdict per source); clamp to two lines so the drawer stays scannable,
-          click to read the full text. */}
-      <Text
-        size="sm"
-        lineClamp={expanded ? undefined : 2}
-        title={w.message}
-        style={{ cursor: 'pointer' }}
-        onClick={() => setExpanded((v) => !v)}
-      >
+      {/* Clamp long messages to keep the drawer scannable; the full text is on
+          the hover tooltip. The message is part of the card's click target, so
+          clicking the issue (anywhere) locates it on the canvas. */}
+      <Text size="sm" lineClamp={3} title={w.message}>
         {w.message}
       </Text>
       <Group gap="xs" mt="xs">
@@ -71,18 +78,24 @@ function IssueRowCard({ row, onGoto }: { row: IssueRow; onGoto: (panelId: string
             variant="light"
             leftSection={<IconTool size={14} />}
             disabled={!row.panelId || !w.circuitId}
-            onClick={() => onApply(fix)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onApply(fix);
+            }}
           >
             {t('issues.apply', { description: fix.description })}
           </Button>
         ))}
-        {row.panelId && (
+        {canLocate && (
           <Button
             size="xs"
             variant="subtle"
             color="gray"
             rightSection={<IconArrowRight size={14} />}
-            onClick={() => onGoto(row.panelId!)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onLocate(row.panelId!, w.circuitId);
+            }}
           >
             {t('issues.goToPanel')}
           </Button>
@@ -120,7 +133,7 @@ function ComplianceIcon({ status }: { status: ComplianceItem['status'] }) {
  * withstand, protective conductor, ampacity) shown at the top of the drawer — the
  * engineering checks you sign off, separate from advisory warnings below.
  */
-function ComplianceSection({ system, onGoto }: { system: SystemResult; onGoto: (panelId: string) => void }) {
+function ComplianceSection({ system, onGoto }: { system: SystemResult; onGoto: (panelId: string, circuitId?: string) => void }) {
   const { t } = useTranslation();
   const panels = system.order
     .map((id) => system.panels[id])
@@ -166,12 +179,13 @@ function ComplianceSection({ system, onGoto }: { system: SystemResult; onGoto: (
 export function ProjectIssues({ system }: { system: SystemResult }) {
   const { t } = useTranslation();
   const applyFix = useProjectStore((s) => s.applyFix);
-  const requestInspector = useProjectStore((s) => s.requestInspector);
+  const requestFocus = useProjectStore((s) => s.requestFocus);
   const [open, setOpen] = useState(false);
 
-  // Jump to a panel: open its canvas inspector and dismiss the drawer.
-  const goTo = (panelId: string) => {
-    requestInspector(panelId);
+  // Locate an issue: centre + pulse-highlight the panel (or its offending
+  // circuit) on the canvas, and dismiss the drawer so the highlight is visible.
+  const goTo = (panelId: string, circuitId?: string) => {
+    requestFocus(panelId, circuitId);
     setOpen(false);
   };
 
@@ -284,7 +298,7 @@ export function ProjectIssues({ system }: { system: SystemResult }) {
                 <Divider label={g} labelPosition="left" mb="xs" />
                 <Stack gap="xs">
                   {list.map((r, i) => (
-                    <IssueRowCard key={`${g}-${r.warning.code}-${i}`} row={r} onGoto={goTo} />
+                    <IssueRowCard key={`${g}-${r.warning.code}-${i}`} row={r} onLocate={goTo} />
                   ))}
                 </Stack>
               </div>

@@ -2469,6 +2469,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
     clearInspectorRequest();
   }, [inspectorRequest, project.panels, openInspector, clearInspectorRequest]);
 
+
   // Source cards enable a PROJECT-level energy source (shown on the service
   // head + the power one-line); the Sources screen is where it's tuned.
   const updateSources = useProjectStore((s) => s.updateSources);
@@ -2624,6 +2625,56 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
       });
     });
   }, [built.nodes, setNodes, layoutDir]);
+
+  // Locate an issue (from the Issues drawer): centre the canvas on the offending
+  // circuit's load node (or the panel when it's a panel-level / feeder issue) and
+  // pulse-highlight it for a moment, so "which component" is unambiguous.
+  const focusRequest = useProjectStore((s) => s.focusRequest);
+  const clearFocusRequest = useProjectStore((s) => s.clearFocusRequest);
+  useEffect(() => {
+    if (!focusRequest) return;
+    const { panelId, circuitId } = focusRequest;
+    const loadId = circuitId ? `load-${circuitId}` : undefined;
+    // Defer a tick (the canvas tab may have just switched, (re)mounting React
+    // Flow), then act. Clear the request only AFTER — clearing it synchronously
+    // re-runs this effect and its cleanup would cancel the pending timeout.
+    const t1 = setTimeout(() => {
+      const inst = rfRef.current;
+      const cur = inst?.getNodes() ?? [];
+      const targetId = loadId && cur.some((n) => n.id === loadId) ? loadId : panelId;
+      const node = inst?.getNode(targetId);
+      if (inst && node) {
+        // Absolute centre (load nodes are children of their panel — add the
+        // parent offset), then a comfortable zoom: in close on a small load,
+        // a touch out on a wide panel.
+        let x = node.position.x;
+        let y = node.position.y;
+        const parent = node.parentId ? inst.getNode(node.parentId) : undefined;
+        if (parent) {
+          x += parent.position.x;
+          y += parent.position.y;
+        }
+        const w = node.measured?.width ?? node.width ?? LOAD_W;
+        const h = node.measured?.height ?? node.height ?? LOAD_NODE_H;
+        const zoom = node.type === 'load' || node.type === 'floatLoad' ? 1.25 : 0.95;
+        inst.setCenter(x + w / 2, y + h / 2, { zoom, duration: 500 });
+        setNodes((ns) =>
+          ns.map((n) => ({
+            ...n,
+            selected: n.id === targetId,
+            className: n.id === targetId ? 'sld-locate' : undefined,
+          })),
+        );
+        // Drop the pulse class after the animation (the node stays selected as a marker).
+        setTimeout(
+          () => setNodes((ns) => ns.map((n) => (n.id === targetId ? { ...n, className: undefined } : n))),
+          2600,
+        );
+      }
+      clearFocusRequest();
+    }, 120);
+    return () => clearTimeout(t1);
+  }, [focusRequest, setNodes, clearFocusRequest]);
 
   // Tidy: discard manual drag offsets and snap every node back to the clean,
   // depth-aligned auto-layout (panels grouped by feeder level, centred, feeders

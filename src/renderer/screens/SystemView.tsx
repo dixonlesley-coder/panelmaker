@@ -91,6 +91,14 @@ export function SystemView() {
     clearServiceRequest();
   }, [serviceRequest, clearServiceRequest]);
 
+  // Locate-an-issue requests must land on the Single-line (where the highlight is
+  // drawn), so the canvas tab is controlled and forced there when one arrives.
+  const focusRequest = useProjectStore((s) => s.focusRequest);
+  const [canvasTab, setCanvasTab] = useState<string | null>('single-line');
+  useEffect(() => {
+    if (focusRequest) setCanvasTab('single-line');
+  }, [focusRequest]);
+
   // A brand-new project (one panel, no circuits, no feeders) shows a warm
   // empty-state prompting the engineer to set up the service first.
   const isEmpty = useMemo(
@@ -340,7 +348,7 @@ export function SystemView() {
       )}
 
       <Card withBorder radius="md" padding="xs">
-        <Tabs defaultValue="single-line">
+        <Tabs value={canvasTab} onChange={setCanvasTab}>
           <Tabs.List>
             <Tabs.Tab value="single-line" leftSection={<IconSitemap size={14} />}>
               {t('system.tabSingleLine')}

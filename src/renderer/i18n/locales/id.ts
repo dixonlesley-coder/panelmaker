@@ -596,6 +596,7 @@ export const id: TranslationKeys = {
     apply: 'Terapkan: {{description}}',
     projectIssues: 'Masalah',
     goToPanel: 'Buka panel',
+    locateHint: 'Klik untuk menemukannya di kanvas',
     systemGroup: 'Sistem',
     fixAllSafe: 'Perbaiki semua yang aman ({{count}})',
     fixAllDone_one: '{{count}} perbaikan diterapkan',

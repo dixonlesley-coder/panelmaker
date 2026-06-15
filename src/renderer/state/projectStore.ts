@@ -132,6 +132,12 @@ export interface ProjectState {
    * Issues drawer "go to panel"); the canvas consumes and clears it. Not persisted.
    */
   inspectorRequest: string | null;
+  /**
+   * Transient request to LOCATE an issue on the canvas: jump to the Single-line,
+   * centre on the panel (or its offending circuit), and pulse-highlight it. Set by
+   * the Issues drawer; the canvas consumes and clears it. Not persisted.
+   */
+  focusRequest: { panelId: string; circuitId?: string } | null;
   /** Set true to ask the canvas host (SystemView) to open the Service & Earthing
    *  inspector — e.g. double-clicking the PLN supply node on the canvas. */
   serviceRequest: boolean;
@@ -170,6 +176,10 @@ export interface ProjectState {
   requestInspector: (panelId: string) => void;
   /** Clear a consumed inspector request (called by the canvas). */
   clearInspectorRequest: () => void;
+  /** Ask the canvas to locate + highlight an issue (panel, optionally a circuit). */
+  requestFocus: (panelId: string, circuitId?: string) => void;
+  /** Clear a consumed focus request (called by the canvas). */
+  clearFocusRequest: () => void;
   /** Ask the host to open the Service & Earthing inspector (PLN node). */
   requestService: () => void;
   /** Clear a consumed service request. */
@@ -508,6 +518,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   floatingLoads: [],
   activePanelId: initialProject.panels[0]?.id ?? '',
   inspectorRequest: null,
+  focusRequest: null,
   activeScreen: 'system',
   preferredBrand: null,
   // Default ON for first-run users (ease of use is the priority); respect an
@@ -527,6 +538,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
   requestInspector: (panelId) =>
     set({ activePanelId: panelId, inspectorRequest: panelId, activeScreen: 'system' }),
   clearInspectorRequest: () => set({ inspectorRequest: null }),
+  requestFocus: (panelId, circuitId) =>
+    set({
+      activePanelId: panelId,
+      focusRequest: { panelId, ...(circuitId ? { circuitId } : {}) },
+      activeScreen: 'system',
+    }),
+  clearFocusRequest: () => set({ focusRequest: null }),
   serviceRequest: false,
   requestService: () => set({ serviceRequest: true }),
   clearServiceRequest: () => set({ serviceRequest: false }),

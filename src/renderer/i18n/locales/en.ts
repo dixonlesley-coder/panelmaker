@@ -593,6 +593,7 @@ export const en = {
     apply: 'Apply: {{description}}',
     projectIssues: 'Issues',
     goToPanel: 'Go to panel',
+    locateHint: 'Click to locate this on the canvas',
     systemGroup: 'System',
     fixAllSafe: 'Fix all safe ({{count}})',
     fixAllDone_one: 'Applied {{count}} fix',
