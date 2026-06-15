@@ -176,6 +176,8 @@ export interface ProjectState {
   clearServiceRequest: () => void;
   setBeginnerMode: (on: boolean) => void;
   dismissOnboarding: () => void;
+  /** Bring back the getting-started checklist (clears the dismissed flag). */
+  resetOnboarding: () => void;
   setPreferredBrand: (brand: string | null) => void;
 
   // circuit editing
@@ -535,6 +537,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
   dismissOnboarding: () => {
     if (typeof localStorage !== 'undefined') localStorage.setItem('pm:onboardingDismissed', '1');
     set({ onboardingDismissed: true });
+  },
+  resetOnboarding: () => {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('pm:onboardingDismissed');
+    set({ onboardingDismissed: false });
   },
   setPreferredBrand: (brand) => set({ preferredBrand: brand }),
 

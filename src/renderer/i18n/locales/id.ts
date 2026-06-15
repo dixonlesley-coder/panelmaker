@@ -233,6 +233,13 @@ export const id: TranslationKeys = {
     electrodeTarget: 'Target elektrode',
     application: 'Aplikasi',
     checkUpdates: 'Periksa pembaruan',
+    guidance: 'Bantuan & panduan',
+    beginnerMode: 'Mode pemula',
+    beginnerModeHint:
+      'Menyembunyikan kolom teknik lanjutan dan melembutkan istilah agar kontrol sehari-hari yang utama. Matikan untuk opsi lengkap.',
+    showGuide: 'Tampilkan panduan memulai lagi',
+    showGuideHint: 'Munculkan kembali daftar langkah di Kanvas.',
+    guideReset: 'Panduan memulai akan tampil lagi di Kanvas.',
     catalogTitle: 'Katalog komponen',
     catalogHint:
       'Setelah mengekstrak katalog pabrikan, ekspor komponen saat ini ke dataset yang di-commit (schneider.parts.json). Aplikasi bersifat offline dan tidak dapat push ke git sendiri — simpan berkas ini ke src/shared/data/catalog/ lalu commit (atau serahkan ke Claude). Pada rilis berikutnya akan di-seed ke setiap instalasi.',

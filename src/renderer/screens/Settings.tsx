@@ -24,6 +24,7 @@ import {
   IconLock,
   IconPhoto,
   IconRefresh,
+  IconSchool,
   IconShieldBolt,
   IconX,
 } from '@tabler/icons-react';
@@ -79,6 +80,9 @@ export function Settings() {
   const parts = useProjectStore((s) => s.parts);
   const importParts = useProjectStore((s) => s.importParts);
   const mergePrices = useProjectStore((s) => s.mergePrices);
+  const beginnerMode = useProjectStore((s) => s.beginnerMode);
+  const setBeginnerMode = useProjectStore((s) => s.setBeginnerMode);
+  const resetOnboarding = useProjectStore((s) => s.resetOnboarding);
 
   const panel = project.panels.find((p) => p.id === activePanelId);
   const meta = project.meta ?? {};
@@ -601,6 +605,41 @@ export function Settings() {
             e.currentTarget.value = '';
           }}
         />
+      </Card>
+
+      <Card withBorder radius="md" padding="md">
+        <Group gap="xs" mb="md">
+          <IconSchool size={18} color="var(--mantine-color-teal-6)" />
+          <Text fw={600}>{t('settings.guidance')}</Text>
+        </Group>
+        <Switch
+          label={t('settings.beginnerMode')}
+          description={t('settings.beginnerModeHint')}
+          checked={beginnerMode}
+          onChange={(e) => setBeginnerMode(e.currentTarget.checked)}
+          mb="md"
+        />
+        <Group justify="space-between" align="flex-start" wrap="nowrap">
+          <div>
+            <Text size="sm" fw={500}>
+              {t('settings.showGuide')}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {t('settings.showGuideHint')}
+            </Text>
+          </div>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconRefresh size={14} />}
+            onClick={() => {
+              resetOnboarding();
+              notifications.show({ message: t('settings.guideReset'), color: 'teal' });
+            }}
+          >
+            {t('settings.showGuide')}
+          </Button>
+        </Group>
       </Card>
 
       <Card withBorder radius="md" padding="md">

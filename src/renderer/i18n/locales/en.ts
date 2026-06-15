@@ -230,6 +230,13 @@ export const en = {
     electrodeTarget: 'Electrode target',
     application: 'Application',
     checkUpdates: 'Check for updates',
+    guidance: 'Help & guidance',
+    beginnerMode: 'Beginner mode',
+    beginnerModeHint:
+      'Hides advanced engineering fields and softens jargon so the everyday controls lead. Turn off for the full set of options.',
+    showGuide: 'Show getting-started guide again',
+    showGuideHint: 'Bring back the step-by-step checklist on the Canvas.',
+    guideReset: 'Getting-started guide will show on the Canvas again.',
     catalogTitle: 'Parts catalogue',
     catalogHint:
       'After extracting a manufacturer catalogue, export the current parts to the committed dataset (schneider.parts.json). The app is offline and can’t push to git itself — save this file over src/shared/data/catalog/ and commit it (or hand it to Claude). On the next release it seeds into every install.',
