@@ -16,16 +16,41 @@
 import type { BreakerClass, BreakerCurve } from '../standards/protection';
 import { tripCurve, type CurveDevice } from '../standards/tcc';
 
-/** Structural / axis ink colour. */
-const INK = '#334155';
-/** Grid line colour (faint). */
-const GRID = '#e2e8f0';
-/** Dimension / annotation colour. */
-const DIM = '#64748b';
-/** Fault marker colour. */
+/** Fault marker colour (reads on both light and dark backgrounds). */
 const FAULT = '#dc2626';
 /** Minimum legible font size (SVG user units). */
 const MIN_FONT = 6;
+
+/**
+ * Colour scheme for the plot chrome (frame / grid / text). The device curves and
+ * fault marker keep their saturated colours (legible on either background).
+ */
+export interface TccPalette {
+  /** Plot-area + legend fill. */
+  bg: string;
+  /** Frame stroke + axis titles + legend text. */
+  ink: string;
+  /** Gridlines + legend border. */
+  grid: string;
+  /** Axis tick labels. */
+  dim: string;
+}
+
+/** Print / light palette (white paper) — the default and what export uses. */
+export const TCC_PRINT_PALETTE: TccPalette = {
+  bg: '#ffffff',
+  ink: '#334155',
+  grid: '#e2e8f0',
+  dim: '#64748b',
+};
+
+/** Dark-UI palette — the plot reads as a panel that matches the dark app shell. */
+export const TCC_DARK_PALETTE: TccPalette = {
+  bg: '#25262b',
+  ink: '#c1c2c5',
+  grid: '#373a40',
+  dim: '#909296',
+};
 
 /**
  * Palette cycled across devices so overlaid curves stay distinguishable. Plain
@@ -62,6 +87,8 @@ export interface BuildTccInput {
   widthPx?: number;
   /** Output height in pixels (default 560). */
   heightPx?: number;
+  /** Chrome colours; defaults to {@link TCC_PRINT_PALETTE} (white paper). */
+  palette?: TccPalette;
 }
 
 /* ------------------------------ plot extents ------------------------------ */
@@ -137,6 +164,7 @@ function tickLabel(v: number): string {
 export function buildTccSvg(input: BuildTccInput): string {
   const width = input.widthPx && input.widthPx > 0 ? input.widthPx : 720;
   const height = input.heightPx && input.heightPx > 0 ? input.heightPx : 560;
+  const { bg: BG, ink: INK, grid: GRID, dim: DIM } = input.palette ?? TCC_PRINT_PALETTE;
 
   const plotX0 = MARGIN.left;
   const plotX1 = width - MARGIN.right;
@@ -167,7 +195,7 @@ export function buildTccSvg(input: BuildTccInput): string {
 
   // --- Plot frame. ---
   parts.push(
-    `<rect x="${n(plotX0)}" y="${n(plotY0)}" width="${n(plotW)}" height="${n(plotH)}" fill="#ffffff" stroke="${INK}" stroke-width="1"/>`,
+    `<rect x="${n(plotX0)}" y="${n(plotY0)}" width="${n(plotW)}" height="${n(plotH)}" fill="${BG}" stroke="${INK}" stroke-width="1"/>`,
   );
 
   // --- Gridlines + tick labels. ---
@@ -234,7 +262,7 @@ export function buildTccSvg(input: BuildTccInput): string {
     const boxX = plotX1 - boxW - 8;
     const boxY = plotY0 + 8;
     parts.push(
-      `<rect x="${n(boxX)}" y="${n(boxY)}" width="${n(boxW)}" height="${n(boxH)}" rx="3" fill="#ffffff" fill-opacity="0.92" stroke="${GRID}" stroke-width="1"/>`,
+      `<rect x="${n(boxX)}" y="${n(boxY)}" width="${n(boxW)}" height="${n(boxH)}" rx="3" fill="${BG}" fill-opacity="0.92" stroke="${GRID}" stroke-width="1"/>`,
     );
     input.devices.forEach((dev, idx) => {
       const colour = DEVICE_COLOURS[idx % DEVICE_COLOURS.length] ?? INK;

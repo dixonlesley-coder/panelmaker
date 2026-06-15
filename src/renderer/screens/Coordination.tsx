@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -12,10 +12,11 @@ import {
   Table,
   Text,
   Title,
+  useComputedColorScheme,
 } from '@mantine/core';
 import { IconChartLine, IconDownload, IconInfoCircle } from '@tabler/icons-react';
 import type { SelectivityEntry } from '@shared/types';
-import { buildTccSvg, type TccDevice } from '@shared/drawing/tccCurve';
+import { buildTccSvg, TCC_DARK_PALETTE, type TccDevice } from '@shared/drawing/tccCurve';
 import { downloadSvg } from '@renderer/lib/download';
 import { useProjectStore } from '@renderer/state/projectStore';
 import { useSystemResult } from '@renderer/state/useSystemResult';
@@ -63,18 +64,27 @@ export function Coordination() {
   const [pairKey, setPairKey] = useState<string | null>(null);
   const activeKey = pairKey ?? (pairs[0] ? `${pairs[0].upstreamCircuitId}:${pairs[0].downstreamPanelId}` : null);
   const active = pairs.find((e) => `${e.upstreamCircuitId}:${e.downstreamPanelId}` === activeKey);
+  const colorScheme = useComputedColorScheme('light');
 
-  const svg = useMemo(() => {
-    if (!active) return null;
-    const devices = devicesForPair(active, system.panels);
-    if (devices.length === 0) return null;
-    return buildTccSvg({
-      devices,
-      faultA: active.downstreamFaultA,
-      widthPx: 860,
-      heightPx: 520,
-    });
-  }, [active, system.panels]);
+  // One builder, two palettes: the on-screen plot follows the app's colour scheme
+  // (a dark panel in dark mode, not a stark white box); the exported .svg always
+  // uses the print/white default so it drops straight onto a drawing sheet.
+  const buildSvg = useCallback(
+    (dark: boolean): string | null => {
+      if (!active) return null;
+      const devices = devicesForPair(active, system.panels);
+      if (devices.length === 0) return null;
+      return buildTccSvg({
+        devices,
+        faultA: active.downstreamFaultA,
+        widthPx: 860,
+        heightPx: 520,
+        ...(dark ? { palette: TCC_DARK_PALETTE } : {}),
+      });
+    },
+    [active, system.panels],
+  );
+  const svg = useMemo(() => buildSvg(colorScheme === 'dark'), [buildSvg, colorScheme]);
 
   return (
     <Stack gap="md">
@@ -90,7 +100,10 @@ export function Coordination() {
             size="xs"
             variant="light"
             leftSection={<IconDownload size={14} />}
-            onClick={() => downloadSvg(`${projectName} - coordination.svg`, svg)}
+            onClick={() => {
+              const print = buildSvg(false);
+              if (print) downloadSvg(`${projectName} - coordination.svg`, print);
+            }}
           >
             {t('coordination.exportSvg')}
           </Button>
