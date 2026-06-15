@@ -1083,7 +1083,10 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
             </Text>
           </Box>
         </Group>
-        <Group gap={4} wrap="nowrap">
+        {/* Status badges never shrink — the long panel NAME truncates instead
+            (it carries a title tooltip), so "46%"/"Supply" stay readable rather
+            than collapsing to "4…"/"P…" on a narrow card. */}
+        <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
           {d.onAddItem && (
             <Tooltip label={t('sldNode.addCircuit')} withinPortal>
               <ActionIcon
