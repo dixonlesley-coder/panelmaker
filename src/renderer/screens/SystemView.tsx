@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActionIcon,
@@ -75,6 +75,16 @@ export function SystemView() {
   const [bomOpen, setBomOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+
+  // Open the Service & Earthing inspector when the canvas asks (double-clicking
+  // the PLN supply node), then clear the one-shot request.
+  const serviceRequest = useProjectStore((s) => s.serviceRequest);
+  const clearServiceRequest = useProjectStore((s) => s.clearServiceRequest);
+  useEffect(() => {
+    if (!serviceRequest) return;
+    setServiceOpen(true);
+    clearServiceRequest();
+  }, [serviceRequest, clearServiceRequest]);
 
   // A brand-new project (one panel, no circuits, no feeders) shows a warm
   // empty-state prompting the engineer to set up the service first.

@@ -132,6 +132,9 @@ export interface ProjectState {
    * Issues drawer "go to panel"); the canvas consumes and clears it. Not persisted.
    */
   inspectorRequest: string | null;
+  /** Set true to ask the canvas host (SystemView) to open the Service & Earthing
+   *  inspector — e.g. double-clicking the PLN supply node on the canvas. */
+  serviceRequest: boolean;
   activeScreen: Screen;
   /** Preferred manufacturer for order-code matching / exports (null = all brands). */
   preferredBrand: string | null;
@@ -163,6 +166,10 @@ export interface ProjectState {
   requestInspector: (panelId: string) => void;
   /** Clear a consumed inspector request (called by the canvas). */
   clearInspectorRequest: () => void;
+  /** Ask the host to open the Service & Earthing inspector (PLN node). */
+  requestService: () => void;
+  /** Clear a consumed service request. */
+  clearServiceRequest: () => void;
   setPreferredBrand: (brand: string | null) => void;
 
   // circuit editing
@@ -507,6 +514,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
   requestInspector: (panelId) =>
     set({ activePanelId: panelId, inspectorRequest: panelId, activeScreen: 'system' }),
   clearInspectorRequest: () => set({ inspectorRequest: null }),
+  serviceRequest: false,
+  requestService: () => set({ serviceRequest: true }),
+  clearServiceRequest: () => set({ serviceRequest: false }),
   setPreferredBrand: (brand) => set({ preferredBrand: brand }),
 
   updateCircuit: (panelId, circuitId, patch) =>

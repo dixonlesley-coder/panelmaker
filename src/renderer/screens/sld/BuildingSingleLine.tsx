@@ -1307,6 +1307,7 @@ function GridSourceNode({ data }: NodeProps) {
   const { t } = useTranslation();
   return (
     <Box
+      title="Double-click to edit the supply (Service & Earthing)"
       style={{
         width: GRID_SRC_W,
         background: 'var(--mantine-color-body)',
@@ -1314,6 +1315,7 @@ function GridSourceNode({ data }: NodeProps) {
         borderRadius: 'var(--mantine-radius-md)',
         boxShadow: 'var(--mantine-shadow-xs)',
         padding: '6px 8px',
+        cursor: 'pointer',
       }}
     >
       <Group gap={6} wrap="nowrap" align="center">
@@ -1367,6 +1369,7 @@ function SourceNode({ data, selected }: NodeProps) {
   const s = SOURCE_NODE_STYLE[d.kind];
   return (
     <Box
+      title="Double-click to size this source (Sources)"
       style={{
         width: GRID_SRC_W,
         background: 'var(--mantine-color-body)',
@@ -1374,6 +1377,7 @@ function SourceNode({ data, selected }: NodeProps) {
         borderRadius: 'var(--mantine-radius-md)',
         boxShadow: selected ? `${SELECT_RING}, var(--mantine-shadow-xs)` : 'var(--mantine-shadow-xs)',
         padding: '6px 8px',
+        cursor: 'pointer',
       }}
     >
       <Group gap={6} wrap="nowrap" align="center">
@@ -1404,19 +1408,27 @@ function SourceNode({ data, selected }: NodeProps) {
 
 interface HybridInverterNodeData {
   sub?: string;
+  /** Number of separate input lines (PLN + each DER) — one handle each. */
+  inputCount?: number;
+  /** Left-to-right tree: inputs on the LEFT edge, output on the RIGHT. */
+  horizontal?: boolean;
   [key: string]: unknown;
 }
 
 /**
  * The shared hybrid (multi-mode) inverter on the service head: the grid (AC) and
- * the PV + battery (DC) converge here, and it feeds the WHOLE panel as an online
- * UPS / automatic source-transfer gateway. Drawn between the sources and the MDP.
+ * the PV + battery (DC) each feed in on their OWN line, and it feeds the WHOLE
+ * panel as an online UPS / automatic source-transfer gateway. Drawn between the
+ * sources and the MDP. Double-click to size the sources (Sources screen).
  */
 function HybridInverterNode({ data }: NodeProps) {
   const d = data as HybridInverterNodeData;
   const { t } = useTranslation();
+  const n = Math.max(1, d.inputCount ?? 1);
+  const horizontal = Boolean(d.horizontal);
   return (
     <Box
+      title="Double-click to size the sources (Sources)"
       style={{
         width: GRID_SRC_W,
         background: 'var(--mantine-color-body)',
@@ -1424,10 +1436,25 @@ function HybridInverterNode({ data }: NodeProps) {
         borderRadius: 'var(--mantine-radius-md)',
         boxShadow: 'var(--mantine-shadow-xs)',
         padding: '6px 8px',
+        cursor: 'pointer',
       }}
     >
-      {/* Sources (grid AC + PV/battery DC) feed in at the top. */}
-      <Handle type="target" id="in" position={Position.Top} isConnectable={false} />
+      {/* One input handle per source, spread along the top (vertical tree) or the
+          left edge (horizontal tree), so each source draws as its own line. */}
+      {Array.from({ length: n }, (_, i) => (
+        <Handle
+          key={i}
+          type="target"
+          id={`in${i}`}
+          position={horizontal ? Position.Left : Position.Top}
+          style={
+            horizontal
+              ? { top: `${((i + 1) / (n + 1)) * 100}%` }
+              : { left: `${((i + 1) / (n + 1)) * 100}%` }
+          }
+          isConnectable={false}
+        />
+      ))}
       <Group gap={6} wrap="nowrap" align="center">
         <ThemeIcon size="md" variant="light" color="teal" style={{ flexShrink: 0 }}>
           <IconWaveSine size={18} />
@@ -1443,8 +1470,8 @@ function HybridInverterNode({ data }: NodeProps) {
           )}
         </Box>
       </Group>
-      {/* Single AC output down into the main bus ('in' on the service panel). */}
-      <Handle type="source" id="out" position={Position.Bottom} isConnectable={false} />
+      {/* Single output to the main bus: bottom (vertical) / right (horizontal). */}
+      <Handle type="source" id="out" position={horizontal ? Position.Right : Position.Bottom} isConnectable={false} />
     </Box>
   );
 }
@@ -1899,7 +1926,28 @@ function buildUnified(
         // Everything feeds the inverter when hybrid, else the panel directly.
         const sinkId = hybrid ? `hinv-${id}` : id;
 
-        // The hybrid inverter (UPS/ATS) node + its single AC output to the MDP.
+        // Distributed energy sources (generator / solar / battery) as their own
+        // nodes beside the PLN intake — built FIRST so the inverter knows how many
+        // separate inputs to expose (one line per source, not a merged bundle).
+        const srcList: SourceNodeData[] = [];
+        if (src?.generator) {
+          srcList.push({
+            kind: 'generator',
+            sub: `${src.generator.ratingKva} kVA · ${src.generator.mode}`,
+            badge: src.generator.transfer === 'manual' ? 'COS' : 'ATS',
+          });
+        }
+        if (src?.solar) {
+          srcList.push({ kind: 'solar', sub: `${src.solar.arrayKwp} kWp · ${src.solar.inverterKw} kW` });
+        }
+        if (src?.battery) {
+          srcList.push({ kind: 'battery', sub: `${src.battery.installedKwh} kWh · ${src.battery.inverterKw} kW` });
+        }
+        // Each source gets its OWN input line into the hybrid inverter (PLN = in0,
+        // then one per DER); non-hybrid sources feed the panel's single 'in'.
+        const inputHandle = (i: number) => (hybrid ? `in${i}` : 'in');
+
+        // The hybrid inverter (UPS/ATS) node + its single output to the MDP.
         if (hybrid) {
           const hinvKw = src?.hybridInverterKw;
           nodes.push({
@@ -1909,8 +1957,14 @@ function buildUnified(
             position: invPos,
             deletable: false,
             draggable: false,
-            selectable: false,
-            data: { sub: hinvKw ? `UPS/ATS · ${hinvKw} kW · whole-building` : 'UPS/ATS · whole-building' },
+            // Selectable so double-click (→ size the sources) fires; it's neither a
+            // panel nor a float, so Ctrl+C never copies it.
+            data: {
+              sub: hinvKw ? `UPS/ATS · ${hinvKw} kW · whole-building` : 'UPS/ATS · whole-building',
+              // one input handle per source (PLN + each DER)
+              inputCount: 1 + srcList.length,
+              ...(horizontal ? { horizontal: true } : {}),
+            },
           });
           edges.push({
             id: `e-hinv-${id}`,
@@ -1932,9 +1986,8 @@ function buildUnified(
           position: gridPos,
           deletable: false,
           draggable: false,
-          // Display-only: it can't be copied or deleted, so a click-selection
-          // here would only muddy what Ctrl+C is about to copy.
-          selectable: false,
+          // Selectable so its double-click (→ open the Service inspector) fires;
+          // it's neither a panel nor a float, so Ctrl+C never copies it.
           data: {
             supplyType,
             voltage:
@@ -1954,34 +2007,18 @@ function buildUnified(
           source: gridId,
           sourceHandle: 'out',
           target: sinkId,
-          targetHandle: 'in',
+          targetHandle: inputHandle(0),
           // PLN is the inverter's AC source when hybrid; label it so.
           ...(hybrid ? { label: 'AC' } : {}),
           type: 'smoothstep',
           style: { stroke: 'var(--mantine-color-indigo-5)', strokeWidth: 2 },
         });
 
-        // Distributed energy sources as their OWN external nodes beside the PLN
-        // intake (generator/solar/battery). When hybrid they feed the inverter
-        // (PV/battery on DC, genset on AC); otherwise they feed the bus directly.
-        // The detailed ATS/inverter interlocks live on the Power one-line tab.
-        const srcList: SourceNodeData[] = [];
-        if (src?.generator) {
-          srcList.push({
-            kind: 'generator',
-            sub: `${src.generator.ratingKva} kVA · ${src.generator.mode}`,
-            badge: src.generator.transfer === 'manual' ? 'COS' : 'ATS',
-          });
-        }
-        if (src?.solar) {
-          srcList.push({ kind: 'solar', sub: `${src.solar.arrayKwp} kWp · ${src.solar.inverterKw} kW` });
-        }
-        if (src?.battery) {
-          srcList.push({ kind: 'battery', sub: `${src.battery.installedKwh} kWh · ${src.battery.inverterKw} kW` });
-        }
+        // Each DER feeds its own inverter input (PV/battery on DC, genset on AC);
+        // non-hybrid sources feed the bus in parallel. The detailed ATS/inverter
+        // interlocks live on the Power one-line tab.
         srcList.forEach((sd, k) => {
           const srcId = `src-${sd.kind}-${id}`;
-          // DC link for the PV/battery into a hybrid inverter; AC otherwise.
           const isDc = hybrid && (sd.kind === 'solar' || sd.kind === 'battery');
           nodes.push({
             id: srcId,
@@ -1997,7 +2034,7 @@ function buildUnified(
             source: srcId,
             sourceHandle: 'out',
             target: sinkId,
-            targetHandle: 'in',
+            targetHandle: inputHandle(k + 1),
             ...(hybrid ? { label: isDc ? 'DC' : 'AC' } : {}),
             type: 'smoothstep',
             style: { stroke: SOURCE_NODE_STYLE[sd.kind].color, strokeWidth: 2, strokeDasharray: '5 3' },
@@ -2191,6 +2228,8 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // Inline order codes follow the chosen export brand (cables stay available).
   const parts = useMemo(() => partsForBrand(allParts, preferredBrand), [allParts, preferredBrand]);
   const setActivePanel = useProjectStore((s) => s.setActivePanel);
+  const setScreen = useProjectStore((s) => s.setScreen);
+  const requestService = useProjectStore((s) => s.requestService);
   const addCircuitConfigured = useProjectStore((s) => s.addCircuitConfigured);
   const addSubPanel = useProjectStore((s) => s.addSubPanel);
   const addPanel = useProjectStore((s) => s.addPanel);
@@ -3039,9 +3078,13 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
               if (pid && cid) setEdgeCtx({ panelId: pid, circuitId: cid, x: e.clientX, y: e.clientY });
             }}
             onNodeDoubleClick={(_, node) => {
-              // Only panels open the inspector; loads handle their own double-click
-              // (inline circuit editor) and the grid source is display-only.
+              // Panels open the inspector; loads handle their own double-click
+              // (inline circuit editor). The service-head nodes jump to where
+              // they're sized: DER sources + the hybrid inverter → Sources screen;
+              // the PLN supply node → the Service & Earthing inspector.
               if (node.type === 'uPanel') openInspector(node.id);
+              else if (node.type === 'source' || node.type === 'hinv') setScreen('sources');
+              else if (node.type === 'grid') requestService();
             }}
             onNodeDragStop={onNodeDragStop}
             onNodeContextMenu={(e, node) => {
