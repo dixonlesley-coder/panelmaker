@@ -73,75 +73,156 @@ function fmtA(a: number): string {
   return `${a.toFixed(1)} A`;
 }
 
+/** Power in kW (engineers read kW on schedules, not raw W). */
+function fmtKw(w: number): string {
+  return `${(w / 1000).toFixed(2)} kW`;
+}
+
+/* --- shared "engineering schedule" table styling (shaded header, thin grid,
+   zebra rows) so the report reads like a drawing-office document, not a web
+   table. Reused by every data table. --- */
+const HEADER_FILL = '#23405e';
+const ZEBRA_FILL = '#eef2f6';
+const GRID = '#9aa7b4';
+
+const scheduleLayout = {
+  fillColor: (rowIndex: number) => (rowIndex === 0 ? HEADER_FILL : rowIndex % 2 === 0 ? ZEBRA_FILL : null),
+  hLineWidth: () => 0.5,
+  vLineWidth: () => 0.5,
+  hLineColor: () => GRID,
+  vLineColor: () => GRID,
+  paddingTop: () => 3,
+  paddingBottom: () => 3,
+  paddingLeft: () => 5,
+  paddingRight: () => 5,
+} as const;
+
+/** A thin-grid layout with no header shading (for the panel data block). */
+const dataBlockLayout = {
+  hLineWidth: () => 0.5,
+  vLineWidth: () => 0.5,
+  hLineColor: () => GRID,
+  vLineColor: () => GRID,
+  paddingTop: () => 3,
+  paddingBottom: () => 3,
+  paddingLeft: () => 5,
+  paddingRight: () => 5,
+} as const;
+
+/** White, bold header cell for a schedule table (optionally right-aligned). */
+function hcell(text: string, align: 'left' | 'right' | 'center' = 'left'): TableCell {
+  return { text, bold: true, color: '#ffffff', alignment: align };
+}
+
+/** Shaded label cell + plain value cell for the panel data block. */
+function lcell(text: string): TableCell {
+  return { text, bold: true, color: '#33414f', fillColor: ZEBRA_FILL };
+}
+
 /** Section heading. */
 function heading(text: string): Content {
   return { text, style: 'h2', margin: [0, 12, 0, 6] };
 }
 
-/** Build the circuit-schedule table for one panel. */
+/** Remarks for a circuit row — the engineering flags an installer/checker needs
+ *  (spare, RCD, life-safety, and any non-compliance), comma-separated. */
+function circuitRemarks(c: PanelResult['circuits'][number]): string {
+  const r: string[] = [];
+  if (c.loadKind === 'spare') r.push('SPARE');
+  if (c.lifeSafety) r.push('life-safety (FRC)');
+  if (c.rcd?.required) r.push(`RCD ${c.rcd.ratingMa ?? 30} mA`);
+  if (!c.voltageDrop.withinLimit) r.push(`ΔU > ${c.voltageDrop.limitPercent}%`);
+  if (c.kaAdequate === false) r.push('Icu < Isc');
+  if (c.disconnectsInTime === false) r.push('Zs high');
+  return r.join(', ');
+}
+
+/** Build the circuit-schedule table for one panel — a conventional electrical
+ *  circuit schedule (way no., load, phase, protective device, conductor, design
+ *  current, voltage drop, remarks). */
 function circuitScheduleTable(panel: PanelResult): Content {
   const header: TableCell[] = [
-    'Tag',
-    'Circuit',
-    'Ph',
-    'Ib (A)',
-    'Breaker',
-    'Cable',
-    'Vd %',
-    'OK',
-  ].map((t) => ({ text: t, bold: true }));
+    hcell('No.'),
+    hcell('Load description'),
+    hcell('Ph', 'center'),
+    hcell('Protective device'),
+    hcell('Icu kA', 'right'),
+    hcell('Conductor'),
+    hcell('I b (A)', 'right'),
+    hcell('ΔU %', 'right'),
+    hcell('Remarks'),
+  ];
 
   const body: TableCell[][] = [header];
   panel.circuits.forEach((c, i) => {
+    const spare = c.loadKind === 'spare';
+    const poles = c.phase === '3ph' ? '3P' : '1P';
+    const device = spare
+      ? '—'
+      : `${poles} ${c.breaker.ratingA} A ${c.breaker.curve} ${c.breaker.deviceClass}`;
+    const vdOver = !c.voltageDrop.withinLimit;
     body.push([
       { text: circuitTag(i), bold: true },
       pdfGlyphs(c.name),
-      c.phase === '3ph' ? '3' : '1',
-      fmtA(c.designCurrentA),
-      `${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve}`,
+      { text: c.phase === '3ph' ? '3' : '1', alignment: 'center' },
+      device,
+      { text: c.breakerKa !== undefined ? String(c.breakerKa) : '—', alignment: 'right' },
       // The full cable make-up (cores + section + PE) reads better than a bare CSA.
-      c.grounding.cableSpec || `${c.cable.csaMm2} mm²`,
-      c.voltageDrop.dropPercent.toFixed(2),
-      c.voltageDrop.withinLimit ? 'yes' : 'NO',
+      spare ? '—' : c.grounding.cableSpec || `${c.cable.csaMm2} mm²`,
+      { text: spare ? '—' : c.designCurrentA.toFixed(1), alignment: 'right' },
+      { text: spare ? '—' : c.voltageDrop.dropPercent.toFixed(2), alignment: 'right', ...(vdOver ? { color: '#c0212f', bold: true } : {}) },
+      { text: circuitRemarks(c), fontSize: 7 },
     ]);
   });
 
   return {
     table: {
       headerRows: 1,
-      widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
+      widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
       body,
     },
-    layout: 'lightHorizontalLines',
+    layout: scheduleLayout,
     fontSize: 8,
   };
 }
 
-/** Busbar + enclosure specification block. */
-function panelSpecTable(panel: PanelResult): Content {
+/** Panel data block — the schedule header an electrician reads first: supply,
+ *  ratings, incomer, fault level, busbar, enclosure. Laid out as a compact
+ *  bordered grid (label · value · label · value), not a vertical list. */
+function panelHeaderBlock(panel: PanelResult, input?: PanelInput): Content {
   const b = panel.busbar;
   const e = panel.enclosure;
-  const rows: TableCell[][] = [
-    [{ text: 'Specification', bold: true }, { text: 'Value', bold: true }],
-    ['Connected load', `${panel.totalConnectedLoadW} W`],
-    ['Total demand current', fmtA(panel.totalDemandCurrentA)],
-    [
-      'Incoming device',
-      `${panel.incomer.breaker.deviceClass} ${panel.incomer.breaker.ratingA} A ${panel.incomer.breaker.curve} · ${panel.incomer.poles}P${
-        panel.incomer.breakerKa !== undefined ? ` · ${panel.incomer.breakerKa} kA` : ''
-      }`,
-    ],
-    ['Busbar', `${b.widthMm}×${b.thicknessMm} mm Cu (${b.ampacityA} A)`],
-    [
-      'Enclosure (W×H×D)',
-      `${e.widthMm} × ${e.heightMm} × ${e.depthMm} mm (${e.sheetThicknessMm} mm)`,
-    ],
-    ['Heat dissipation', `${e.totalHeatW} W (${e.ventilation})`],
-    ['Modules / rows', `${e.modules} / ${e.rows}`],
+  const inc = panel.incomer;
+  const threePh = input?.system === '3ph';
+  const volts = input ? `${input.voltageV} V` : '—';
+  const sys = threePh ? '3-phase, 4-wire (R-S-T-N-PE)' : '1-phase, 2-wire (L-N-PE)';
+  const incomer = `${inc.poles}P ${inc.breaker.ratingA} A ${inc.breaker.curve} ${inc.breaker.deviceClass}${
+    inc.breakerKa !== undefined ? ` · ${inc.breakerKa} kA` : ''
+  }`;
+  const fault = panel.faultLevelKa !== undefined ? `${panel.faultLevelKa.toFixed(1)} kA` : '—';
+  const pb = panel.phaseBalance;
+  const loading = threePh
+    ? `${pb.L1.toFixed(0)} / ${pb.L2.toFixed(0)} / ${pb.L3.toFixed(0)} A · ${pb.imbalancePct.toFixed(0)}% imb.`
+    : 'n/a (1-phase)';
+
+  const pair = (l1: string, v1: string, l2: string, v2: string): TableCell[] => [
+    lcell(l1),
+    { text: v1 },
+    lcell(l2),
+    { text: v2 },
+  ];
+  const body: TableCell[][] = [
+    pair('Supply', volts, 'System', sys),
+    pair('Connected load', fmtKw(panel.totalConnectedLoadW), 'Demand current', fmtA(panel.totalDemandCurrentA)),
+    pair('Main incomer', incomer, 'Fault level (Isc)', fault),
+    pair('Busbar', `${b.widthMm}×${b.thicknessMm} mm Cu — ${b.ampacityA} A`, 'Enclosure W×H×D', `${e.widthMm}×${e.heightMm}×${e.depthMm} mm · ${e.sheetThicknessMm} mm`),
+    pair('Phase loading R-S-T', loading, 'Modules · heat', `${e.modules} mod · ${e.totalHeatW} W (${e.ventilation})`),
   ];
   return {
-    table: { widths: ['auto', '*'], body: rows },
-    layout: 'lightHorizontalLines',
+    table: { widths: ['auto', '*', 'auto', '*'], body },
+    layout: dataBlockLayout,
+    fontSize: 8.5,
+    margin: [0, 0, 0, 2],
   };
 }
 
@@ -208,10 +289,7 @@ function panelDrawingPages(
  * standard clause numbers only — this is a main-process document, no i18n.
  */
 function standardsReferencesBlock(): Content[] {
-  const header: TableCell[] = ['Sizing rule', 'PUIL 2011 / IEC clause'].map((t) => ({
-    text: t,
-    bold: true,
-  }));
+  const header: TableCell[] = [hcell('Sizing rule'), hcell('PUIL 2011 / IEC clause')];
   const body: TableCell[][] = [header];
   for (const ref of STANDARD_REFERENCES) {
     body.push([ref.topic, ref.clause]);
@@ -220,7 +298,7 @@ function standardsReferencesBlock(): Content[] {
     heading('Standards references (PUIL 2011 / IEC 60364)'),
     {
       table: { headerRows: 1, widths: ['*', '*'], body },
-      layout: 'lightHorizontalLines',
+      layout: scheduleLayout,
       fontSize: 7,
     },
     {
@@ -256,14 +334,19 @@ function warningsBlock(warnings: Warning[]): Content[] {
 function bomLinesForPanel(panel: PanelResult): BomLine[] {
   const lines: BomLine[] = [];
   for (const c of panel.circuits) {
+    // Spares carry no devices/cable on the BOM.
+    if (c.loadKind === 'spare') continue;
+    // Device descriptions OMIT the circuit name so identical items aggregate into
+    // one ordered quantity (a BOM is a purchasing list, not a per-circuit log).
+    const poles = c.phase === '3ph' ? '3P' : '1P';
     lines.push({
-      description: pdfGlyphs(`Breaker ${c.breaker.ratingA} A ${c.breaker.deviceClass} ${c.breaker.curve} — ${c.name}`),
+      description: pdfGlyphs(`${c.breaker.deviceClass} ${poles} ${c.breaker.ratingA} A curve ${c.breaker.curve}`),
       category: 'breaker',
       qty: 1,
       matched: false,
     });
     lines.push({
-      description: pdfGlyphs(`Cable ${c.cable.csaMm2} mm² — ${c.name}`),
+      description: pdfGlyphs(`Cable ${c.grounding.cableSpec || `${c.cable.csaMm2} mm²`}`),
       category: 'cable',
       qty: 1,
       matched: false,
@@ -282,19 +365,37 @@ function bomLinesForPanel(panel: PanelResult): BomLine[] {
   return lines;
 }
 
-/** Render a BOM table from BOM lines. */
+/** Render a BOM table — identical items aggregated into one quantity, ordered by
+ *  category then description (a purchasing list, not a per-circuit log). */
 function bomTable(lines: BomLine[]): Content {
-  const header: TableCell[] = ['Item', 'Category', 'Qty'].map((t) => ({
-    text: t,
-    bold: true,
-  }));
-  const body: TableCell[][] = [header];
+  // Aggregate by category + description, summing quantities.
+  const agg = new Map<string, BomLine>();
   for (const l of lines) {
-    body.push([l.description, l.category, String(l.qty)]);
+    const key = `${l.category} ${l.description}`;
+    const cur = agg.get(key);
+    if (cur) cur.qty += l.qty;
+    else agg.set(key, { ...l });
   }
+  const sorted = [...agg.values()].sort(
+    (a, b) => a.category.localeCompare(b.category) || a.description.localeCompare(b.description),
+  );
+
+  const prettyCategory = (c: string) =>
+    c.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase());
+  const header: TableCell[] = [hcell('#'), hcell('Description'), hcell('Category'), hcell('Qty', 'right')];
+  const body: TableCell[][] = [header];
+  sorted.forEach((l, i) => {
+    body.push([
+      { text: String(i + 1), alignment: 'right' },
+      l.description,
+      prettyCategory(l.category),
+      { text: String(l.qty), alignment: 'right' },
+    ]);
+  });
   return {
-    table: { headerRows: 1, widths: ['*', 'auto', 'auto'], body },
-    layout: 'lightHorizontalLines',
+    table: { headerRows: 1, widths: ['auto', '*', 'auto', 'auto'], body },
+    layout: scheduleLayout,
+    fontSize: 8,
   };
 }
 
@@ -372,7 +473,7 @@ function titleBlock(project: ProjectInput, reportTitle: string): Content[] {
 function revisionBlock(project: ProjectInput): Content[] {
   const revisions = project.meta?.revisions ?? [];
   if (revisions.length === 0) return [];
-  const header: TableCell[] = ['Rev', 'Date', 'Note', 'By'].map((t) => ({ text: t, bold: true }));
+  const header: TableCell[] = [hcell('Rev'), hcell('Date'), hcell('Note'), hcell('By')];
   const body: TableCell[][] = [header];
   for (const r of revisions) {
     body.push([r.rev, r.date, r.note, r.by ?? '']);
@@ -381,7 +482,7 @@ function revisionBlock(project: ProjectInput): Content[] {
     heading('Revision history'),
     {
       table: { headerRows: 1, widths: ['auto', 'auto', '*', 'auto'], body },
-      layout: 'lightHorizontalLines',
+      layout: scheduleLayout,
       fontSize: 8,
     },
   ];
@@ -404,9 +505,9 @@ function panelDocDefinition(
     pageMargins: [36, 36, 36, 48],
     content: [
       ...titleBlock(project, 'Panel Report'),
-      heading(`Panel: ${panelLabel(panel)}`),
-      panelSpecTable(panel),
-      heading('Circuit Schedule'),
+      heading(`Panel schedule — ${panelLabel(panel)}`),
+      panelHeaderBlock(panel, input),
+      heading('Circuit schedule'),
       circuitScheduleTable(panel),
       heading('Bill of Materials'),
       bomTable(bomLinesForPanel(panel)),
@@ -431,18 +532,29 @@ function systemDocDefinition(
 ): TDocumentDefinitions {
   const content: Content[] = [...titleBlock(project, 'System Report')];
 
-  // System summary.
-  content.push(heading('System Summary'));
+  // System summary — supply, totals and power factor at a glance.
+  content.push(heading('System summary'));
+  const sup = system.supply;
+  const supplyDesc = `${sup.type === 'MV' ? 'MV (transformer)' : 'LV (PLN direct)'}${
+    sup.transformerKva ? ` · ${sup.transformerKva} kVA` : ''
+  }`;
+  const pf = system.powerFactor;
+  const summaryRows: TableCell[][] = [
+    [lcell('Project'), { text: project.name }, lcell('Panels'), { text: String(system.totals.panelCount) }],
+    [lcell('Supply'), { text: supplyDesc }, lcell('Total connected load'), { text: fmtKw(system.totals.connectedLoadW) }],
+  ];
+  if (pf && pf.needed && pf.bankKvar > 0) {
+    summaryRows.push([
+      lcell('Power-factor correction'),
+      { text: `${pf.bankKvar} kvar bank` },
+      lcell('Target PF'),
+      { text: pf.targetPf !== undefined ? pf.targetPf.toFixed(2) : '—' },
+    ]);
+  }
   content.push({
-    table: {
-      widths: ['auto', '*'],
-      body: [
-        [{ text: 'Metric', bold: true }, { text: 'Value', bold: true }],
-        ['Panels', String(system.totals.panelCount)],
-        ['Total connected load', `${system.totals.connectedLoadW} W`],
-      ],
-    },
-    layout: 'lightHorizontalLines',
+    table: { widths: ['auto', '*', 'auto', '*'], body: summaryRows },
+    layout: dataBlockLayout,
+    fontSize: 8.5,
   });
 
   // Per-panel schedule sections in root-first order; the drawing sheets are
@@ -452,11 +564,11 @@ function systemDocDefinition(
   for (const panelId of system.order) {
     const panel = system.panels[panelId];
     if (!panel) continue;
-    content.push(heading(`Panel: ${panelLabel(panel)}`));
-    content.push(panelSpecTable(panel));
-    content.push({ text: 'Circuit Schedule', style: 'h2', margin: [0, 6, 0, 4] });
-    content.push(circuitScheduleTable(panel));
     const input = panelInputFor(project, panel.panelId);
+    content.push(heading(`Panel schedule — ${panelLabel(panel)}`));
+    content.push(panelHeaderBlock(panel, input));
+    content.push({ text: 'Circuit schedule', style: 'h2', margin: [0, 6, 0, 4] });
+    content.push(circuitScheduleTable(panel));
     if (input) drawingPages.push(...panelDrawingPages(input, panel, project));
     allBom.push(...bomLinesForPanel(panel));
   }
