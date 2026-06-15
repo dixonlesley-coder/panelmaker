@@ -1140,9 +1140,16 @@ export const en = {
     title: 'Lighting calculator',
     add: 'Add fitting',
     empty: 'Add fittings (downlights, LED strip, panels…) to auto-calculate the load.',
-    summary: '{{count}} fittings',
+    summary: '{{count}} items',
     custom: 'Custom fitting',
     fromFittings: 'Auto from fittings',
+    fromAppliances: 'Auto from appliances',
+  },
+  applianceCalc: {
+    title: 'Appliance calculator',
+    add: 'Add appliance',
+    empty: 'Add appliances (fridge, TV, kettle…) or general socket points to auto-calculate the load.',
+    custom: 'Custom appliance',
   },
   circuitEditor: {
     design: 'Design current',

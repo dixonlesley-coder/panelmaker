@@ -1145,9 +1145,16 @@ export const id: TranslationKeys = {
     title: 'Kalkulator pencahayaan',
     add: 'Tambah armatur',
     empty: 'Tambahkan armatur (downlight, strip LED, panel…) untuk menghitung beban otomatis.',
-    summary: '{{count}} armatur',
+    summary: '{{count}} item',
     custom: 'Armatur khusus',
     fromFittings: 'Otomatis dari armatur',
+    fromAppliances: 'Otomatis dari peralatan',
+  },
+  applianceCalc: {
+    title: 'Kalkulator peralatan',
+    add: 'Tambah peralatan',
+    empty: 'Tambahkan peralatan (kulkas, TV, ketel…) atau titik stop kontak umum untuk menghitung beban otomatis.',
+    custom: 'Peralatan khusus',
   },
   circuitEditor: {
     design: 'Arus desain',

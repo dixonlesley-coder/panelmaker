@@ -13,6 +13,7 @@ import {
   MAX_W_PER_SMART_CHANNEL,
   VA_PER_SOCKET_POINT,
   LIGHTING_FIXTURE_PRESETS,
+  APPLIANCE_PRESETS,
 } from '@shared/standards/fixtures';
 import { assemblyHoursForCategory } from '@shared/standards/labor';
 import type { CircuitInput, PanelInput, Part } from '@shared/types';
@@ -59,6 +60,17 @@ describe('lighting fixture presets', () => {
       fixtures: [{ id: 'f', name: dl.label, wattsPerFitting: dl.watts, qty: 8 }],
     });
     expect(derivedPointsLoadW(c)).toBe(dl.watts * 8);
+  });
+  it('appliance presets: non-empty, custom present, and a socket row derives its VA', () => {
+    expect(APPLIANCE_PRESETS.length).toBeGreaterThan(5);
+    expect(APPLIANCE_PRESETS.some((p) => p.id === 'custom')).toBe(true);
+    const fridge = APPLIANCE_PRESETS.find((p) => p.id === 'fridge')!;
+    const c = circuit({
+      id: 'ca',
+      name: 'Kitchen',
+      sockets: [{ id: 's', name: fridge.label, qty: 2, type: 'dedicated', vaPerPoint: fridge.watts }],
+    });
+    expect(derivedPointsLoadW(c)).toBe(fridge.watts * 2);
   });
 });
 

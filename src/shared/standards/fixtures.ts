@@ -97,3 +97,30 @@ export const LIGHTING_FIXTURE_PRESETS: readonly FixturePreset[] = [
   { id: 'pendant25', label: 'Pendant / decorative', watts: 25 },
   { id: 'custom', label: 'Custom fitting…', watts: 12 },
 ];
+
+/**
+ * Common household / small-power appliances with typical real wattages, for the
+ * socket-circuit load calculator. The first entry is a plain general-purpose
+ * outlet at the standard planning VA; the rest are dedicated appliances. Values
+ * are planning defaults (editable per row); treat W ≈ VA at the appliance PF.
+ */
+export const APPLIANCE_PRESETS: readonly FixturePreset[] = [
+  { id: 'socket', label: 'General socket point', watts: VA_PER_SOCKET_POINT },
+  { id: 'fridge', label: 'Refrigerator', watts: 150 },
+  { id: 'tv', label: 'Television (LED)', watts: 100 },
+  { id: 'washer', label: 'Washing machine', watts: 500 },
+  { id: 'microwave', label: 'Microwave oven', watts: 1000 },
+  { id: 'kettle', label: 'Electric kettle', watts: 1500 },
+  { id: 'ricecooker', label: 'Rice cooker', watts: 400 },
+  { id: 'iron', label: 'Electric iron', watts: 1000 },
+  { id: 'hairdryer', label: 'Hair dryer', watts: 1200 },
+  { id: 'airfryer', label: 'Air fryer / toaster oven', watts: 1200 },
+  { id: 'vacuum', label: 'Vacuum cleaner', watts: 1000 },
+  { id: 'pc', label: 'Desktop PC + monitor', watts: 300 },
+  { id: 'laptop', label: 'Laptop / charger', watts: 90 },
+  { id: 'dispenser', label: 'Water dispenser', watts: 350 },
+  { id: 'waterpump', label: 'Water pump (small)', watts: 250 },
+  { id: 'coffee', label: 'Coffee maker', watts: 800 },
+  { id: 'dishwasher', label: 'Dishwasher', watts: 1800 },
+  { id: 'custom', label: 'Custom appliance…', watts: 200 },
+];
