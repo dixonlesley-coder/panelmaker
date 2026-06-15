@@ -130,7 +130,9 @@ function circuitRemarks(c: PanelResult['circuits'][number]): string {
   const r: string[] = [];
   if (c.loadKind === 'spare') r.push('SPARE');
   if (c.lifeSafety) r.push('life-safety (FRC)');
-  if (c.rcd?.required) r.push(`RCD ${c.rcd.ratingMa ?? 30} mA`);
+  if (c.rcd?.required) r.push(`RCD${c.rcd.type ? ` ${c.rcd.type}` : ''} ${c.rcd.ratingMa ?? 30} mA`);
+  if (c.instantaneousTrips === false) r.push('no inst. trip');
+  if (c.phaseWithstandOk === false) r.push('cable I²t');
   if (!c.voltageDrop.withinLimit) r.push(`ΔU > ${c.voltageDrop.limitPercent}%`);
   if (c.kaAdequate === false) r.push('Icu < Isc');
   if (c.disconnectsInTime === false) r.push('Zs high');

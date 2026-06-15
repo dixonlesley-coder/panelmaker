@@ -22,6 +22,7 @@ import { circuitDemandFactor } from './occupancy';
 import { derivedPointsLoadW, finalCircuitWarnings, summarizeFinalCircuit } from './fixtures';
 import { sizeCableTray, sizeCircuitConduit } from './containment';
 import { deratingFactor } from './derating';
+import { minLineNeutralFaultA, instantaneousTrips, phaseWithstand } from './minFault';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
@@ -88,6 +89,16 @@ interface CircuitComputation {
   threePhase: boolean;
 }
 
+/** A circuit's effective install method: a per-run laying override ('ground' →
+ *  buried, 'air' → above-ground even if the panel default is buried) wins over
+ *  the panel's method (which defaults to in-air). Drives both the ampacity table
+ *  and the temperature derating (air vs ground). */
+function effectiveInstallMethod(c: CircuitInput, panel: PanelInput): PanelInput['installMethod'] {
+  if (c.laying === 'ground') return 'buried';
+  if (c.laying === 'air' && panel.installMethod === 'buried') return 'conduit';
+  return panel.installMethod;
+}
+
 function computeCircuit(
   c: CircuitInput,
   panel: PanelInput,
@@ -148,12 +159,7 @@ function computeCircuit(
   // 'ground' sizes this circuit as a buried run (higher in-ground rating);
   // 'air' forces an above-ground rating even if the panel default is buried;
   // absent = the panel's method (which defaults to in-air).
-  const installMethod: PanelInput['installMethod'] =
-    c.laying === 'ground'
-      ? 'buried'
-      : c.laying === 'air' && panel.installMethod === 'buried'
-        ? 'conduit'
-        : panel.installMethod;
+  const installMethod = effectiveInstallMethod(c, panel);
   // Copper/PVC cables size against the manufacturer's per-TYPE ampacity (Supreme
   // catalogue): an explicit type wins; otherwise the Cu/PVC default is NYY for
   // three-phase, NYM for single-phase finals (matching the cable-spec defaults).
@@ -234,6 +240,7 @@ function computeCircuit(
     isFinalCircuit: !isFeeder,
     designCurrentA,
     ...(c.lifeSafety ? { lifeSafety: true } : {}),
+    ...(c.starterType === 'VFD' ? { hasVfd: true } : {}),
   });
 
   let modules = threePhase ? 3 : 1; // branch breaker poles
@@ -360,6 +367,33 @@ function computeCircuit(
     result.peMinAdiabaticMm2 = zs.peMinAdiabaticMm2;
     result.peAdiabaticOk = zs.peAdiabaticOk;
 
+    // Minimum (line-neutral) prospective fault at the load end + whether the
+    // breaker's magnetic element trips on it; and the PHASE conductor's
+    // short-circuit (adiabatic) withstand against the worst-case bus energy.
+    if (!isFeeder && c.loadKind !== 'spare') {
+      const sourceZOhm = opts.sourceZ ? Math.hypot(opts.sourceZ.rOhm, opts.sourceZ.xOhm) : 0;
+      const mf = minLineNeutralFaultA({
+        u0V: phaseVoltage,
+        sourceZOhm,
+        csaMm2: cable.csaMm2,
+        lengthM: c.lengthM,
+        material,
+        runsPerPhase,
+      });
+      result.minFaultA = round(mf, 0);
+      result.instantaneousTrips = instantaneousTrips(mf, {
+        ratingA: breaker.ratingA,
+        curve: breaker.curve,
+      });
+      result.phaseWithstandOk = phaseWithstand({
+        faultA: opts.faultLevelA,
+        clearingTimeS: 0.1,
+        csaMm2: cable.csaMm2,
+        material,
+        insulation,
+      }).ok;
+    }
+
     warnings.push(
       ...protectionWarnings(result, {
         earthingSystem: opts.earthingSystem ?? 'TN-C-S',
@@ -393,27 +427,20 @@ function computeCircuit(
 
 /** Compute all sizing, control, phase balance, enclosure, busbar and warnings for one panel. */
 export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}): PanelResult {
-  const df = deratingFactor({
-    ambientC: panel.ambientTempC,
-    groupingCount: panel.groupingCount,
-    installMethod: panel.installMethod,
-    insulation: panel.insulation,
-    soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
-  });
-
   const branches = panel.circuits.filter((c) => c.role === 'branch');
-  // Grouping is a property of the containment route — a circuit may override
-  // the panel-wide count, getting its own derating factor.
+  // Derating is per-circuit: grouping may be overridden, and the laying regime
+  // (air vs ground) selects the temperature-correction basis (ground temp +
+  // depth for buried runs, air temp otherwise).
   const dfFor = (c: CircuitInput): number =>
-    c.groupingCountOverride !== undefined
-      ? deratingFactor({
-          ambientC: panel.ambientTempC,
-          groupingCount: c.groupingCountOverride,
-          installMethod: panel.installMethod,
-          insulation: panel.insulation,
-          soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
-        })
-      : df;
+    deratingFactor({
+      ambientC: panel.ambientTempC,
+      groupingCount: c.groupingCountOverride ?? panel.groupingCount,
+      installMethod: effectiveInstallMethod(c, panel),
+      insulation: panel.insulation,
+      soilThermalResistivityKmW: opts.soilThermalResistivityKmW,
+      groundTempC: panel.groundTempC,
+      depthM: panel.depthM,
+    });
   const comps = branches.map((c) => computeCircuit(c, panel, dfFor(c), opts));
 
   // distribute single-phase circuits across phases and report imbalance —

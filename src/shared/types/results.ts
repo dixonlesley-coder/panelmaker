@@ -4,6 +4,7 @@ import type { BreakerCurve, BreakerClass } from '../standards/protection';
 import type { Ventilation } from '../standards/enclosure';
 import type { ControlAssembly, PumpGroupResult } from './control';
 import type { PhaseAssignment, EarthingSystem, CableType, LoadKind } from './electrical';
+import type { RcdType } from '../standards/rcdType';
 import type { SourcesResult } from './sources';
 // Type-only imports of result shapes defined alongside their engine modules
 // (erased at runtime — no import cycle): SPD, earth-electrode and busbar withstand.
@@ -20,6 +21,8 @@ export interface RcdSpec {
   required: boolean;
   ratingMa: number;
   reason: string;
+  /** RCD sensitivity TYPE (AC/A/F/B) per IEC 60364-4-41 / IEC 62423. */
+  type?: RcdType;
 }
 
 /** Installation earthing-system design. */
@@ -35,6 +38,8 @@ export interface EarthingResult {
   electrodeResistanceTargetOhm: number;
   /** Earth-electrode (rod array) design from soil resistivity. */
   electrode?: ElectrodeResult;
+  /** TT prospective touch voltage check (RA·IΔn ≤ 50 V), TT systems only. */
+  touchVoltage?: { touchVoltageV: number; limitV: number; ok: boolean; maxElectrodeOhm: number };
   note: string;
 }
 
@@ -85,6 +90,8 @@ export interface SupplyResult {
   recommendedDayaVa?: number;
   /** The contracted PLN connected power (VA), when the user has set it. */
   contractedDayaVa?: number;
+  /** Transformer energisation inrush + the voltage sag it causes (MV supply). */
+  inrush?: { multiple: number; inrushA: number; sagPercent: number; withinTransientLimit: boolean };
 }
 
 export interface BreakerResult {
@@ -167,6 +174,12 @@ export interface CircuitResult {
   peMinAdiabaticMm2?: number;
   /** True when the PE conductor meets the adiabatic thermal-withstand minimum. */
   peAdiabaticOk?: boolean;
+  /** Minimum prospective single-phase (L-N) fault current at the load end (A). */
+  minFaultA?: number;
+  /** True when the breaker's magnetic element trips on that minimum fault. */
+  instantaneousTrips?: boolean;
+  /** True when the PHASE conductor meets the adiabatic short-circuit withstand. */
+  phaseWithstandOk?: boolean;
   /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
   containment?: ContainmentResult;
   /** When the feeder runs as busbar trunking (busway): its standard rating (A). */

@@ -92,6 +92,30 @@ export function PanelSettingsEditor({
             comboboxProps={{ withinPortal: true }}
             onChange={(v) => v && patch({ installMethod: v as InstallMethod })}
           />
+          {panel.installMethod === 'buried' && (
+            <NumberInput
+              label={t('panelSettings.groundTempC')}
+              description={t('panelSettings.groundTempHint')}
+              value={panel.groundTempC ?? 20}
+              min={5}
+              max={50}
+              suffix=" °C"
+              onChange={(v) => typeof v === 'number' && patch({ groundTempC: v })}
+            />
+          )}
+          {panel.installMethod === 'buried' && (
+            <NumberInput
+              label={t('panelSettings.depthM')}
+              description={t('panelSettings.depthHint')}
+              value={panel.depthM ?? 0.5}
+              min={0.5}
+              max={2}
+              step={0.1}
+              decimalScale={2}
+              suffix=" m"
+              onChange={(v) => typeof v === 'number' && patch({ depthM: v })}
+            />
+          )}
           <Select
             label={t('panelSettings.insulation')}
             description={t('panelSettings.insulationHint')}

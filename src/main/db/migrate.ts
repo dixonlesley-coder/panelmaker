@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS panels (
   frequency_hz REAL NOT NULL DEFAULT 50,
   ambient_temp_c REAL NOT NULL DEFAULT 30,
   install_method TEXT NOT NULL DEFAULT 'conduit',
+  ground_temp_c REAL,
+  depth_m REAL,
   insulation TEXT,
   material TEXT,
   grouping_count INTEGER NOT NULL DEFAULT 1,
@@ -230,6 +232,9 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'circuits', column: 'busbar_break_before', ddl: 'ALTER TABLE circuits ADD COLUMN busbar_break_before INTEGER' },
   // Cable insulation family (PVC / XLPE).
   { table: 'panels', column: 'insulation', ddl: 'ALTER TABLE panels ADD COLUMN insulation TEXT' },
+  // Buried-run ground temperature + depth (derating).
+  { table: 'panels', column: 'ground_temp_c', ddl: 'ALTER TABLE panels ADD COLUMN ground_temp_c REAL' },
+  { table: 'panels', column: 'depth_m', ddl: 'ALTER TABLE panels ADD COLUMN depth_m REAL' },
   // Pinned phase + per-route grouping override.
   { table: 'circuits', column: 'phase_override', ddl: 'ALTER TABLE circuits ADD COLUMN phase_override TEXT' },
   { table: 'circuits', column: 'grouping_override', ddl: 'ALTER TABLE circuits ADD COLUMN grouping_override INTEGER' },

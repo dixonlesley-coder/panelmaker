@@ -84,6 +84,9 @@ export const panels = sqliteTable('panels', {
   ambientTempC: real('ambient_temp_c').notNull().default(30),
   /** InstallMethod. */
   installMethod: text('install_method').notNull().default('conduit'),
+  /** Buried-run ground temperature (°C) and depth (m); null = IEC defaults. */
+  groundTempC: real('ground_temp_c'),
+  depthM: real('depth_m'),
   /** Insulation family: 'PVC' | 'XLPE' (null = PVC). */
   insulation: text('insulation'),
   /** Conductor material: 'Cu' | 'Al' (null = Cu). */

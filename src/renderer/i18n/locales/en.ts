@@ -1204,6 +1204,10 @@ export const en = {
   },
   panelSettings: {
     title: 'Panel supply & settings',
+    groundTempC: 'Ground temperature',
+    groundTempHint: 'Buried runs: corrects the in-ground rating (IEC ref 20 °C).',
+    depthM: 'Burial depth',
+    depthHint: 'Buried runs: depth-of-laying derating (IEC ref 0.5 m).',
     system: 'System',
     voltage: 'Voltage',
     supply: 'Supply',

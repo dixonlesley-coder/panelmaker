@@ -4,6 +4,8 @@ import { peConductorSize } from '../standards/grounding';
 import { circuitConnectedW, computePanel } from './computePanel';
 import { circuitDemandFactor, effectiveDiversityFactor } from './occupancy';
 import { determineSupply } from './transformer';
+import { transformerInrush, energisationSag } from './transformerInrush';
+import { touchVoltageTT } from './touchVoltage';
 import { ASSUMED_BUILDING_PF } from '../standards/transformer';
 import { nextDaya } from '../standards/pln';
 import { computeSources } from './sources';
@@ -487,6 +489,39 @@ export function computeSystem(project: ProjectInput): SystemResult {
     peConductorSize(mainCable.csaMm2),
     project.site?.soilResistivityOhmM,
   );
+  // TT systems: the protection condition is RA·IΔn ≤ 50 V — verify the prospective
+  // touch voltage at an earth fault against the installation's main RCD (assumed
+  // 300 mA). TN relies on ADS/Zs, checked per circuit.
+  if ((project.earthingSystem ?? 'TN-C-S') === 'TT') {
+    const ra = earthing.electrode?.achievedOhm ?? earthing.electrodeResistanceTargetOhm;
+    const tv = touchVoltageTT({ electrodeResistanceOhm: ra, rcdRatingMa: 300 });
+    earthing.touchVoltage = tv;
+    if (!tv.ok) {
+      warnings.push({
+        code: 'touch-voltage-exceeds-limit',
+        severity: 'error',
+        message: `TT system: prospective touch voltage ${round(tv.touchVoltageV, 0)} V exceeds 50 V — reduce the earth-electrode resistance to ≤ ${round(tv.maxElectrodeOhm, 0)} Ω or use a more sensitive RCD.`,
+      });
+    }
+  }
+  // MV supply: assess transformer energisation inrush and the LV-bus voltage dip.
+  if (supply.type === 'MV' && supply.transformerKva && supply.transformerSecondaryA) {
+    const inr = transformerInrush({ ratedCurrentA: supply.transformerSecondaryA, kva: supply.transformerKva });
+    const sag = energisationSag({ inrushA: inr.inrushA, sourceFaultLevelA: originFaultA });
+    supply.inrush = {
+      multiple: inr.multiple,
+      inrushA: round(inr.inrushA, 0),
+      sagPercent: round(sag.sagPercent, 1),
+      withinTransientLimit: sag.withinTransientLimit,
+    };
+    if (!sag.withinTransientLimit) {
+      warnings.push({
+        code: 'transformer-inrush-sag',
+        severity: 'warning',
+        message: `Transformer energisation inrush (~${inr.multiple}× ≈ ${round(inr.inrushA, 0)} A) dips the LV bus ~${round(sag.sagPercent, 1)}%, above the 8% transient limit — consider inrush-rated incomer settings, soft/pre-insertion energisation, or a stiffer source.`,
+      });
+    }
+  }
   // PF correction sized to the project's target (meta override or 0.95). When
   // any panel reports non-trivial harmonics, the bank must be detuned.
   // Secondary SPDs: a sub-board far from the origin (> ~10 m of feeder) sits

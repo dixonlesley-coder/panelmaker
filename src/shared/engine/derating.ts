@@ -4,6 +4,7 @@ import {
   GROUPING_FACTORS,
   SOIL_THERMAL_RESISTIVITY_FACTORS,
 } from '../standards/conductors';
+import { groundTempFactor, depthFactor } from '../standards/groundDerating';
 import type { InstallMethod, Insulation } from '../types/electrical';
 import { interpolateTable } from './util';
 
@@ -44,6 +45,10 @@ export interface DeratingInput {
   insulation?: Insulation;
   /** Site soil thermal resistivity (K·m/W); only affects buried runs. */
   soilThermalResistivityKmW?: number;
+  /** Ground temperature (°C) for buried runs. Default 20 °C (IEC ground ref). */
+  groundTempC?: number;
+  /** Burial depth (m) for buried runs. Default 0.5 m (IEC reference depth). */
+  depthM?: number;
 }
 
 /**
@@ -58,10 +63,15 @@ export function deratingFactor({
   installMethod,
   insulation,
   soilThermalResistivityKmW,
+  groundTempC,
+  depthM,
 }: DeratingInput): number {
-  return (
-    ambientFactor(ambientC, insulation ?? 'PVC') *
-    groupingFactor(groupingCount) *
-    soilThermalFactor(installMethod, soilThermalResistivityKmW)
-  );
+  // Buried runs correct for GROUND temperature + burial depth (the in-ground
+  // ampacity is referenced to 20 °C soil at 0.5 m); above-ground runs use the
+  // AIR temperature factor. Grouping + soil-resistivity apply in both cases.
+  const tempFactor =
+    installMethod === 'buried'
+      ? groundTempFactor(groundTempC ?? 20, insulation ?? 'PVC') * depthFactor(depthM ?? 0.5)
+      : ambientFactor(ambientC, insulation ?? 'PVC');
+  return tempFactor * groupingFactor(groupingCount) * soilThermalFactor(installMethod, soilThermalResistivityKmW);
 }

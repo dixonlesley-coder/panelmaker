@@ -141,6 +141,27 @@ export function protectionWarnings(result: CircuitResult, ctx: ProtectionWarning
     });
   }
 
+  // The breaker's magnetic element must trip on the MINIMUM (far-end, L-N) fault;
+  // otherwise only the slow thermal element clears a short circuit.
+  if (result.instantaneousTrips === false && result.minFaultA !== undefined) {
+    out.push({
+      code: 'no-instantaneous-trip',
+      severity: 'warning',
+      message: `${result.name}: minimum L-N fault ${result.minFaultA} A is below the ${result.breaker.ratingA} A ${result.breaker.curve}-curve magnetic threshold — instantaneous trip not guaranteed; shorten the run, increase the CSA, or use a lower (B) curve.`,
+      ...base,
+    });
+  }
+
+  // Phase-conductor short-circuit (adiabatic) withstand — k²S² ≥ I²t.
+  if (result.phaseWithstandOk === false) {
+    out.push({
+      code: 'phase-conductor-withstand',
+      severity: 'error',
+      message: `${result.name}: phase conductor ${result.cable.csaMm2} mm² may not withstand the prospective short-circuit energy — increase the cross-section or use a current-limiting device.`,
+      ...base,
+    });
+  }
+
   return out;
 }
 

@@ -6,6 +6,7 @@ import {
   neutralConductorSize,
   peConductorSize,
 } from '../standards/grounding';
+import { recommendedRcdType } from '../standards/rcdType';
 import type { CableType, EarthingSystem, LoadKind, SystemType } from '../types/electrical';
 import type { EarthingResult, GroundingResult, RcdSpec } from '../types/results';
 import { designElectrode } from './electrode';
@@ -104,10 +105,14 @@ export interface CircuitRcdInput {
   designCurrentA: number;
   /** Life-safety circuit (fire pump etc.) — availability prevails, no RCD. */
   lifeSafety?: boolean;
+  /** The circuit runs through a VFD — forces RCD Type B (DC-component immunity). */
+  hasVfd?: boolean;
 }
 
-/** Decide whether a circuit needs an RCD and at what sensitivity. */
+/** Decide whether a circuit needs an RCD, at what sensitivity, and which TYPE. */
 export function circuitRcd(i: CircuitRcdInput): RcdSpec {
+  const rcdType = () =>
+    recommendedRcdType({ loadKind: i.loadKind, hasVfd: i.hasVfd, isEvCharger: i.loadKind === 'ev_charger' }).type;
   // A spare way has no load and no cable run — nothing for an RCD to protect.
   if (i.loadKind === 'spare') return { required: false, ratingMa: 0, reason: '' };
   // Life-safety: an earth-fault trip must not stop a fire pump mid-fire —
@@ -125,6 +130,7 @@ export function circuitRcd(i: CircuitRcdInput): RcdSpec {
       required: true,
       ratingMa: i.designCurrentA <= 63 ? 30 : 100,
       reason: 'TT system — RCD required for earth-fault protection.',
+      type: rcdType(),
     };
   }
   if (i.loadKind === 'socket' || i.loadKind === 'ev_charger') {
@@ -132,6 +138,7 @@ export function circuitRcd(i: CircuitRcdInput): RcdSpec {
       required: true,
       ratingMa: 30,
       reason: 'Socket / EV circuit — 30 mA RCD (additional protection).',
+      type: rcdType(),
     };
   }
   return { required: false, ratingMa: 0, reason: '' };

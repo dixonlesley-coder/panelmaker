@@ -20,3 +20,5 @@ export * from './fixtures';
 export * from './containment';
 export * from './labor';
 export * from './control';
+export * from './groundDerating';
+export * from './rcdType';

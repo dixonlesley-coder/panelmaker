@@ -160,6 +160,10 @@ export interface PanelInput {
   voltageV: number;
   ambientTempC: number;
   installMethod: InstallMethod;
+  /** Ground temperature for BURIED runs (°C). Default 20 °C (IEC ground ref). */
+  groundTempC?: number;
+  /** Burial depth for BURIED runs (m). Default 0.5 m (IEC reference depth). */
+  depthM?: number;
   /**
    * Cable insulation family for this panel's circuits: PVC (NYM/NYY, 70 °C) or
    * XLPE (N2XY, 90 °C). Default PVC. Drives ampacity, ambient derating and the

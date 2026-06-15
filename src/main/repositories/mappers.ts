@@ -219,6 +219,8 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     frequencyHz: 50,
     ambientTempC: p.ambientTempC,
     installMethod: p.installMethod,
+    groundTempC: undefToNull(p.groundTempC),
+    depthM: undefToNull(p.depthM),
     insulation: undefToNull(p.insulation),
     material: undefToNull(p.material),
     groupingCount: p.groupingCount,
@@ -257,6 +259,10 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
   if (insulation !== undefined) p.insulation = insulation as PanelInput['insulation'];
   const material = nullToUndef(r.material);
   if (material !== undefined) p.material = material as PanelInput['material'];
+  const groundTempC = nullToUndef(r.groundTempC);
+  if (groundTempC !== undefined) p.groundTempC = groundTempC;
+  const depthM = nullToUndef(r.depthM);
+  if (depthM !== undefined) p.depthM = depthM;
   if (r.essential) p.essential = true;
   if (r.upsBacked) p.upsBacked = true;
   if (r.submeter) p.submeter = true;

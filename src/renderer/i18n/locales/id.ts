@@ -1208,6 +1208,10 @@ export const id: TranslationKeys = {
     done: 'Selesai',
   },
   panelSettings: {
+    groundTempC: 'Suhu tanah',
+    groundTempHint: 'Kabel tertanam: koreksi KHA di tanah (acuan IEC 20 °C).',
+    depthM: 'Kedalaman tanam',
+    depthHint: 'Kabel tertanam: faktor kedalaman penanaman (acuan IEC 0,5 m).',
     title: 'Suplai & pengaturan panel',
     system: 'Sistem',
     voltage: 'Tegangan',

@@ -35,3 +35,6 @@ export * from './computePanel';
 export * from './computeSystem';
 export * from './control';
 export * from './compliance';
+export * from './minFault';
+export * from './touchVoltage';
+export * from './transformerInrush';
