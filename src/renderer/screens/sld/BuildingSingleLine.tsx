@@ -169,7 +169,7 @@ const SOURCE_PALETTE: { key: SourceKind; labelKey: string; icon: React.ReactNode
  */
 
 /* ----------------------------- schematic geometry -------------------------- */
-const LEFT = 52; // gutter for the bar labels (L1/L2/L3/N/PE)
+const LEFT = 76; // left gutter: rail id pill + its value (R-S-T amps, N/PE mm²)
 // Horizontal pitch per outgoing way / bus-tapped device. Wide enough that a
 // way's breaker-rating + starter text and its drop-cable label ("4×50 mm² ·
 // 68%") clear the neighbouring column — 76 px packed them illegibly.
@@ -644,34 +644,44 @@ function PanelSchematic({ d, width }: { d: UnifiedPanelData; width: number }) {
         bus: {d.busSpec}
       </text>
 
-      {/* Phase / N / PE bars — drawn as rounded copper rails with a soft sheen and
-          shadow for depth, a coloured label pill, and the N/PE sized section. */}
+      {/* Phase / N / PE bars — rounded copper rails with a soft sheen + shadow.
+          Each rail is annotated in the (drop-free) LEFT gutter: phase rails show
+          their line current, N/PE show their conductor section — so the values
+          never collide with the drop columns crossing the rails. */}
       {L.bars.map((b) => {
         const color = PHASE_COLOR[b.key] ?? '#888';
         const h = b.key === 'PE' ? 4 : b.key === 'N' ? 5 : 6;
         const w = right - LEFT;
         // Phase bars use the PUIL/Indonesian R-S-T designation (N/PE unchanged).
         const label = PHASE_RST[b.key] ?? b.key;
+        const isPhase = b.key !== 'N' && b.key !== 'PE';
+        const amp = !isPhase
+          ? undefined
+          : b.key === 'L'
+            ? d.phaseBalance?.L1
+            : (d.phaseBalance as Record<string, number> | undefined)?.[b.key];
+        const value = isPhase
+          ? amp !== undefined
+            ? `${Math.round(amp)} A`
+            : ''
+          : b.key === 'N'
+            ? d.neutralSpec
+            : d.peSpec;
         return (
           <g key={b.key}>
-            <rect x={3} y={b.y - 6} width={LEFT - 12} height={12} rx={6} fill={color} />
-            <text x={3 + (LEFT - 12) / 2} y={b.y + 3} fontSize={9} fontWeight={700} textAnchor="middle" fill="#fff">
+            {/* Identity pill (R/S/T/N/PE). */}
+            <rect x={3} y={b.y - 6} width={18} height={12} rx={4} fill={color} />
+            <text x={12} y={b.y + 2.5} fontSize={8.5} fontWeight={700} textAnchor="middle" fill="#fff">
               {label}
             </text>
+            {/* Value: line current (phases) or conductor section (N/PE). */}
+            {value && (
+              <text x={25} y={b.y + 2.5} fontSize={8} fontWeight={600} textAnchor="start" fill={color}>
+                {value}
+              </text>
+            )}
             <rect x={LEFT} y={b.y - h / 2} width={w} height={h} rx={h / 2} fill={color} filter="url(#sldBarShadow)" />
             <rect x={LEFT + 2} y={b.y - h / 2 + 0.6} width={w - 4} height={1.1} rx={0.5} fill="#fff" opacity={0.45} />
-            {/* N sits just ABOVE its bar, PE just BELOW its bar — the two rails
-                are close, so splitting the labels keeps them from overlapping. */}
-            {b.key === 'N' && (
-              <text x={right - 2} y={b.y - 7} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
-                N {d.neutralSpec}
-              </text>
-            )}
-            {b.key === 'PE' && (
-              <text x={right - 2} y={b.y + 12} fontSize={7.5} fontWeight={600} textAnchor="end" fill={color}>
-                PE {d.peSpec}
-              </text>
-            )}
           </g>
         );
       })}
