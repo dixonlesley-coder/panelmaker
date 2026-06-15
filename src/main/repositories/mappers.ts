@@ -100,6 +100,7 @@ export function circuitToRow(
     sensing: undefToNull(c.sensing),
     cableOverrideMm2: undefToNull(c.cableOverrideMm2),
     cableType: undefToNull(c.cableType),
+    laying: undefToNull(c.laying),
     lifeSafety: c.lifeSafety === true ? true : null,
     busway: c.busway === true ? true : null,
     transformer: c.transformer === true ? true : null,
@@ -160,6 +161,8 @@ export function rowToCircuit(r: CircuitRow): CircuitInput {
   if (cableOverrideMm2 !== undefined) c.cableOverrideMm2 = cableOverrideMm2;
   const cableType = nullToUndef(r.cableType);
   if (cableType !== undefined) c.cableType = cableType as CircuitInput['cableType'];
+  const laying = nullToUndef(r.laying);
+  if (laying !== undefined) c.laying = laying as CircuitInput['laying'];
   if (r.lifeSafety) c.lifeSafety = true;
   if (r.busway) c.busway = true;
   if (r.transformer) c.transformer = true;

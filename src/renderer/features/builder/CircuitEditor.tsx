@@ -308,6 +308,22 @@ export function CircuitEditor({ panelId, circuit, result, opened, onClose }: Pro
             onChange={(v) => patch({ cableType: v && v !== 'auto' ? (v as CableType) : undefined })}
           />
           <Select
+            label={t('circuitEditor.laying')}
+            data={[
+              { value: 'air', label: t('circuitEditor.layingAir') },
+              { value: 'ground', label: t('circuitEditor.layingGround') },
+            ]}
+            value={circuit.laying ?? 'air'}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+            styles={
+              circuit.laying === 'ground'
+                ? { input: { color: 'var(--mantine-color-violet-6)', fontWeight: 600 } }
+                : undefined
+            }
+            onChange={(v) => patch({ laying: v === 'ground' ? 'ground' : undefined })}
+          />
+          <Select
             label={t('builder.overrideCable')}
             data={CABLE_OPTIONS}
             value={circuit.cableOverrideMm2 !== undefined ? String(circuit.cableOverrideMm2) : 'auto'}

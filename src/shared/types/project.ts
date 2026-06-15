@@ -89,6 +89,13 @@ export interface CircuitInput {
    */
   cableType?: CableType;
   /**
+   * Per-run cable laying regime for current-carrying capacity: 'air' (above
+   * ground) or 'ground' (buried). Absent = follow the panel's install method,
+   * which defaults to in-air. Lets one circuit be sized as a buried run (the
+   * higher in-ground rating) without changing the whole panel.
+   */
+  laying?: 'air' | 'ground';
+  /**
    * Manual breaker rating override (A). When set, the engine uses this rating
    * instead of auto-sizing from the load — and FLAGS non-compliance (an
    * undersized override nuisance-trips) rather than silently correcting it.

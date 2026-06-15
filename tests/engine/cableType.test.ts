@@ -52,6 +52,21 @@ describe('per-circuit cable type', () => {
     expect(explicit.cableSpec.startsWith('NYA ')).toBe(true);
   });
 
+  it('per-run laying: in ground uses the higher in-ground rating; default is in air', () => {
+    const mk = (laying?: 'air' | 'ground') =>
+      computePanel(
+        panel({
+          id: 'P',
+          name: 'DB',
+          circuits: [branch({ id: 'c', name: 'Run', loadW: 1500, ...(laying ? { laying } : {}) })],
+        }),
+      ).circuits[0]!.cable;
+    const air = mk(); // default
+    const ground = mk('ground');
+    // Same small section, but the catalogue's in-ground rating beats in-air.
+    expect(ground.baseKhaA).toBeGreaterThan(air.baseKhaA);
+  });
+
   it('computePanel: an explicit circuit cableType wins; siblings keep the default', () => {
     const p = panel({
       id: 'P1',

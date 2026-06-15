@@ -142,6 +142,8 @@ export const circuits = sqliteTable('circuits', {
   cableOverrideMm2: real('cable_override_mm2'),
   /** Explicit cable construction (NYY/NYM/NYA/NYAF…); null = panel default. */
   cableType: text('cable_type'),
+  /** Per-run cable laying regime ('air' | 'ground'); null = in air (default). */
+  laying: text('laying'),
   /** Life-safety circuit (fire pump etc.): no RCD, FRC cable. */
   lifeSafety: integer('life_safety', { mode: 'boolean' }),
   /** Feeder runs as busbar trunking (busway) instead of cable. */

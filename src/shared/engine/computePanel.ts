@@ -144,6 +144,16 @@ function computeCircuit(
   const minSection = Math.max(baseMinSection, c.cableOverrideMm2 ?? 0);
   const insulation = panel.insulation ?? 'PVC';
   const material = panel.material ?? 'Cu';
+  // Per-run laying regime overrides the panel's install method for ampacity:
+  // 'ground' sizes this circuit as a buried run (higher in-ground rating);
+  // 'air' forces an above-ground rating even if the panel default is buried;
+  // absent = the panel's method (which defaults to in-air).
+  const installMethod: PanelInput['installMethod'] =
+    c.laying === 'ground'
+      ? 'buried'
+      : c.laying === 'air' && panel.installMethod === 'buried'
+        ? 'conduit'
+        : panel.installMethod;
   // Copper/PVC cables size against the manufacturer's per-TYPE ampacity (Supreme
   // catalogue): an explicit type wins; otherwise the Cu/PVC default is NYY for
   // three-phase, NYM for single-phase finals (matching the cable-spec defaults).
@@ -164,7 +174,7 @@ function computeCircuit(
     minSectionMm2: minSection,
     insulation,
     material,
-    installMethod: panel.installMethod,
+    installMethod,
     ...(cableFamily ? { cableFamily } : {}),
     threePhase,
     // Auto-upsize the cable so it also meets the 3%/5% voltage-drop limit; the

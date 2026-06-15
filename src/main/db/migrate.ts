@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS circuits (
   sensing TEXT,
   cable_override_mm2 REAL,
   cable_type TEXT,
+  laying TEXT,
   life_safety INTEGER,
   busway INTEGER,
   transformer INTEGER,
@@ -236,6 +237,8 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'panels', column: 'material', ddl: 'ALTER TABLE panels ADD COLUMN material TEXT' },
   // Per-circuit cable construction (NYY/NYM/NYA/NYAF…).
   { table: 'circuits', column: 'cable_type', ddl: 'ALTER TABLE circuits ADD COLUMN cable_type TEXT' },
+  // Per-circuit cable laying regime (air/ground).
+  { table: 'circuits', column: 'laying', ddl: 'ALTER TABLE circuits ADD COLUMN laying TEXT' },
   // Essential (genset-backed) panel flag.
   { table: 'panels', column: 'essential', ddl: 'ALTER TABLE panels ADD COLUMN essential INTEGER' },
   // Explicit supply phase count (1 or 3) for a circuit.
