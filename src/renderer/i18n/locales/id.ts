@@ -1128,6 +1128,7 @@ export const id: TranslationKeys = {
     solar: 'Surya PV + inverter',
     battery: 'Baterai + inverter',
     generator: 'Genset',
+    hybridInverter: 'Inverter hibrida',
     sourcesHint: 'Letakkan sumber untuk menambahkannya ke suplai; klik dua kali nodenya untuk menghitung ukurannya.',
     groupOverrides: 'Override',
     breakerOverride: 'Rating MCB',

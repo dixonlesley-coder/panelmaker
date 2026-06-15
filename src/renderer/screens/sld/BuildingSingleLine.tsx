@@ -1387,6 +1387,53 @@ function SourceNode({ data, selected }: NodeProps) {
   );
 }
 
+interface HybridInverterNodeData {
+  sub?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The shared hybrid (multi-mode) inverter on the service head: the grid (AC) and
+ * the PV + battery (DC) converge here, and it feeds the WHOLE panel as an online
+ * UPS / automatic source-transfer gateway. Drawn between the sources and the MDP.
+ */
+function HybridInverterNode({ data }: NodeProps) {
+  const d = data as HybridInverterNodeData;
+  const { t } = useTranslation();
+  return (
+    <Box
+      style={{
+        width: GRID_SRC_W,
+        background: 'var(--mantine-color-body)',
+        border: '1.5px solid var(--mantine-color-teal-5)',
+        borderRadius: 'var(--mantine-radius-md)',
+        boxShadow: 'var(--mantine-shadow-xs)',
+        padding: '6px 8px',
+      }}
+    >
+      {/* Sources (grid AC + PV/battery DC) feed in at the top. */}
+      <Handle type="target" id="in" position={Position.Top} isConnectable={false} />
+      <Group gap={6} wrap="nowrap" align="center">
+        <ThemeIcon size="md" variant="light" color="teal" style={{ flexShrink: 0 }}>
+          <IconWaveSine size={18} />
+        </ThemeIcon>
+        <Box style={{ minWidth: 0 }}>
+          <Text size="xs" fw={700} lineClamp={1}>
+            {t('vbuilder.hybridInverter')}
+          </Text>
+          {d.sub && (
+            <Text style={{ fontSize: 9 }} c="dimmed" lineClamp={1}>
+              {d.sub}
+            </Text>
+          )}
+        </Box>
+      </Group>
+      {/* Single AC output down into the main bus ('in' on the service panel). */}
+      <Handle type="source" id="out" position={Position.Bottom} isConnectable={false} />
+    </Box>
+  );
+}
+
 /**
  * Stable content key for a node's data — serialised, dropping the callback props
  * (which are fresh closures every rebuild but wrap STABLE handlers). Lets the
@@ -1477,6 +1524,7 @@ const UNIFIED_NODE_TYPES = {
   grid: GridSourceNode, // display-only + cheap; no callbacks to worry about
   source: memoNode(SourceNode),
   control: PumpControlNode, // display-only pump-group controller
+  hinv: HybridInverterNode, // display-only hybrid inverter (UPS/ATS gateway)
 };
 
 /**
@@ -1777,13 +1825,49 @@ function buildUnified(
       // supply as a CHILD node above its incomer — a building has one intake.
       // Other standalone roots render as "not connected" until they're fed.
       if (panel.sourceType === 'utility' && id === rootId) {
+        const src = system.sources;
+        // A single hybrid inverter sits BETWEEN the sources and the MDP: the grid
+        // (AC) + PV/battery (DC) converge on it and it feeds the whole panel as an
+        // online UPS / source-transfer gateway. Otherwise the sources feed the
+        // bus in parallel (grid-tied / AC-coupled).
+        const hybrid = Boolean(src?.hybridInverter);
+        const INV_ROW_Y = -(GRID_SRC_H + 30); // row directly above the panel
+        const SRC_ROW_Y = hybrid ? INV_ROW_Y - (GRID_SRC_H + 44) : INV_ROW_Y;
+        const plnX = w / 2 - GRID_SRC_W / 2;
+        // Everything feeds the inverter when hybrid, else the panel directly.
+        const sinkId = hybrid ? `hinv-${id}` : id;
+
+        // The hybrid inverter (UPS/ATS) node + its single AC output to the MDP.
+        if (hybrid) {
+          const hinvKw = src?.hybridInverterKw;
+          nodes.push({
+            id: sinkId,
+            type: 'hinv',
+            parentId: id,
+            position: { x: plnX, y: INV_ROW_Y },
+            deletable: false,
+            draggable: false,
+            selectable: false,
+            data: { sub: hinvKw ? `UPS/ATS · ${hinvKw} kW · whole-building` : 'UPS/ATS · whole-building' },
+          });
+          edges.push({
+            id: `e-hinv-${id}`,
+            source: sinkId,
+            sourceHandle: 'out',
+            target: id,
+            targetHandle: 'in',
+            type: 'smoothstep',
+            style: { stroke: 'var(--mantine-color-teal-5)', strokeWidth: 2.4 },
+          });
+        }
+
         const gridId = `grid-${id}`;
         const supplyType = system.supply.type === 'MV' ? 'MV' : 'LV';
         nodes.push({
           id: gridId,
           type: 'grid',
           parentId: id,
-          position: { x: w / 2 - GRID_SRC_W / 2, y: -(GRID_SRC_H + 30) },
+          position: { x: plnX, y: SRC_ROW_Y },
           deletable: false,
           draggable: false,
           // Display-only: it can't be copied or deleted, so a click-selection
@@ -1807,17 +1891,18 @@ function buildUnified(
           id: `e-grid-${id}`,
           source: gridId,
           sourceHandle: 'out',
-          target: id,
+          target: sinkId,
           targetHandle: 'in',
+          // PLN is the inverter's AC source when hybrid; label it so.
+          ...(hybrid ? { label: 'AC' } : {}),
           type: 'smoothstep',
           style: { stroke: 'var(--mantine-color-indigo-5)', strokeWidth: 2 },
         });
 
         // Distributed energy sources as their OWN external nodes beside the PLN
-        // intake (generator/solar/battery), each feeding the main bus. Deleting
-        // a node disables that source. The detailed ATS/inverter interlocks live
-        // on the Power one-line tab; here they read as parallel sources.
-        const src = system.sources;
+        // intake (generator/solar/battery). When hybrid they feed the inverter
+        // (PV/battery on DC, genset on AC); otherwise they feed the bus directly.
+        // The detailed ATS/inverter interlocks live on the Power one-line tab.
         const srcList: SourceNodeData[] = [];
         if (src?.generator) {
           srcList.push({
@@ -1832,16 +1917,17 @@ function buildUnified(
         if (src?.battery) {
           srcList.push({ kind: 'battery', sub: `${src.battery.installedKwh} kWh · ${src.battery.inverterKw} kW` });
         }
-        const plnX = w / 2 - GRID_SRC_W / 2;
         const SRC_GAP = 16;
         srcList.forEach((sd, k) => {
           const srcId = `src-${sd.kind}-${id}`;
+          // DC link for the PV/battery into a hybrid inverter; AC otherwise.
+          const isDc = hybrid && (sd.kind === 'solar' || sd.kind === 'battery');
           nodes.push({
             id: srcId,
             type: 'source',
             parentId: id,
-            // To the LEFT of the PLN intake, on the same row.
-            position: { x: plnX - (k + 1) * (GRID_SRC_W + SRC_GAP), y: -(GRID_SRC_H + 30) },
+            // To the LEFT of the PLN intake, on the sources row.
+            position: { x: plnX - (k + 1) * (GRID_SRC_W + SRC_GAP), y: SRC_ROW_Y },
             draggable: false,
             data: sd,
           });
@@ -1849,8 +1935,9 @@ function buildUnified(
             id: `e-${srcId}`,
             source: srcId,
             sourceHandle: 'out',
-            target: id,
+            target: sinkId,
             targetHandle: 'in',
+            ...(hybrid ? { label: isDc ? 'DC' : 'AC' } : {}),
             type: 'smoothstep',
             style: { stroke: SOURCE_NODE_STYLE[sd.kind].color, strokeWidth: 2, strokeDasharray: '5 3' },
           });

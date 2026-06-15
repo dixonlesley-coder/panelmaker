@@ -1123,6 +1123,7 @@ export const en = {
     solar: 'Solar PV + inverter',
     battery: 'Battery + inverter',
     generator: 'Generator',
+    hybridInverter: 'Hybrid inverter',
     sourcesHint: 'Drop a source to add it to the supply; double-click its node to size it.',
     groupOverrides: 'Overrides',
     breakerOverride: 'MCB rating',
