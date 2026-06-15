@@ -33,10 +33,12 @@ import {
   IconBulb,
   IconChargingPile,
   IconCircuitSwitchOpen,
+  IconClock,
   IconDroplet,
   IconEngine,
   IconFireHydrant,
   IconFlame,
+  IconGauge,
   IconHandMove,
   IconLayoutDistributeHorizontal,
   IconLayoutDistributeVertical,
@@ -49,7 +51,7 @@ import {
   IconTool,
   IconWaveSine,
 } from '@tabler/icons-react';
-import type { CircuitInput, LoadKind, PanelInput, Part, PhaseAssignment, ProjectInput, SystemResult } from '@shared/types';
+import type { CircuitInput, LoadKind, PanelInput, Part, PhaseAssignment, ProjectInput, SystemResult, SystemType } from '@shared/types';
 import { circuitOrderCodes } from '@shared/engine/bom';
 import { balancePhases, type PhaseCircuit } from '@shared/engine';
 import { partsForBrand } from '@shared/data/catalog';
@@ -70,7 +72,7 @@ const SLD_DND = 'application/x-panelmaker-sld-add';
 type SourceKind = 'generator' | 'solar' | 'battery';
 type SldAdd =
   | { type: 'load'; loadKind: LoadKind; nameKey: string; defaults: Partial<CircuitInput> }
-  | { type: 'subpanel' }
+  | { type: 'subpanel'; system?: SystemType }
   | { type: 'source'; source: SourceKind };
 
 /**
@@ -105,10 +107,15 @@ const PALETTE_GROUPS: { key: PaletteGroup; labelKey: string }[] = [
 const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd; group: PaletteGroup }[] = [
   { key: 'lighting', labelKey: 'vbuilder.lighting', group: 'loads', icon: <IconBulb size={14} />, action: loadCard('lighting', 'vbuilder.lighting', { loadW: 1200 }) },
   { key: 'socket', labelKey: 'vbuilder.sockets', group: 'loads', icon: <IconPlug size={14} />, action: loadCard('socket', 'vbuilder.sockets', { loadW: 2000 }) },
-  { key: 'hvac', labelKey: 'vbuilder.hvac', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac', { loadW: 5500 }) },
+  // Air-conditioning split by supply phase: a 1φ split unit vs a 3φ package/VRF.
+  { key: 'hvac1', labelKey: 'vbuilder.hvac1ph', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac1ph', { loadW: 2500, phases: 1 }) },
+  { key: 'hvac3', labelKey: 'vbuilder.hvac3ph', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac3ph', { loadW: 5500, phases: 3 }) },
   // Resistive water heater — hotels/apartments/restaurants; no-neutral when 3φ.
-  { key: 'heating', labelKey: 'vbuilder.heating', group: 'loads', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.heating', { loadW: 2000 }) },
-  { key: 'ev', labelKey: 'vbuilder.ev', group: 'loads', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev', { loadW: 7400 }) },
+  { key: 'waterHeater1', labelKey: 'vbuilder.waterHeater1ph', group: 'loads', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.waterHeater1ph', { loadW: 3000, phases: 1 }) },
+  { key: 'waterHeater3', labelKey: 'vbuilder.waterHeater3ph', group: 'loads', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.waterHeater3ph', { loadW: 9000, phases: 3 }) },
+  // EV charger split by supply phase: a 7.4 kW 1φ wallbox vs a 22 kW 3φ unit.
+  { key: 'ev1', labelKey: 'vbuilder.ev1ph', group: 'loads', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev1ph', { loadW: 7400, phases: 1 }) },
+  { key: 'ev3', labelKey: 'vbuilder.ev3ph', group: 'loads', icon: <IconChargingPile size={14} />, action: loadCard('ev_charger', 'vbuilder.ev3ph', { loadW: 22000, phases: 3 }) },
   // Industrial CEE-form 3φ socket: the 30 mA socket RCD rule still applies.
   { key: 'socket3', labelKey: 'vbuilder.socket3ph', group: 'loads', icon: <IconPlugConnected size={14} />, action: loadCard('socket', 'vbuilder.socket3ph', { loadW: 7500, phases: 3 }) },
   // UPS / IT load — a non-linear (harmonic) source the power-quality pass flags.
@@ -132,7 +139,8 @@ const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; actio
   { key: 'firepump', labelKey: 'vbuilder.firePump', group: 'motors', icon: <IconFireHydrant size={14} />, action: loadCard('pump', 'vbuilder.firePump', { loadW: 0, motorKw: 15, starterType: 'DOL', startingDuty: 'heavy', lifeSafety: true }) },
   // A spare way: installed breaker, no load/cable — boards keep 20-30% spare.
   { key: 'spare', labelKey: 'vbuilder.spare', group: 'dist', icon: <IconCircuitSwitchOpen size={14} />, action: loadCard('spare', 'vbuilder.spareName', { loadW: 0, lengthM: 1 }) },
-  { key: 'subpanel', labelKey: 'vbuilder.subpanel', group: 'dist', icon: <IconSitemap size={14} />, action: { type: 'subpanel' } },
+  { key: 'subpanel3', labelKey: 'vbuilder.subpanel3ph', group: 'dist', icon: <IconSitemap size={14} />, action: { type: 'subpanel', system: '3ph' } },
+  { key: 'subpanel1', labelKey: 'vbuilder.subpanel1ph', group: 'dist', icon: <IconSitemap size={14} />, action: { type: 'subpanel', system: '1ph' } },
 ];
 
 /**
@@ -2241,7 +2249,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         return;
       }
       if (action.type === 'subpanel') {
-        addSubPanel(panelId);
+        addSubPanel(panelId, action.system);
         notifications.show({ message: t('vbuilder.subpanelAdded'), color: 'teal' });
         return;
       }
@@ -2288,7 +2296,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         // A panel dropped on empty canvas is a STANDALONE panel (nothing feeds
         // it yet) — say so, and put it where it was dropped, not where the
         // auto-layout would park it.
-        const id = addPanel();
+        const id = addPanel(action.system);
         pendingPanelPos.current.set(id, { x: snap(p.x - 150), y: snap(p.y - 40) });
         notifications.show({ message: t('system.panelAddedUnfed'), color: 'teal' });
         return;

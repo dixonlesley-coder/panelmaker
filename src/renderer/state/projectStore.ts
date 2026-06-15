@@ -18,6 +18,7 @@ import type {
   SourcesConfig,
   StarterType,
   SuggestedFix,
+  SystemType,
 } from '@shared/types';
 
 /** A load placed on the canvas but not yet wired to a panel (no MCB yet). */
@@ -211,13 +212,13 @@ export interface ProjectState {
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
   /** Append a blank standalone panel; returns its id (so the canvas can place it). */
-  addPanel: () => string;
+  addPanel: (system?: SystemType) => string;
   /**
    * Drop a sub-panel onto a parent: creates the child panel AND the feeder
    * circuit in the parent (cross-wired feedsPanelId/fedByCircuitId) as one
    * undoable step. Returns nothing; the child becomes the active panel.
    */
-  addSubPanel: (parentPanelId: string) => void;
+  addSubPanel: (parentPanelId: string, system?: SystemType) => void;
   /**
    * Wire an EXISTING unassigned panel under a parent: adds a feeder circuit in
    * the parent feeding the child and flips the child to feeder-fed (cross-wired),
@@ -743,14 +744,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
       ),
     ),
 
-  addPanel: () => {
+  addPanel: (system = '3ph') => {
     const id = nextId('P');
     set((s) => {
       const newPanel: PanelInput = {
         id,
         name: uniquePanelName(s.project.panels, 'New panel'),
-        system: '3ph',
-        voltageV: 400,
+        system,
+        voltageV: system === '1ph' ? 230 : 400,
         ambientTempC: 35,
         installMethod: 'conduit',
         groupingCount: 3,
@@ -767,17 +768,23 @@ export const useProjectStore = create<ProjectState>((set) => ({
     return id;
   },
 
-  addSubPanel: (parentPanelId) =>
+  addSubPanel: (parentPanelId, system) =>
     set((s) => {
       const parent = s.project.panels.find((p) => p.id === parentPanelId);
       if (!parent) return s;
       const childId = nextId('P');
       const feederId = nextId('c');
+      // The child's phasing: the explicit choice, else inherit the parent's. A
+      // 1-phase sub-board fed from a 3-phase parent runs at the phase voltage
+      // (~230 V), tapped off one line of the parent's feeder.
+      const childSystem: SystemType = system ?? parent.system;
+      const childVoltageV =
+        childSystem === parent.system ? parent.voltageV : childSystem === '1ph' ? 230 : 400;
       const child: PanelInput = {
         id: childId,
         name: uniquePanelName(s.project.panels, 'Sub-panel'),
-        system: parent.system,
-        voltageV: parent.voltageV,
+        system: childSystem,
+        voltageV: childVoltageV,
         ambientTempC: parent.ambientTempC,
         installMethod: parent.installMethod,
         groupingCount: parent.groupingCount,
