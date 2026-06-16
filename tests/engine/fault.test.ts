@@ -271,6 +271,28 @@ describe('earth-fault loop impedance (Zs) and ADS', () => {
     expect(c.peAdiabaticOk).toBe(false);
     expect(sys.warnings.some((w) => w.code === 'pe-undersized-adiabatic')).toBe(true);
   });
+
+  it('does NOT flag phase-conductor withstand for a small MCB on a correctly-sized cable', () => {
+    // A small single-phase pump (~6 A) on its own breaker. At a real short-circuit
+    // the small MCB trips in its instantaneous region (a few ms), so the cable
+    // withstands easily — the old fixed-100 ms assumption was a false positive.
+    const project: ProjectInput = {
+      id: 'PRJ',
+      name: 'B',
+      earthingSystem: 'TN-C-S',
+      panels: [
+        panel({
+          id: 'P',
+          name: 'DB',
+          circuits: [branch({ id: 'c', name: 'Pump', loadW: 1300, lengthM: 20, phases: 1 })],
+        }),
+      ],
+    };
+    const sys = computeSystem(project);
+    const c = sys.panels['P']!.circuits[0]!;
+    expect(c.phaseWithstandOk).toBe(true);
+    expect(sys.warnings.some((w) => w.code === 'phase-conductor-withstand')).toBe(false);
+  });
 });
 
 describe('selectivity / discrimination', () => {

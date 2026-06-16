@@ -22,7 +22,7 @@ import { circuitDemandFactor } from './occupancy';
 import { derivedPointsLoadW, finalCircuitWarnings, summarizeFinalCircuit } from './fixtures';
 import { sizeCableTray, sizeCircuitConduit } from './containment';
 import { deratingFactor } from './derating';
-import { minLineNeutralFaultA, instantaneousTrips, phaseWithstand } from './minFault';
+import { minLineNeutralFaultA, instantaneousTrips, phaseWithstand, magneticTripThresholdA } from './minFault';
 import { estimateEnclosure } from './enclosure';
 import { loadCurrent } from './loadCurrent';
 import { selectBreaker } from './breakerSelect';
@@ -385,13 +385,24 @@ function computeCircuit(
         ratingA: breaker.ratingA,
         curve: breaker.curve,
       });
-      result.phaseWithstandOk = phaseWithstand({
-        faultA: opts.faultLevelA,
-        clearingTimeS: 0.1,
-        csaMm2: cable.csaMm2,
-        material,
-        insulation,
-      }).ok;
+      // Phase-conductor short-circuit (adiabatic) withstand. An MCB is current-
+      // limiting and type-tested to protect its cable (which the engine sizes
+      // Iz ≥ In), so a real short-circuit is cut off sub-cycle with low let-through
+      // energy — a 2.5 mm² on a 6 A MCB survives easily. The old fixed-100 ms
+      // assumption was a false positive. For the (rarer) MCCB branch, a fault above
+      // the magnetic pickup clears via the instantaneous element in ~20 ms (NOT the
+      // conventional ~100 ms), so evaluate the adiabatic energy at that time.
+      const magneticA = magneticTripThresholdA({ ratingA: breaker.ratingA, curve: breaker.curve });
+      result.phaseWithstandOk =
+        result.breaker.deviceClass !== 'MCCB' || opts.faultLevelA < magneticA
+          ? true
+          : phaseWithstand({
+              faultA: opts.faultLevelA,
+              clearingTimeS: 0.02,
+              csaMm2: cable.csaMm2,
+              material,
+              insulation,
+            }).ok;
     }
 
     warnings.push(
@@ -504,12 +515,32 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   }
 
   if (panel.system === '3ph' && balance.imbalancePct > 15) {
-    warnings.push({
-      code: 'phase-imbalance',
-      severity: 'warning',
-      message: `Phase loading is unbalanced by ${balance.imbalancePct}% (L1 ${balance.L1} A, L2 ${balance.L2} A, L3 ${balance.L3} A). Redistribute single-phase circuits.`,
-      panelId: panel.id,
+    // Only flag imbalance that REDISTRIBUTION can actually fix. The balancer has
+    // already assigned phases optimally, so check whether moving any one single-
+    // phase circuit to another phase would shrink the spread. If not — e.g. only
+    // two 1φ loads on a 3φ board, where the third phase is unavoidably idle — the
+    // imbalance is structural, not a maldistribution, so we don't nag.
+    const totals = { L1: balance.L1, L2: balance.L2, L3: balance.L3 };
+    const spread = (t: typeof totals) => Math.max(t.L1, t.L2, t.L3) - Math.min(t.L1, t.L2, t.L3);
+    const base = spread(totals);
+    const lines: (keyof typeof totals)[] = ['L1', 'L2', 'L3'];
+    const reducible = comps.some((cm) => {
+      if (cm.threePhase || cm.result.designCurrentA <= 0) return false;
+      const from = cm.result.phase as keyof typeof totals;
+      if (!lines.includes(from)) return false;
+      const c = cm.result.designCurrentA;
+      return lines.some(
+        (to) => to !== from && spread({ ...totals, [from]: totals[from] - c, [to]: totals[to] + c }) < base - 0.05,
+      );
     });
+    if (reducible) {
+      warnings.push({
+        code: 'phase-imbalance',
+        severity: 'warning',
+        message: `Phase loading is unbalanced by ${balance.imbalancePct}% (L1 ${balance.L1} A, L2 ${balance.L2} A, L3 ${balance.L3} A). Redistribute single-phase circuits.`,
+        panelId: panel.id,
+      });
+    }
   }
 
   // Busbar / incomer carry the worst-loaded phase's line current, not the scalar
