@@ -2968,7 +2968,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   };
 
   return (
-    <Group align="stretch" gap="sm" wrap="nowrap" h="clamp(560px, calc(100vh - 220px), 880px)">
+    <Group align="stretch" gap="sm" wrap="nowrap" h="max(560px, calc(100vh - 220px))">
       {/* Palette — drag a card onto a panel to add it there. The VISIBLE grip
           bar on the right edge resizes it; double-click resets to the width
           that fits every card name. */}
