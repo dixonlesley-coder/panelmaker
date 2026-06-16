@@ -1928,6 +1928,9 @@ function buildUnified(
       };
       // draggable comes from the flow-level nodesDraggable; per-node draggable:false
       // would override it and break rearranging. Panels are deletable (Delete key).
+      // Panels always take their computed tidy-tree slot; dragging a panel reorders
+      // its siblings (and the parent's feeder breakers) and re-tidies — so the tree
+      // stays clean and feeders never cross (see onNodeDragStop).
       nodes.push({ id, type: 'uPanel', position: { x: snap(slot.x), y: snap(slot.y) }, data });
 
       // ONLY the service-entrance panel (the MDP) shows the incoming PLN grid
@@ -2226,7 +2229,11 @@ function buildUnified(
         id: `feed-${circuitId}`,
         source: parentId,
         // Left-to-right tree: feeders to sub-panels leave from the RIGHT outlet;
-        // top-to-bottom: from the way's own column on the bottom busbar.
+        // top-to-bottom: from the feeder breaker's OWN column on the bottom busbar
+        // (so the line visibly attaches to the breaker that protects it). Dragging
+        // a child reorders the parent's feeder breakers to match the children's
+        // left-to-right order (see onNodeDragStop) — so the columns line up with
+        // the panels and sibling feeders never cross.
         sourceHandle: dir === 'horizontal' ? 'out' : circuitId,
         target: childId,
         targetHandle: 'in',
@@ -2598,9 +2605,13 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
   // When the orientation flips, snap every panel to the fresh layout (a re-arrange)
   // instead of preserving dragged positions.
   const prevDirRef = useRef(layoutDir);
+  // Set by "Auto-arrange": force every node back to the freshly-computed layout
+  // (ignoring in-session drag offsets), then fit the view.
+  const tidyRequested = useRef(false);
   useEffect(() => {
     const dirChanged = prevDirRef.current !== layoutDir;
     prevDirRef.current = layoutDir;
+    const forceReset = dirChanged || tidyRequested.current;
     setNodes((cur) => {
       const posById = new Map(cur.map((n) => [n.id, n.position]));
       // Keep the user's selection across model rebuilds — every edit regenerates
@@ -2618,12 +2629,16 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         // children (a panel's grid-supply head and its load nodes) must take
         // the fresh layout position — preserving theirs left them stranded at
         // stale offsets whenever the panel's width/way count changed. On a
-        // direction flip, even user-placed panels re-arrange to the new layout.
+        // direction flip (or Auto-arrange), even user-placed panels re-arrange.
         const userPlaced = n.type === 'uPanel' || n.type === 'floatLoad';
-        const keepPos = userPlaced && !dirChanged;
+        const keepPos = userPlaced && !forceReset;
         return { ...n, ...sel, position: keepPos ? (posById.get(n.id) ?? n.position) : n.position };
       });
     });
+    if (tidyRequested.current) {
+      tidyRequested.current = false;
+      setTimeout(() => rfRef.current?.fitView({ padding: 0.2, duration: 350 }), 60);
+    }
   }, [built.nodes, setNodes, layoutDir]);
 
   // Locate an issue (from the Issues drawer): centre the canvas on the offending
@@ -2755,27 +2770,51 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         else moveFloatingLoad(fid, node.position);
         return;
       }
-      if (node.type !== 'uPanel') return; // only keep panels from overlapping
-      setNodes((cur) => {
-        const me = panelBox(node.id);
-        let { x, y } = node.position;
-        const M = 28;
-        for (let pass = 0; pass < 40; pass++) {
-          let bumped = false;
-          for (const n of cur) {
-            if (n.id === node.id || n.type !== 'uPanel') continue;
-            const o = panelBox(n.id);
-            if (x < n.position.x + o.w + M && x + me.w + M > n.position.x && y < n.position.y + o.h + M && y + me.h + M > n.position.y) {
-              y = snap(n.position.y + o.h + M); // drop below the obstacle, on-grid
-              bumped = true;
+      if (node.type !== 'uPanel') return;
+      // Dragging a child panel REORDERS it among its siblings: re-sort the parent's
+      // feeder breakers by where each child now sits (left→right vertical / top→
+      // bottom horizontal) so a feeder's breaker column lines up with its panel —
+      // sibling feeders can't cross. A real reorder flags tidyRequested so the
+      // rebuild re-centres the whole tree (the dragged panel snaps to its new slot).
+      const parent = project.panels.find((p) =>
+        p.circuits.some((c) => c.feedsPanelId === node.id),
+      );
+      let reordered = false;
+      if (parent) {
+        const feeders = parent.circuits.filter((c) => c.feedsPanelId);
+        if (feeders.length > 1) {
+          const axis = (childId: string): number => {
+            const pos = childId === node.id ? node.position : nodes.find((n) => n.id === childId)?.position;
+            if (!pos) return Number.POSITIVE_INFINITY;
+            return layoutDir === 'horizontal' ? pos.y : pos.x;
+          };
+          const sorted = [...feeders].sort((a, b) => axis(a.feedsPanelId!) - axis(b.feedsPanelId!));
+          const ids = parent.circuits.map((c) => c.id);
+          // Drop the sorted feeders into the slots feeders currently occupy,
+          // leaving every non-feeder circuit exactly where it is.
+          const newIds = [...ids];
+          let k = 0;
+          parent.circuits.forEach((c, i) => {
+            if (c.feedsPanelId) {
+              newIds[i] = sorted[k]!.id;
+              k += 1;
             }
+          });
+          if (newIds.some((id, i) => id !== ids[i])) {
+            reordered = true;
+            tidyRequested.current = true; // rebuild → node-sync effect re-tidies + fits
+            reorderCircuits(parent.id, newIds);
           }
-          if (!bumped) break;
         }
-        return cur.map((n) => (n.id === node.id ? { ...n, position: { x, y } } : n));
-      });
+      }
+      // No reorder (just a nudge / a root panel): snap the panel back to its tidy
+      // slot so the layout never drifts into a crossing mess.
+      if (!reordered) {
+        const home = built.nodes.find((n) => n.id === node.id);
+        if (home) setNodes((cur) => cur.map((n) => (n.id === node.id ? { ...n, position: home.position } : n)));
+      }
     },
-    [panelBox, setNodes, moveFloatingLoad, attachFloatingLoad, nodes, project, built.nodes, reorderCircuits],
+    [moveFloatingLoad, attachFloatingLoad, nodes, project, built.nodes, reorderCircuits, layoutDir, panelBox, setNodes],
   );
 
   /** Nearest panel to a canvas point (distance to its expanded box; 0 inside). */
