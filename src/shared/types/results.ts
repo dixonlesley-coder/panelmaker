@@ -288,6 +288,10 @@ export interface EnclosureResult {
   ventilation: Ventilation;
   modules: number;
   rows: number;
+  /** True when one or more dimensions are a manual override (vs the auto estimate). */
+  manual?: boolean;
+  /** True when the mounted gear fits the (possibly manual) enclosure across its rows. */
+  fitsModules?: boolean;
   /** Temperature-rise verification + IP-rating recommendation (IEC 61439-1 / 60890). */
   thermal?: EnclosureThermalResult;
 }

@@ -233,6 +233,8 @@ export function panelToRow(p: PanelInput, projectId: string): NewPanelRow {
     submeter: p.submeter === true ? true : null,
     pumpGroupsJson:
       p.pumpGroups && p.pumpGroups.length > 0 ? JSON.stringify(p.pumpGroups) : null,
+    enclosureJson:
+      p.enclosure && Object.keys(p.enclosure).length > 0 ? JSON.stringify(p.enclosure) : null,
   };
 }
 
@@ -272,6 +274,14 @@ export function rowToPanel(r: PanelRow, circuits: CircuitInput[]): PanelInput {
       if (Array.isArray(groups) && groups.length > 0) p.pumpGroups = groups;
     } catch {
       /* corrupt pump-groups blob — drop it, keep the panel */
+    }
+  }
+  if (r.enclosureJson) {
+    try {
+      const enc = JSON.parse(r.enclosureJson) as PanelInput['enclosure'];
+      if (enc && Object.keys(enc).length > 0) p.enclosure = enc;
+    } catch {
+      /* corrupt enclosure blob — drop it, keep the panel */
     }
   }
   return p;

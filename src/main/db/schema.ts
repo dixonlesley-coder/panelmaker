@@ -108,6 +108,8 @@ export const panels = sqliteTable('panels', {
   submeter: integer('submeter', { mode: 'boolean' }),
   /** Functional pump groups (control scheme + members) as JSON. */
   pumpGroupsJson: text('pump_groups_json'),
+  /** Manual enclosure-size override { widthMm?, heightMm?, depthMm?, rows? } as JSON. */
+  enclosureJson: text('enclosure_json'),
 });
 
 export const circuits = sqliteTable('circuits', {

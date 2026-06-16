@@ -646,7 +646,20 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
       }
     }
   }
-  const enclosure = estimateEnclosure({ modules: totalModules, totalHeatW, hasFloorGear });
+  const enclosure = estimateEnclosure({
+    modules: totalModules,
+    totalHeatW,
+    hasFloorGear,
+    ...(panel.enclosure ? { override: panel.enclosure } : {}),
+  });
+  if (enclosure.fitsModules === false) {
+    warnings.push({
+      code: 'enclosure-too-small',
+      severity: 'warning',
+      message: `${panel.name}: the manual enclosure (${enclosure.widthMm} × ${enclosure.heightMm} mm, ${enclosure.rows} row${enclosure.rows > 1 ? 's' : ''}) can't fit the ${totalModules} DIN modules of gear — widen it, or add DIN rows.`,
+      panelId: panel.id,
+    });
+  }
   // Verify the internal temperature rise (IEC 61439-1 / 60890) COUNTING the
   // cooling the enclosure already specifies — it used to verify as if naturally
   // convected, flagging designs whose chosen fan/heat-exchanger was already

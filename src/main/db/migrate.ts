@@ -81,7 +81,8 @@ CREATE TABLE IF NOT EXISTS panels (
   essential INTEGER,
   ups_backed INTEGER,
   submeter INTEGER,
-  pump_groups_json TEXT
+  pump_groups_json TEXT,
+  enclosure_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS circuits (
@@ -260,6 +261,7 @@ const COLUMN_BACKFILLS: { table: string; column: string; ddl: string }[] = [
   { table: 'panels', column: 'submeter', ddl: 'ALTER TABLE panels ADD COLUMN submeter INTEGER' },
   // Functional pump groups (control scheme + members) as JSON.
   { table: 'panels', column: 'pump_groups_json', ddl: 'ALTER TABLE panels ADD COLUMN pump_groups_json TEXT' },
+  { table: 'panels', column: 'enclosure_json', ddl: 'ALTER TABLE panels ADD COLUMN enclosure_json TEXT' },
 ];
 
 /** Add any missing columns to existing tables (safe to run repeatedly). */

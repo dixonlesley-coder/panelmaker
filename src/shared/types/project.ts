@@ -208,6 +208,13 @@ export interface PanelInput {
    * demand; the meter (+ CTs) lands in the BOM.
    */
   submeter?: boolean;
+  /**
+   * Manual enclosure sizing to suit the installation space. Any field overrides
+   * the auto estimate; the rest stay auto-calculated. Constraining the width (or
+   * setting rows) makes the gear wrap across more DIN rows instead of one wide
+   * board. The engine warns (`enclosure-too-small`) if the gear can't fit.
+   */
+  enclosure?: { widthMm?: number; heightMm?: number; depthMm?: number; rows?: number };
   circuits: CircuitInput[];
   /**
    * Functional pump groups on this panel: sets of pump circuits run together

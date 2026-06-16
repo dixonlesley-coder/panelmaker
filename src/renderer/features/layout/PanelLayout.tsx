@@ -1,10 +1,11 @@
-import { Alert, Box, Button, Card, Group, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Alert, Badge, Box, Button, Card, Group, NumberInput, SimpleGrid, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { IconFileVector, IconRuler2 } from '@tabler/icons-react';
+import { IconAlertTriangle, IconFileVector, IconRefresh, IconRuler2 } from '@tabler/icons-react';
 import type { PanelInput } from '@shared/types/project';
 import type { PanelResult } from '@shared/types/results';
 import { panelGaSvg, panelGaDxf } from '@shared/drawing';
 import { downloadSvg, downloadDxf } from '@renderer/lib/drawingExport';
+import { useProjectStore } from '@renderer/state/projectStore';
 
 /** Small labelled key/value used in the dimension legend. */
 function KeyVal({ k, v }: { k: string; v: string }) {
@@ -30,8 +31,21 @@ function KeyVal({ k, v }: { k: string; v: string }) {
  */
 export function PanelLayout({ panel, result }: { panel: PanelInput; result: PanelResult }) {
   const { t } = useTranslation();
+  const updatePanel = useProjectStore((s) => s.updatePanel);
   const enc = result.enclosure;
   const { widthMm, heightMm, depthMm, sheetThicknessMm, modules, rows, ventilation, totalHeatW } = enc;
+
+  // Manual enclosure override: leave a field blank for auto (placeholder shows the
+  // computed value); type a value to size the box to the room. Setting the width
+  // or rows re-flows the gear across more DIN rows instead of one wide board.
+  const ov = panel.enclosure ?? {};
+  const isManual = Object.keys(ov).length > 0;
+  const patchEnc = (field: 'widthMm' | 'heightMm' | 'depthMm' | 'rows', v: number | undefined) => {
+    const next = { ...ov };
+    if (typeof v === 'number' && v > 0) next[field] = field === 'rows' ? Math.round(v) : v;
+    else delete next[field];
+    updatePanel(panel.id, { enclosure: Object.keys(next).length ? next : undefined });
+  };
 
   // Degenerate enclosure (no sized gear yet): show a friendly placeholder.
   if (widthMm <= 0 || heightMm <= 0 || rows <= 0 || modules <= 0) {
@@ -99,17 +113,88 @@ export function PanelLayout({ panel, result }: { panel: PanelInput; result: Pane
         </Text>
       </Card>
 
+      {enc.fitsModules === false && (
+        <Alert color="orange" icon={<IconAlertTriangle size={18} />} title={t('layout.tooSmallTitle')}>
+          {t('layout.tooSmallBody', { modules })}
+        </Alert>
+      )}
+
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <Card withBorder radius="md" padding="md">
-          <Text fw={600} size="sm" mb="xs">
-            {t('layout.enclosure')}
+          <Group justify="space-between" mb="xs">
+            <Group gap="xs">
+              <Text fw={600} size="sm">
+                {t('layout.enclosure')}
+              </Text>
+              {isManual && (
+                <Badge size="xs" variant="light" color="indigo">
+                  {t('layout.custom')}
+                </Badge>
+              )}
+            </Group>
+            {isManual && (
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="gray"
+                leftSection={<IconRefresh size={13} />}
+                onClick={() => updatePanel(panel.id, { enclosure: undefined })}
+              >
+                {t('layout.resetAuto')}
+              </Button>
+            )}
+          </Group>
+          {/* Editable to suit the room — blank = auto (placeholder shows the
+              computed value); a value overrides and re-flows the gear. */}
+          <SimpleGrid cols={2} spacing="xs">
+            <NumberInput
+              label={t('layout.width')}
+              hideControls
+              suffix=" mm"
+              min={100}
+              step={50}
+              value={ov.widthMm ?? ''}
+              placeholder={`${widthMm}`}
+              onChange={(v) => patchEnc('widthMm', typeof v === 'number' ? v : undefined)}
+            />
+            <NumberInput
+              label={t('layout.height')}
+              hideControls
+              suffix=" mm"
+              min={100}
+              step={50}
+              value={ov.heightMm ?? ''}
+              placeholder={`${heightMm}`}
+              onChange={(v) => patchEnc('heightMm', typeof v === 'number' ? v : undefined)}
+            />
+            <NumberInput
+              label={t('layout.depth')}
+              hideControls
+              suffix=" mm"
+              min={80}
+              step={50}
+              value={ov.depthMm ?? ''}
+              placeholder={`${depthMm}`}
+              onChange={(v) => patchEnc('depthMm', typeof v === 'number' ? v : undefined)}
+            />
+            <NumberInput
+              label={t('layout.dinRows')}
+              hideControls
+              min={1}
+              max={12}
+              value={ov.rows ?? ''}
+              placeholder={`${rows}`}
+              onChange={(v) => patchEnc('rows', typeof v === 'number' ? v : undefined)}
+            />
+          </SimpleGrid>
+          <Group justify="space-between" mt="xs">
+            <Text size="xs" c="dimmed">
+              {t('layout.sheetThickness')}: {sheetThicknessMm} mm · {t('layout.modules18')}: {modules}
+            </Text>
+          </Group>
+          <Text size="xs" c="dimmed" mt={4}>
+            {t('layout.customHint')}
           </Text>
-          <Stack gap={4}>
-            <KeyVal k={t('layout.overall')} v={`${widthMm} × ${heightMm} × ${depthMm} mm`} />
-            <KeyVal k={t('layout.sheetThickness')} v={`${sheetThicknessMm} mm`} />
-            <KeyVal k={t('layout.dinRows')} v={`${rows}`} />
-            <KeyVal k={t('layout.modules18')} v={`${modules}`} />
-          </Stack>
         </Card>
         <Card withBorder radius="md" padding="md">
           <Text fw={600} size="sm" mb="xs">
