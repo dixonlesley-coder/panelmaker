@@ -150,7 +150,7 @@ shared on-disk DB.
 
 ## Implemented feature set (current progress)
 
-Active branch: `claude/trusting-lovelace-fflrn3`; last published release **v0.1.43**; full suite green.
+Active branch: `claude/affectionate-turing-us1h8z`; last published release **v0.3.1**; suite at 572 tests, green.
 
 - **Sizing engine (PUIL/IEC):** load current (1ph/3ph), derating, cable sizing
   (`Iz ≥ max(In, 1.25·Ib)` + minimums + voltage drop), breaker (MCB/MCCB), busbar
@@ -434,6 +434,48 @@ box for the feeder arrow (Roboto has no `→`). Reworked into proper plotted dra
   but **no arrow glyphs** — verified against the bundled `vfs_fonts` cmap.
 - Verified by rendering the generated PDF to images (pypdfium2) since the GUI can't run headless.
   Suite at **489 tests** (new `drawing.test.ts` cases for the sheet builders + `pdfGlyphs`).
+
+### Tier-1 protection/derating + ease-of-use overhaul (branch `claude/affectionate-turing-us1h8z`, released v0.3.0)
+
+- **Protection/derating correctness:** per-run cable laying (`CircuitInput.laying 'air'|'ground'`,
+  default in-air; `PanelInput.groundTempC`/`depthM`) drives ground-temp × depth derating for buried
+  runs (`engine/derating.ts`); new checks — `no-instantaneous-trip`, `phase-conductor-withstand`,
+  TT `touch-voltage-exceeds-limit` (IEC 60364-4-41 RA·IDn ≤ 50 V), MV `transformer-inrush-sag`.
+  New result fields `CircuitResult.{minFaultA,instantaneousTrips,phaseWithstandOk}`,
+  `EarthingResult.touchVoltage`, `SupplyResult.inrush`. DB columns `circuits.laying`,
+  `panels.ground_temp_c`/`depth_m` (schema + migrate ALTER + mappers).
+- **Supreme cable ampacity (`standards/conductors.ts`, STANDARDS_VERSION 'PUIL2011-rev2'):** KHA set
+  to Supreme NYY 3-core (air→B1/C/E, ground→D) + per-type tables (NYY 2C, NYM, NYA pipe/air);
+  `cableKha(section, {family, threePhase, installMethod})`; `CableSizingInput.cableFamily`.
+- **Ease of use (priority):** getting-started **onboarding checklist** (`features/onboarding`, clickable
+  steps), **beginner mode** (default-ON first run; hides advanced fields, collapses editor sections,
+  plain-language field labels + a glossary tooltip), **Help & guidance** card in Preferences (re-show
+  onboarding + explained beginner toggle), **load calculators** (lighting fixtures / appliances) in the
+  circuit editor, **cable-only editor** when double-clicking a cable, and **left-drag pans** the canvas
+  (was the CAD `selectionOnDrag` scheme; Shift-drag box-selects, scroll/Ctrl-scroll zooms — the canvas
+  guide text matches). Pricelist screen gained a **template download + currently-priced table**.
+- **Legibility (both diagram canvases + reports, light & dark):** the systematic fixes were (a) status
+  chips no longer shrink before their text (`flexShrink:0` — panel-header badges, fault-levels kA,
+  busbar ampacity) so the NAME truncates instead; (b) React-Flow default white edge labels themed to
+  the canvas (`EDGE_LABEL_BASE`/`edgeLabelBg` on the single-line AC/DC, `labelChip` on the power
+  one-line); (c) the TCC coordination plot dark-themed on screen (`TCC_DARK_PALETTE`) while export
+  stays print-white; (d) load-node names wrap to two lines.
+- **Click-to-locate issues:** clicking an Issues-drawer row centres the canvas on the offending circuit's
+  load node (or the panel) and pulse-highlights it (`focusRequest` store action → `setCenter` + the
+  `sld-locate` CSS pulse). SystemView's canvas tabs are now controlled so a locate lands on the Single-line.
+
+### Canvas drag/layout + viewport (same branch, released v0.3.1)
+
+- **Canvas fills the viewport:** the single-line container is `h="max(560px, calc(100vh - 220px))"` —
+  the old `clamp(..., 880px)` capped it and left dead space on tall screens.
+- **Drag a panel to reorder its siblings:** on `onNodeDragStop`, a child panel's parent re-sorts its
+  **feeder breakers** to match the children's left→right (vertical) / top→bottom (horizontal) order, then
+  the tree **re-tidies** (`tidyRequested` ref → the node-sync effect force-resets positions + fits). Because
+  each feeder leaves from its breaker's own column, matching column order to panel order means **sibling
+  feeders never cross**. A no-op nudge just snaps the panel back to its tidy slot (no free-form pinning).
+- **Centered feeder/load connections:** the busbar SVG is inset by the card's `CARD_PAD` (10 px), so the
+  per-way handles + load/control child nodes (placed in node-outer-box coords) now add `CARD_PAD` to line
+  up dead-centre under the breakers (the load-reorder hit-test subtracts it to match).
 
 ## README
 
