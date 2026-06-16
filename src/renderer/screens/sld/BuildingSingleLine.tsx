@@ -176,6 +176,11 @@ const LEFT = 76; // left gutter: rail id pill + its value (R-S-T amps, N/PE mm²
 // 68%") clear the neighbouring column — 76 px packed them illegibly.
 const WAY_W = 108;
 const RIGHT_PAD = 16;
+// The panel card's inner padding. The busbar schematic (where breakers are drawn
+// at colX(i)) is inset by this, so the per-way handles + load/control child nodes
+// — placed relative to the node's OUTER box — must add it back to line up under
+// the breakers (otherwise the feeder/load drop connects a card-padding off-centre).
+const CARD_PAD = 10;
 const INCOMER_Y = 8;
 const INCOMER_H = 26;
 const BUS_TOP_Y = 92; // y of the first (L1) phase bar
@@ -1043,7 +1048,7 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
           : hover
             ? 'var(--mantine-shadow-md)'
             : 'var(--mantine-shadow-sm)',
-        padding: 10,
+        padding: CARD_PAD,
         transition: 'box-shadow 120ms ease, border-color 120ms ease',
       }}
       onDragOver={(e) => {
@@ -1180,7 +1185,7 @@ function UnifiedPanelNode({ data, selected }: NodeProps) {
       {/* A source anchor per way at its MCB column — feeder edges go to sub-panels,
           load edges go to the external load node. Not for starting new connections. */}
       {d.ways.map((w, i) => {
-        const left = LEFT + i * WAY_W + WAY_W / 2;
+        const left = CARD_PAD + LEFT + i * WAY_W + WAY_W / 2;
         return <Handle key={w.id} type="source" id={w.id} position={Position.Bottom} style={{ left }} isConnectable={false} />;
       })}
       {/* Outlet: drag from here onto another panel to feed it (creates the feeder).
@@ -2100,7 +2105,7 @@ function buildUnified(
         // panel schematic IS the representation — no external load node.
         if (wy.kind === 'spare') return;
         const loadId = `load-${wy.id}`;
-        const wayCx = LEFT + i * WAY_W + WAY_W / 2;
+        const wayCx = CARD_PAD + LEFT + i * WAY_W + WAY_W / 2;
         nodes.push({
           id: loadId,
           type: 'load',
@@ -2164,7 +2169,7 @@ function buildUnified(
           .map((mid) => ways.findIndex((wy) => wy.id === mid && !wy.feeds && wy.kind !== 'spare'))
           .filter((idx) => idx >= 0);
         if (memberIdx.length === 0) return;
-        const centers = memberIdx.map((idx) => LEFT + idx * WAY_W + WAY_W / 2);
+        const centers = memberIdx.map((idx) => CARD_PAD + LEFT + idx * WAY_W + WAY_W / 2);
         const avgX = centers.reduce((s, c) => s + c, 0) / centers.length;
         const ctlId = `pgctl-${g.id}`;
         nodes.push({
@@ -2736,7 +2741,7 @@ export function BuildingSingleLine({ system }: { system: SystemResult }) {
         if (!panel || !cid) return;
         const count = panel.circuits.length;
         const cx = node.position.x + LOAD_W / 2;
-        const target = Math.max(0, Math.min(count - 1, Math.round((cx - LEFT - WAY_W / 2) / WAY_W)));
+        const target = Math.max(0, Math.min(count - 1, Math.round((cx - CARD_PAD - LEFT - WAY_W / 2) / WAY_W)));
         const ids = panel.circuits.map((c) => c.id);
         const from = ids.indexOf(cid);
         if (from !== -1 && from !== target) {
