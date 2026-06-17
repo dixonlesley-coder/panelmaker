@@ -1665,11 +1665,16 @@ function FeederEdge({
             title="Double-click to edit this feeder cable (length, size)"
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              // A vertical load drop puts its label to the RIGHT of the wire (left
+              // edge a few px clear of the line) so the cable never runs through the
+              // text; feeders keep the label centred on their horizontal run.
+              transform: data?.drop
+                ? `translate(9px, -50%) translate(${labelX}px, ${labelY}px)`
+                : `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               fontSize: 11,
               fontWeight: 700,
               lineHeight: 1.15,
-              textAlign: 'center',
+              textAlign: data?.drop ? 'left' : 'center',
               background: 'var(--mantine-color-body)',
               padding: '1px 5px',
               borderRadius: 4,
@@ -2153,7 +2158,10 @@ function buildUnified(
             util: wy.util,
             panelId: id,
             circuitId: wy.id,
-            // Alternate the label height a little so adjacent drops never collide.
+            // A vertical drop: place the label BESIDE the wire (not centred on it)
+            // so the cable line never runs through the text. Alternate the height a
+            // little so adjacent drops never collide.
+            drop: true,
             offset: i % 2 === 0 ? 4 : 20,
           },
         });
