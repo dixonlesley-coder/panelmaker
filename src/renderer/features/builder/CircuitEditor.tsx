@@ -234,6 +234,7 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
   const removeCircuit = useProjectStore((s) => s.removeCircuit);
   const parts = useProjectStore((s) => s.parts);
   const preferredBrand = useProjectStore((s) => s.preferredBrand);
+  const panel = useProjectStore((s) => s.project.panels.find((p) => p.id === panelId));
   const patch = (p: Partial<CircuitInput>) => updateCircuit(panelId, circuit.id, p);
   const motor = isMotorKind(circuit.loadKind);
   // Feeders are three-phase by topology — offering a phase override would lie.
@@ -266,6 +267,24 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
       reasons.push(t('circuitEditor.whyCableVd', { csa, limit: result.voltageDrop.limitPercent }));
     } else {
       reasons.push(t('circuitEditor.whyCableAmpacity', { csa, iz: formatAmps(result.cable.deratedIzA) }));
+    }
+    // Explain WHY the ampacity is below the catalogue figure when grouping/ambient
+    // derates it — otherwise a derated upsize (e.g. 20 A → 4 mm²) looks wrong vs the
+    // base table. Only for MEANINGFUL derating (grouping, or a hot ambient) so the
+    // note stays quiet at the default single-circuit / mild-ambient case.
+    if (
+      !result.cable.overridden &&
+      ((panel?.groupingCount ?? 1) > 1 || result.cable.deratingFactor < 0.9)
+    ) {
+      reasons.push(
+        t('circuitEditor.whyDerated', {
+          pct: Math.round(result.cable.deratingFactor * 100),
+          base: formatAmps(result.cable.baseKhaA),
+          iz: formatAmps(result.cable.deratedIzA),
+          grouping: panel?.groupingCount ?? 1,
+          ambient: panel?.ambientTempC ?? 30,
+        }),
+      );
     }
   }
 

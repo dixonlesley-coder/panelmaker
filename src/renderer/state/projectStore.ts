@@ -805,9 +805,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
         name: uniquePanelName(s.project.panels, 'New panel'),
         system,
         voltageV: system === '1ph' ? 230 : 400,
+        // No grouping derating assumed by default — cables match the catalogue /
+        // PUIL base rating (e.g. 20 A → 2.5 mm²). Set the grouping count per panel
+        // when several circuits actually share a conduit/trunk (IEC 60364-5-52).
         ambientTempC: 35,
         installMethod: 'conduit',
-        groupingCount: 3,
+        groupingCount: 1,
         diversityFactor: 0.8,
         sourceType: 'utility',
         circuits: [],

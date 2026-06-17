@@ -1184,6 +1184,7 @@ export const en = {
     whyBreaker: 'Breaker {{rating}} A — smallest standard rating at or above the {{design}} design current.',
     whyBreakerManual: 'Breaker {{rating}} A — manual override.',
     whyCableAmpacity: 'Cable {{csa}} mm² — set by ampacity: the derated Iz {{iz}} carries the load.',
+    whyDerated: 'Ampacity derated to {{pct}}% (base {{base}} → {{iz}}) for {{grouping}}-circuit grouping at {{ambient}} °C — fewer grouped circuits or a lower ambient (Panel settings) allow a smaller cable.',
     whyCableVd: 'Cable {{csa}} mm² — upsized past the ampacity minimum to keep voltage drop within {{limit}}%.',
     whyCableManual: 'Cable {{csa}} mm² — manual minimum pinned.',
     device: 'Device',

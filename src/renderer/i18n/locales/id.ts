@@ -1189,6 +1189,7 @@ export const id: TranslationKeys = {
     whyBreaker: 'Pemutus {{rating}} A — rating standar terkecil pada atau di atas arus desain {{design}}.',
     whyBreakerManual: 'Pemutus {{rating}} A — penggantian manual.',
     whyCableAmpacity: 'Kabel {{csa}} mm² — ditentukan kapasitas hantar: Iz terderating {{iz}} mampu memikul beban.',
+    whyDerated: 'KHA diderating ke {{pct}}% (dasar {{base}} → {{iz}}) untuk pengelompokan {{grouping}} sirkit pada {{ambient}} °C — kurangi jumlah sirkit terkelompok atau suhu ambien (Pengaturan panel) agar kabel lebih kecil.',
     whyCableVd: 'Kabel {{csa}} mm² — diperbesar melebihi minimum kapasitas agar jatuh tegangan tetap dalam {{limit}}%.',
     whyCableManual: 'Kabel {{csa}} mm² — minimum manual disematkan.',
     device: 'Perangkat',

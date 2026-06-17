@@ -24,7 +24,7 @@ function panel(p: Partial<PanelInput> & { name: string; circuits: CircuitInput[]
     voltageV: 400,
     ambientTempC: 35,
     installMethod: 'conduit',
-    groupingCount: 3,
+    groupingCount: 1,
     diversityFactor: 0.8,
     sourceType: 'utility',
     ...p,
