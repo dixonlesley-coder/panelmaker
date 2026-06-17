@@ -49,6 +49,9 @@ python scripts/extract_catalogue.py --pdf catalogue.pdf --inspect 1-20  # debug 
    branches but NOT tags (HTTP 403) — the workflow creates and pushes the `vX.Y.Z` tag itself.
 4. Verify: the run concludes `success` AND the release at that tag carries all three assets —
    `PanelMaker-X.Y.Z-setup.exe`, its `.blockmap`, and `latest.yml` (the auto-update feed).
+5. **ALWAYS update this `CLAUDE.md` after every version** (user standing instruction): bump the
+   status line below (active branch · last published release · test count) and add a short
+   feature-batch entry for what shipped. Commit + push it with (or right after) the release.
 
 **Version number is Claude's call** (user-delegated): patch (`0.1.x`) for fixes/small UX
 batches, minor (`0.x.0`) when a batch meaningfully expands the design domain (new engineering
@@ -150,7 +153,7 @@ shared on-disk DB.
 
 ## Implemented feature set (current progress)
 
-Active branch: `claude/affectionate-turing-us1h8z`; last published release **v0.3.1**; suite at 572 tests, green.
+Active branch: `claude/affectionate-turing-us1h8z`; last published release **v0.4.0**; suite at 574 tests, green.
 
 - **Sizing engine (PUIL/IEC):** load current (1ph/3ph), derating, cable sizing
   (`Iz ≥ max(In, 1.25·Ib)` + minimums + voltage drop), breaker (MCB/MCCB), busbar
@@ -476,6 +479,39 @@ box for the feeder arrow (Roboto has no `→`). Reworked into proper plotted dra
 - **Centered feeder/load connections:** the busbar SVG is inset by the card's `CARD_PAD` (10 px), so the
   per-way handles + load/control child nodes (placed in node-outer-box coords) now add `CARD_PAD` to line
   up dead-centre under the breakers (the load-reorder hit-test subtracts it to match).
+
+### Warning correctness, custom enclosure, label/sizing polish (same branch, v0.3.2 → v0.3.6)
+
+- **False-positive warning fixes (v0.3.2):** `phase-conductor-withstand` used a fixed 100 ms clearing time
+  for ALL devices — MCBs are current-limiting and protect their `Iz≥In` cable, so they now pass (the
+  adiabatic check stays for MCCB branches); `phase-imbalance` now only fires when moving a single-phase
+  circuit could actually reduce the spread (not for two 1φ loads on a 3φ board — structurally unavoidable).
+- **Custom enclosure sizing (v0.3.2):** `PanelInput.enclosure?{widthMm,heightMm,depthMm,rows}` override
+  (DB `panels.enclosure_json`); editable W/H/D/DIN-rows on the Layout tab (`estimateEnclosure` re-flows gear
+  across rows when width/rows are pinned; `enclosure-too-small` warns when it can't fit; thermal auto-grow
+  respects pinned dims — v0.3.3).
+- **Warning-logic audit (v0.3.3):** `pe-undersized-adiabatic` made consistent with the phase fix (MCBs pass —
+  same conductor, lower earth fault); the rest of the ~45 warnings reviewed and confirmed sound (arc-flash's
+  conservative clearing times are deliberate — safe direction for PPE).
+- **Cleaner drop-cable labels (v0.3.4):** single-line cable spec only (loading % already on the load node),
+  offset BESIDE the wire (`data.drop` flag in `FeederEdge`) so the line never runs through the label.
+- **Default 1 cable per conduit (v0.3.5):** new panels seed `groupingCount: 1` (was 3) so cable sizing matches
+  the Supreme/PUIL **base** rating (20 A → 2.5 mm²); grouping derating is opt-in per panel where cables share a
+  conduit. The circuit editor's "why these sizes" note now spells out any grouping/ambient derating
+  (`circuitEditor.whyDerated`). **Bulk control (v0.3.6):** Service & Earthing → "Cables per conduit (all
+  panels)" sets every panel's grouping at once (`setAllPanelsGrouping`, one undo step).
+
+### Air-conditioning modelling (same branch, released v0.4.0)
+
+- **PK ratings + compressor inrush (`standards/aircon.ts`):** AC units pick by **PK** (cooling capacity) →
+  electrical input W (`AC_PK_RATINGS_1PH`/`_3PH`, `acInputW`); a **Cooling capacity** selector in the circuit
+  editor auto-fills `loadW`. Every `hvac` load now reports `CircuitResult.startingCurrentA` = running ×
+  `AC_COMPRESSOR_INRUSH` (~5× locked-rotor), shown in the editor — the compressor surge, not just steady draw.
+- **Separate outdoor/indoor cards:** palette gains **AC outdoor (cond.)** (3φ `hvac`, gets the inrush) and
+  **AC indoor (FCU)** (small fan `general` load) for ducted/VRF jobs where condenser and FCU are separate
+  feeds; the simple **Air-con (1φ/3φ)** cards stay for splits (indoor interconnected from the outdoor).
+- **VRF / central-AC panel template:** outdoor condensing units (with inrush) + an AHU VFD fan + indoor FCU
+  groups as their own circuits, in one click.
 
 ## README
 
