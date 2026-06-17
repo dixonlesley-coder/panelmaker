@@ -2135,9 +2135,11 @@ function buildUnified(
             onContext: (mx: number, my: number) => onContextCircuit(id, wy.id, mx, my),
           },
         });
-        // Label the drop cable with its size (+ loading %), like the feeders — and
-        // make double-clicking the line open the cable editor for that circuit.
-        const loadLabel = wy.util !== undefined ? `${wy.cable} · ${wy.util}%` : wy.cable;
+        // Label the drop cable with its size only — the loading % already sits on
+        // the load node ("6A · 46%") and the breaker rating on the busbar, so each
+        // fact reads once. A single line (no longer the two-line size+% stack) keeps
+        // a row of drops tidy; double-clicking the line opens the cable editor.
+        const loadLabel = wy.cable;
         edges.push({
           id: `e-${loadId}`,
           source: id,
@@ -2151,9 +2153,7 @@ function buildUnified(
             util: wy.util,
             panelId: id,
             circuitId: wy.id,
-            // Stack the drop label onto two lines so a row of narrow loads never
-            // collides; still alternate the height a little for extra clearance.
-            stack: true,
+            // Alternate the label height a little so adjacent drops never collide.
             offset: i % 2 === 0 ? 4 : 20,
           },
         });
