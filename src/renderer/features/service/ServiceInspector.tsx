@@ -39,6 +39,7 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
   const { t } = useTranslation();
   const project = useProjectStore((s) => s.project);
   const updatePanel = useProjectStore((s) => s.updatePanel);
+  const setAllPanelsGrouping = useProjectStore((s) => s.setAllPanelsGrouping);
   const setEarthingSystem = useProjectStore((s) => s.setEarthingSystem);
   const setProjectMeta = useProjectStore((s) => s.setProjectMeta);
   const setSiteConditions = useProjectStore((s) => s.setSiteConditions);
@@ -251,6 +252,17 @@ export function ServiceInspector({ opened, onClose }: { opened: boolean; onClose
             decimalScale={2}
             value={project.meta?.targetPf ?? 0.95}
             onChange={(v) => setProjectMeta({ targetPf: typeof v === 'number' ? v : 0.95 })}
+          />
+          {/* Project-wide convenience: bulk-set the grouping (cables-per-conduit)
+              count on every panel. 1 = each cable in its own conduit (no bunching
+              derating → catalogue base ampacity). */}
+          <NumberInput
+            label={t('service.grouping')}
+            description={t('service.groupingHint')}
+            min={1}
+            max={20}
+            value={root?.groupingCount ?? 1}
+            onChange={(v) => typeof v === 'number' && setAllPanelsGrouping(v)}
           />
         </Stack>
 

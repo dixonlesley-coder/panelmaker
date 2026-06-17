@@ -236,6 +236,8 @@ export interface ProjectState {
 
   // panel editing
   updatePanel: (panelId: string, patch: Partial<PanelInput>) => void;
+  /** Bulk-set the grouping (cables-per-conduit) count on EVERY panel (one undo step). */
+  setAllPanelsGrouping: (count: number) => void;
   /** Append a blank standalone panel; returns its id (so the canvas can place it). */
   addPanel: (system?: SystemType) => string;
   /**
@@ -794,6 +796,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
         s,
         (project) => mapPanel(project, panelId, (panel) => ({ ...panel, ...patch })),
         `p:${panelId}:${Object.keys(patch).sort().join('+')}`,
+      ),
+    ),
+
+  setAllPanelsGrouping: (count) =>
+    set((s) =>
+      withHistory(
+        s,
+        (project) => ({
+          ...project,
+          panels: project.panels.map((p) => ({ ...p, groupingCount: Math.max(1, Math.round(count)) })),
+        }),
+        'all-panels-grouping',
       ),
     ),
 

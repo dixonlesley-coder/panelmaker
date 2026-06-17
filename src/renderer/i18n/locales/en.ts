@@ -66,6 +66,8 @@ export const en = {
     occupancyHint: 'Sets standard diversity & demand factors.',
     occupancyNone: 'Not set',
     targetPf: 'Target power factor',
+    grouping: 'Cables per conduit (all panels)',
+    groupingHint: 'How many circuits share one conduit/trunk. 1 = each cable in its own conduit (no bunching derating → catalogue ampacity). Applies to every panel.',
     sources: 'Energy sources',
     configureSources: 'Configure…',
     generator: 'Generator backup',

@@ -69,6 +69,8 @@ export const id: TranslationKeys = {
     occupancyHint: 'Menetapkan faktor diversitas & permintaan standar.',
     occupancyNone: 'Belum diatur',
     targetPf: 'Target faktor daya',
+    grouping: 'Kabel per konduit (semua panel)',
+    groupingHint: 'Berapa sirkit berbagi satu konduit/trunk. 1 = tiap kabel di konduitnya sendiri (tanpa derating pengelompokan → KHA katalog). Berlaku untuk semua panel.',
     sources: 'Sumber energi',
     configureSources: 'Atur…',
     generator: 'Cadangan genset',
