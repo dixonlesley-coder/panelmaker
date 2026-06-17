@@ -109,9 +109,13 @@ const PALETTE_GROUPS: { key: PaletteGroup; labelKey: string }[] = [
 const SLD_PALETTE: { key: string; labelKey: string; icon: React.ReactNode; action: SldAdd; group: PaletteGroup }[] = [
   { key: 'lighting', labelKey: 'vbuilder.lighting', group: 'loads', icon: <IconBulb size={14} />, action: loadCard('lighting', 'vbuilder.lighting', { loadW: 1200 }) },
   { key: 'socket', labelKey: 'vbuilder.sockets', group: 'loads', icon: <IconPlug size={14} />, action: loadCard('socket', 'vbuilder.sockets', { loadW: 2000 }) },
-  // Air-conditioning split by supply phase: a 1φ split unit vs a 3φ package/VRF.
+  // Air-conditioning: a 1φ split unit, a 3φ package/VRF, and — for ducted/VRF
+  // jobs — the outdoor condenser (compressor, has start inrush) and the indoor
+  // FCU/AHU fan as SEPARATE circuits (each its own panel feed).
   { key: 'hvac1', labelKey: 'vbuilder.hvac1ph', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac1ph', { loadW: 2500, phases: 1 }) },
   { key: 'hvac3', labelKey: 'vbuilder.hvac3ph', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.hvac3ph', { loadW: 5500, phases: 3 }) },
+  { key: 'acOutdoor', labelKey: 'vbuilder.acOutdoor', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('hvac', 'vbuilder.acOutdoor', { loadW: 2800, phases: 3 }) },
+  { key: 'acIndoor', labelKey: 'vbuilder.acIndoor', group: 'loads', icon: <IconAirConditioning size={14} />, action: loadCard('general', 'vbuilder.acIndoor', { loadW: 150, phases: 1 }) },
   // Resistive water heater — hotels/apartments/restaurants; no-neutral when 3φ.
   { key: 'waterHeater1', labelKey: 'vbuilder.waterHeater1ph', group: 'loads', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.waterHeater1ph', { loadW: 3000, phases: 1 }) },
   { key: 'waterHeater3', labelKey: 'vbuilder.waterHeater3ph', group: 'loads', icon: <IconFlame size={14} />, action: loadCard('heating', 'vbuilder.waterHeater3ph', { loadW: 9000, phases: 3 }) },

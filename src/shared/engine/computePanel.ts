@@ -1,6 +1,7 @@
 import { STANDARDS_VERSION } from '../standards/version';
 import { DIN_MODULE_WIDTH_MM, sheetThicknessMm } from '../standards/enclosure';
 import { LOAD_DEFAULTS } from '../standards/loads';
+import { AC_COMPRESSOR_INRUSH } from '../standards/aircon';
 import { STANDARD_SECTIONS_MM2, CABLE_FAMILIES, type CableFamily } from '../standards/conductors';
 import { selectBuswayRating } from '../standards/busway';
 import {
@@ -312,6 +313,14 @@ function computeCircuit(
     control,
     containment,
   };
+
+  // AC outdoor (compressor) start inrush: a hermetic compressor started direct-on-
+  // line draws ~5× its running current for a moment (locked-rotor). Surface it so
+  // the breaker curve + any source dip account for the compressor, not just the
+  // steady draw. (Indoor FCU fans are small and not flagged.)
+  if (c.loadKind === 'hvac' && !isFeeder && designCurrentA > 0) {
+    result.startingCurrentA = round(designCurrentA * AC_COMPRESSOR_INRUSH, 0);
+  }
 
   // Busbar trunking (busway) feeder: report a standard busway rating and label
   // the run as busway rather than a cable make-up (the riser for tall buildings).

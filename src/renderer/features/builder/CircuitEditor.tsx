@@ -36,6 +36,7 @@ import {
   presetKeyFor,
 } from '@shared/standards';
 import type { FixturePreset } from '@shared/standards/fixtures';
+import { AC_PK_RATINGS_1PH, AC_PK_RATINGS_3PH, acInputW } from '@shared/standards/aircon';
 import { derivedPointsLoadW } from '@shared/engine/fixtures';
 import { STANDARD_SECTIONS_MM2 } from '@shared/standards/conductors';
 import { circuitOrderCodes } from '@shared/engine/bom';
@@ -529,6 +530,37 @@ export function CircuitEditor({ panelId, circuit, result, focus, opened, onClose
             />
           </>
         )}
+
+        {/* AC: pick the unit by PK rating (auto-fills the electrical input), and
+            show the compressor start inrush. */}
+        {circuit.loadKind === 'hvac' && (() => {
+          const acThreePhase = circuit.phases === 3 || result?.phase === '3ph';
+          const table = acThreePhase ? AC_PK_RATINGS_3PH : AC_PK_RATINGS_1PH;
+          const currentPk = table.find((r) => r.inputW === circuit.loadW)?.pk;
+          return (
+            <>
+              <Divider label={t('acCalc.title')} />
+              <Select
+                label={t('acCalc.pk')}
+                description={t('acCalc.pkHint')}
+                data={table.map((r) => ({ value: String(r.pk), label: `${r.pk} PK · ~${r.inputW} W` }))}
+                value={currentPk !== undefined ? String(currentPk) : null}
+                placeholder={t('acCalc.custom')}
+                allowDeselect={false}
+                comboboxProps={{ withinPortal: true }}
+                onChange={(v) => v && patch({ loadW: acInputW(Number(v), acThreePhase) })}
+              />
+              {result?.startingCurrentA !== undefined && (
+                <Text size="xs" c="dimmed">
+                  {t('acCalc.inrush', {
+                    lra: formatAmps(result.startingCurrentA),
+                    rla: formatAmps(result.designCurrentA),
+                  })}
+                </Text>
+              )}
+            </>
+          );
+        })()}
           </>
         )}
 

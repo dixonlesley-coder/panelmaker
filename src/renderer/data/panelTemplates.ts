@@ -276,6 +276,60 @@ function elevatorPanel(): PanelInput {
   });
 }
 
+/**
+ * VRF / ducted central-AC board: the outdoor condensing units (compressors —
+ * 3φ, with the start-inrush the engine flags on `hvac` loads), an AHU supply fan
+ * on a VFD, and the indoor FCU fan-coil groups as their OWN circuits — the split
+ * a ducted/VRF system actually wires (each condenser + each FCU bank fed
+ * separately), rather than one lumped "air-con" load.
+ */
+function vrfAcPanel(): PanelInput {
+  return panel({
+    name: 'VRF / central AC panel',
+    occupancy: 'commercial',
+    circuits: [
+      branch({
+        name: 'Outdoor condensing unit 1 (10 PK)',
+        loadKind: 'hvac',
+        loadW: 9200,
+        cosPhi: 0.85,
+        demandFactor: 0.9,
+        lengthM: 25,
+      }),
+      branch({
+        name: 'Outdoor condensing unit 2 (8 PK)',
+        loadKind: 'hvac',
+        loadW: 7400,
+        cosPhi: 0.85,
+        demandFactor: 0.9,
+        lengthM: 30,
+      }),
+      branch({
+        name: 'AHU supply fan (VFD)',
+        loadKind: 'motor',
+        motorKw: 4,
+        starterType: 'VFD',
+        startingDuty: 'normal',
+        lengthM: 20,
+      }),
+      branch({
+        name: 'Indoor FCU group A',
+        loadKind: 'general',
+        loadW: 1200,
+        cosPhi: 0.9,
+        lengthM: 28,
+      }),
+      branch({
+        name: 'Indoor FCU group B',
+        loadKind: 'general',
+        loadW: 1200,
+        cosPhi: 0.9,
+        lengthM: 32,
+      }),
+    ],
+  });
+}
+
 /** The catalog of available panel templates, in picker order. */
 export const PANEL_TEMPLATES: readonly PanelTemplate[] = [
   {
@@ -307,6 +361,12 @@ export const PANEL_TEMPLATES: readonly PanelTemplate[] = [
     label: 'Elevator / lift machine room',
     description: 'VFD hoist motor (heavy duty) with car/shaft/pit lighting, socket and ventilation.',
     build: elevatorPanel,
+  },
+  {
+    id: 'vrf-ac',
+    label: 'VRF / central AC panel',
+    description: 'Outdoor condensing units (compressor inrush), an AHU fan on VFD, and indoor FCU groups as separate circuits.',
+    build: vrfAcPanel,
   },
 ];
 

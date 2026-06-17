@@ -180,6 +180,8 @@ export interface CircuitResult {
   instantaneousTrips?: boolean;
   /** True when the PHASE conductor meets the adiabatic short-circuit withstand. */
   phaseWithstandOk?: boolean;
+  /** Compressor/motor start inrush (A) for AC outdoor units — running × LRA factor. */
+  startingCurrentA?: number;
   /** Conduit-fill sizing for this circuit's cable. See `engine/containment`. */
   containment?: ContainmentResult;
   /** When the feeder runs as busbar trunking (busway): its standard rating (A). */

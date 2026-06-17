@@ -1103,6 +1103,8 @@ export const en = {
     hvac: 'Air conditioning',
     hvac1ph: 'Air-con (1φ)',
     hvac3ph: 'Air-con (3φ)',
+    acOutdoor: 'AC outdoor (cond.)',
+    acIndoor: 'AC indoor (FCU)',
     heating: 'Water heater',
     waterHeater1ph: 'Water heater (1φ)',
     waterHeater3ph: 'Water heater (3φ)',
@@ -1174,6 +1176,13 @@ export const en = {
     add: 'Add appliance',
     empty: 'Add appliances (fridge, TV, kettle…) or general socket points to auto-calculate the load.',
     custom: 'Custom appliance',
+  },
+  acCalc: {
+    title: 'AC unit (PK)',
+    pk: 'Cooling capacity',
+    pkHint: 'Sets the electrical input from the PK rating (verify against the unit nameplate).',
+    custom: 'Custom (set kW directly)',
+    inrush: 'Compressor start inrush ≈ {{lra}} (~5× running {{rla}}) — a brief locked-rotor surge on start.',
   },
   circuitEditor: {
     design: 'Design current',

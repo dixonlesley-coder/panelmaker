@@ -1108,6 +1108,8 @@ export const id: TranslationKeys = {
     hvac: 'Pendingin udara',
     hvac1ph: 'AC (1φ)',
     hvac3ph: 'AC (3φ)',
+    acOutdoor: 'AC outdoor (kond.)',
+    acIndoor: 'AC indoor (FCU)',
     heating: 'Pemanas air',
     waterHeater1ph: 'Pemanas air (1φ)',
     waterHeater3ph: 'Pemanas air (3φ)',
@@ -1179,6 +1181,13 @@ export const id: TranslationKeys = {
     add: 'Tambah peralatan',
     empty: 'Tambahkan peralatan (kulkas, TV, ketel…) atau titik stop kontak umum untuk menghitung beban otomatis.',
     custom: 'Peralatan khusus',
+  },
+  acCalc: {
+    title: 'Unit AC (PK)',
+    pk: 'Kapasitas pendinginan',
+    pkHint: 'Mengatur daya input listrik dari rating PK (verifikasi dengan pelat nama unit).',
+    custom: 'Khusus (atur kW langsung)',
+    inrush: 'Arus start kompresor ≈ {{lra}} (~5× arus jalan {{rla}}) — lonjakan rotor-terkunci sesaat saat start.',
   },
   circuitEditor: {
     design: 'Arus desain',
