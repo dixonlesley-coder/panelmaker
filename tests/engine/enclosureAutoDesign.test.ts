@@ -66,6 +66,19 @@ describe('enclosure thermal auto-design', () => {
     );
   });
 
+  it('honours a PINNED enclosure size instead of growing it (warns if it runs hot)', () => {
+    // A hot board with a manually-sized enclosure: the thermal auto-grow must NOT
+    // push it past the user's room constraint — it keeps the pinned dimensions and
+    // warns (enclosure-overtemp) if it can't shed the heat at that size.
+    const hot = Array.from({ length: 8 }, (_, i) => vfdMotor(`m${i}`, 18.5));
+    const r = computePanel({ ...panel(hot), enclosure: { widthMm: 600, heightMm: 600 } });
+    expect(r.enclosure.widthMm).toBe(600);
+    expect(r.enclosure.heightMm).toBe(600);
+    if (r.enclosure.thermal?.withinLimit === false) {
+      expect(r.warnings.some((w) => w.code === 'enclosure-overtemp')).toBe(true);
+    }
+  });
+
   it('a heat load beyond all escalation still warns (split-the-board case)', () => {
     // 20 large VFDs in one assembly: multi-kW of heat defeats the 2.2×1.6 m
     // cabinet ceiling — the engine must keep telling the truth here.

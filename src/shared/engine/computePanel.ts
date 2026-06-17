@@ -366,6 +366,15 @@ function computeCircuit(
     result.earthFaultA = zs.earthFaultA;
     result.peMinAdiabaticMm2 = zs.peMinAdiabaticMm2;
     result.peAdiabaticOk = zs.peAdiabaticOk;
+    // Consistent with the phase-conductor withstand below: an MCB is current-
+    // limiting and type-tested to protect its conductors, a branch PE is sized
+    // = phase CSA, and it sees a LOWER (earth) fault than the phase — so the
+    // standard-sized PE on an MCB is protected. The adiabatic check at the
+    // 0.1 s method-floor would otherwise over-flag a stiff bus. Keep the
+    // conservative check for the (rarer) MCCB, whose let-through can be larger.
+    if (result.breaker.deviceClass !== 'MCCB' && result.peAdiabaticOk === false) {
+      result.peAdiabaticOk = true;
+    }
 
     // Minimum (line-neutral) prospective fault at the load end + whether the
     // breaker's magnetic element trips on it; and the PHASE conductor's
@@ -652,7 +661,7 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
     hasFloorGear,
     ...(panel.enclosure ? { override: panel.enclosure } : {}),
   });
-  if (enclosure.fitsModules === false) {
+  if (enclosure.manual === true && enclosure.fitsModules === false) {
     warnings.push({
       code: 'enclosure-too-small',
       severity: 'warning',
@@ -684,9 +693,12 @@ export function computePanel(panel: PanelInput, opts: ComputePanelOptions = {}):
   }
   while (!enclosure.thermal.withinLimit) {
     // Height is cheap wall space — grow it first, then width; stop at practical
-    // cabinet limits (2.2 m tall, 1.6 m wide).
-    if (enclosure.heightMm < 2200) enclosure.heightMm += 100;
-    else if (enclosure.widthMm < 1600) enclosure.widthMm += 100;
+    // cabinet limits (2.2 m tall, 1.6 m wide). A dimension the user PINNED is the
+    // room constraint — never grow past it; just let it warn (enclosure-overtemp).
+    const canGrowH = panel.enclosure?.heightMm === undefined && enclosure.heightMm < 2200;
+    const canGrowW = panel.enclosure?.widthMm === undefined && enclosure.widthMm < 1600;
+    if (canGrowH) enclosure.heightMm += 100;
+    else if (canGrowW) enclosure.widthMm += 100;
     else break;
     enclosure.thermal = verifyThermal();
   }

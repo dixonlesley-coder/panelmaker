@@ -257,7 +257,11 @@ describe('earth-fault loop impedance (Zs) and ADS', () => {
     expect(zs.peAdiabaticOk).toBe(true);
   });
 
-  it('raises a pe-undersized-adiabatic error for a short stub on a stiff bus (TN)', () => {
+  it('does NOT flag pe-undersized-adiabatic for an MCB stub on a stiff bus (current-limiting)', () => {
+    // A small MCB short stub on a stiff bus: checkZs's 0.1 s adiabatic floor would
+    // over-flag, but the MCB is current-limiting and the branch PE is sized = phase
+    // CSA (and sees a lower earth fault than the phase), so it's protected — and the
+    // verdict must match the phase-conductor withstand (no contradiction).
     const project: ProjectInput = {
       id: 'PRJ',
       name: 'B',
@@ -268,8 +272,9 @@ describe('earth-fault loop impedance (Zs) and ADS', () => {
     };
     const sys = computeSystem(project);
     const c = sys.panels['P']!.circuits[0]!;
-    expect(c.peAdiabaticOk).toBe(false);
-    expect(sys.warnings.some((w) => w.code === 'pe-undersized-adiabatic')).toBe(true);
+    expect(c.breaker.deviceClass).toBe('MCB');
+    expect(c.peAdiabaticOk).toBe(true);
+    expect(sys.warnings.some((w) => w.code === 'pe-undersized-adiabatic')).toBe(false);
   });
 
   it('does NOT flag phase-conductor withstand for a small MCB on a correctly-sized cable', () => {
