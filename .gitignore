@@ -24,4 +24,8 @@ machine.id
 scripts/__pycache__/
 
 # Claude Code agent worktrees / local scaffolding (ephemeral)
-/.claude/
+/.claude/*
+# The shared Claude Code permission rules ship with the repo (installed
+# globally by scripts/setup-claude-permissions.sh). Local/ephemeral Claude
+# state stays ignored.
+!/.claude/settings.json
